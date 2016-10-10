@@ -7,8 +7,11 @@
     "test": "test"
   },
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^3.7.1"
+  },
   "scripts": {
+    "lint": "eslint .",
     "test": "node --harmony test"
   },
   "author": "",
