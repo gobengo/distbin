@@ -14,7 +14,7 @@ A networked place to store posted web documents. This is meant to allow for dist
 
 ### Starting the Process
 
-[ ] TODO - make the process
+`./bin/server`
 
 ### Interacting with a running distbin
 

@@ -1,0 +1,11 @@
+#!/usr/bin/env node
+
+const distbin = require('../');
+const http = require('http');
+
+const server = http.createServer(distbin());
+
+// console.log('http://localhost:6511')
+server.listen(0, () => {
+  process.stdout.write('http://localhost:' + server.address().port);
+})
