@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+# Create a Post by issuing an HTTP Request via cURL
+
+# debug
+set -e
+# verbose
+# set -x
+
+collection_url="http://localhost:8000/collection/"
+
+# TODO: Not a good AS2 Post
+request_body=$(cat <<EOF
+
+{
+    "field1": "test",
+    "field2": {
+        "foo": "bar"
+    }
+}
+EOF)
+
+# Make the Request
+curl -XPOST "$collection_url" \
+-H 'Content-Type: text/json; charset=utf-8' \
+-d "$request_body"
+
+# TODO: Consider printing the URL of the Post to stdout
