@@ -11,13 +11,13 @@ const sendRequest = (handler, request) => {
 	let listened;
 	return new Promise((resolve, reject) => {
 		server
-			.once('error', () => {
-				if ( ! listened) reject();
-			})
-			.listen(0, () => {
-				listened = true;
-				resolve();
-			})
+		.once('error', () => {
+			if ( ! listened) reject();
+		})
+		.listen(0, () => {
+			listened = true;
+			resolve();
+		})
 	})
 	.then(() => new Promise((resolve, reject) => {
 		const url = `http://localhost:${server.address().port}`
@@ -57,7 +57,9 @@ if (require.main === module) {
 	Promise.all(
 		// map to array of promises of logged errors
 		// (or falsy if the test passed)
-		Object.entries(tests).map(([testName, runTest]) => {
+		Object.keys(tests)
+		.map((testName) => [testName, tests[testName]])
+		.map(([testName, runTest]) => {
 			function logFailure(err) {
 				console.error(`TEST FAIL: ${testName}\n${err.stack}\n`)
 			}
