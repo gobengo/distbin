@@ -1,0 +1,16 @@
+{
+  "name": "distbin",
+  "version": "1.0.0",
+  "description": "Post bin with distributed social features.",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {
+    "test": "node --harmony test"
+  },
+  "author": "",
+  "license": "ISC"
+}
