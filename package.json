@@ -2,7 +2,7 @@
   "name": "distbin",
   "version": "1.0.0",
   "description": "Post bin with distributed social features.",
-  "main": "index.js",
+  "main": "src",
   "directories": {
     "test": "test"
   },
