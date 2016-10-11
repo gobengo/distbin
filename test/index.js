@@ -4,22 +4,6 @@ const http = require('http')
 
 let tests = module.exports
 
-// activitypub helpers
-// (will be added to from relevant spec sections below e.g. 3.2)
-let activitypub = {};
-
-// 3.2 Methods on Objects - https://w3c.github.io/activitypub/#obj-methods
-
-// The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
-//  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
-activitypub.clientHeaders = (headers = {}) => {
-  const requirements = { accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#' }
-  if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
-    throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
-  }
-  return Object.assign(requirements, headers);
-}
-
 tests['distbin can be imported'] = () => {
   assert(distbin, 'distbin is truthy')
 }
@@ -32,6 +16,72 @@ tests['can send http requests to a distbin.Server'] = async function() {
   const res = await sendRequest(await requestForListener(distbin()))
   assert.equal(res.statusCode, 200)
 }
+
+tests['/ route can be fetched as JSONLD and includes pointers to things like outbox'] = async function () {
+  const res = await sendRequest(await requestForListener(distbin(), {
+    headers: {
+      'accept': 'application/ld+json'
+    }
+  }));
+  assert.equal(res.statusCode, 200);
+  
+  const resBody = await readResponseBody(res);
+  const rootResource = JSON.parse(resBody);
+  assert(Object.keys(rootResource).includes('outbox'));
+}
+
+/*
+
+Tests of ActivityPub functionality, including lots of text from the spec itself and #critiques
+
+*/
+
+// activitypub helpers
+// (will be added to from relevant spec sections below e.g. 3.2)
+let activitypub = {};
+
+/*
+3.1 Object Identifiers - https://w3c.github.io/activitypub/#obj-id
+
+All Objects in [ActivityStreams] should have unique global identifiers. ActivityPub extends this requirement; all objects distributed by the ActivityPub protocol must have unique global identifiers; these identifiers must fall into one of the following groups:
+* Publicly dereferencable URIs, such as HTTPS URIs, with their authority belonging to that of their originating server. (Publicly facing content should use HTTPS URIs.)
+* An ID explicitly specified as the JSON null object, which implies an anonymous object (a part of its parent context)
+  #critique: There are no examples of this anywhere in the spec, and it's a weird deviation from AS2 which does not require 'explicit' null (I think...). 
+
+Identifiers must be provided for activities posted in server to server communication.
+However, for client to server communication, a server receiving an object with no specified id should allocate an object ID in the user's namespace and attach it to the posted object.
+
+All objects must have the following properties:
+
+id
+The object's unique global identifier
+type
+The type of the object
+*/
+activitypub.objectHasRequiredProperties = (obj) => {
+  const requiredProperties = ['id', 'type'];
+  const missingProperties = requiredProperties.filter(p => obj[p]);
+  return missingProperties.length ? false : true;
+}
+
+// 3.2 Methods on Objects - https://w3c.github.io/activitypub/#obj-methods
+
+// Create a headers map for http.request() incl. any specced requirements for ActivityPub Client requests
+activitypub.clientHeaders = (headers = {}) => {
+  const requirements = {
+    // The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
+    //  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
+    accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#'
+  }
+  if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
+    throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
+  }
+  return Object.assign(requirements, headers);
+}
+
+// 4 Actors - https://w3c.github.io/activitypub/#actors
+
+// #critique - This normalization algorithm isn't really normalizing if it leaves the default URI scheme up to each implementation to decide "preferably https"
 
 // 5.4 Outbox - https://w3c.github.io/activitypub/#outbox
 
@@ -144,6 +194,8 @@ tests['can submit an Activity to the Outbox'] = async function() {
   If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.
     #critique - noooo. It's better to block requests that already have IDs than ignore what the client sends. I think a 409 Conflict or 400 Bad Request would be better.
     #critique - If there *is not* an id, is the server supposed to generate one? Implied but not stated
+      Oh actually it is mentioned up on 3.1 "However, for client to server communication, a server receiving an object with no specified id should allocate an object ID in the user's namespace and attach it to the posted object.", but it's SHOULD not MUST. Regardless I think it would be easier for implementors if this were moved from 3.1 to 7
+    #critique - ok last one. In 3.1 it says "Identifiers must be provided for activities posted in server to server communication." How can a server tell if a request is coming from the server or the client? It's supposed to always expect .ids from other servers, but it's supposed to ignore/rewrite all .ids from 'clients'. In a federated thing like this every server is someone elses client, no? I think this is a blocking inconsistency. Oh... maybe not. Is the heuristic here that 'servers' deliver to inboxes and 'clients' deliver to outboxes?
     #TODO - skipping for now. test later
   */
 
