@@ -10,6 +10,8 @@ module.exports = function () {
     switch (req.url) {
       case '/':
         return handle(index)
+      case '/outbox':
+        return handle(outbox)
       case '/public':
         return handle(public)
       default:
@@ -19,12 +21,27 @@ module.exports = function () {
 }
 
 // root route, do nothing for now but 200
-async function index(req, res) {
-    res.writeHead(200)
-    res.end('distbin')
+function index(req, res) {
+  res.writeHead(200)
+  res.end('distbin')
 }
 
-// route for ActivityPub 'Public Collection'
+// route for ActivityPub Outbox
+// https://w3c.github.io/activitypub/#outbox
+function outbox(req, res) {
+  switch (req.method.toLowerCase()) {
+    case 'get':
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        type: "OrderedCollection"
+      }, null, 2))
+      break;
+    default:
+      return error(405, 'Method not allowed: ')(req, res)
+  }
+}
+
+// route for ActivityPub Public Collection
 // https://w3c.github.io/activitypub/#public-addressing
 function public(req, res) {
   const publicCollection = {
@@ -39,6 +56,7 @@ function public(req, res) {
 function error(statusCode, error) {
   return (req, res) => {
     res.writeHead(statusCode)
-    res.end(error.toString() || statusCode.toString())    
+    const responseText = error ? error.toString() : statusCode.toString()
+    res.end(responseText)    
   }
 }

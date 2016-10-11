@@ -17,6 +17,28 @@ tests['can send http requests to a distbin.Server'] = async function() {
   assert.equal(res.statusCode, 200)
 }
 
+// 5.4 Outbox - https://w3c.github.io/activitypub/#outbox
+
+  // The outbox is discovered through the outbox property of an actor's profile.
+  // #critique - Can only 'actors' have outboxes? Can a single distbin have one outbox?
+  // #TODO - distbin home (or /activitypub root) should have 'outbox' link to /outbox for discoverability
+
+  // The outbox must be an OrderedCollection.
+  // #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be' this type
+  // #assumption - It accepts GET requests, so I'll test
+tests['The outbox must be an OrderedCollection'] = async function () {
+  const res = await sendRequest(distbin(), '/outbox')
+  assert.equal(res.statusCode, 200);
+  const resBody = await readResponseBody(res);
+  const outbox = JSON.parse(resBody);
+  assert.equal(outbox.type, "OrderedCollection");
+}
+
+  /*
+  The outbox stream contains objects the user has published, subject to the ability of the requestor to retrieve the object (that is, the contents of the outbox are filtered by the permissions of the person reading it). If a user submits a request without Authorization the server should respond with all of the Public posts. This could potentially be all relevant objects published by the user, though the number of available items is left to the discretion of those implementing and deploying the server.
+  The outbox accepts HTTP POST requests, with behaviour described in Client to Server Interactions.
+  */
+
 // 5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
 tests['can request the public Collection'] = async function () {
   const res = await sendRequest(distbin(), '/public')
@@ -27,6 +49,32 @@ tests['can request the public Collection'] = async function () {
 
 // 7 Client to Server Interactions - https://w3c.github.io/activitypub/#client-to-server-interactions
 
+// Example 6
+let article = {
+  "@context": "https://www.w3.org/ns/activitypub",
+  "id": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+  "type": "Article",
+  "name": "Minimal ActivityPub update client",
+  "content": "Today I finished morph, a client for posting ActivityStreams2...",
+  "attributedTo": "https://rhiaro.co.uk/#amy",
+  "to": "https://rhiaro.co.uk/followers/", 
+  "cc": "https://e14n.com/evan"
+}
+// example 7
+let likeOfArticle = {
+  "@context": "https://www.w3.org/ns/activitypub",
+  "type": "Like",
+  // #TODO: Fix bug where a comma was missing at end of here
+  "actor": "https://dustycloud.org/chris/",
+  "name": "Chris liked 'Minimal ActivityPub update client'",
+  "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+  "to": ["https://rhiaro.co.uk/#amy",
+         "https://dustycloud.org/followers",
+         "https://rhiaro.co.uk/followers/"],
+  "cc": "https://e14n.com/evan"
+}
+
+
 // 7.1 Create Activity - https://w3c.github.io/activitypub/#create-activity-outbox
 
 // Run tests if this file is executed
@@ -34,6 +82,16 @@ if (require.main === module) {
   run(tests)
     .then(() => process.exit())
     .catch(() => proceess.exit(1))
+}
+
+// Given an HTTP Response, read the whole response body and return as string
+async function readResponseBody(res) {
+  let body = '';
+  return new Promise((resolve, reject) => {
+    res.on('error', reject);
+    res.on('data', (chunk) => body += chunk)
+    res.on('end', () => resolve(body))
+  })
 }
 
 // execute some tests
