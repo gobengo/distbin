@@ -4,6 +4,21 @@ const http = require('http')
 
 let tests = module.exports
 
+// activitypub helpers
+// (will be added to from relevant spec sections below e.g. 3.2)
+let activitypub = {};
+
+// 3.2 Methods on Objects - https://w3c.github.io/activitypub/#obj-methods
+
+// The client must specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
+activitypub.clientHeaders = (headers = {}) => {
+  const requirements = { accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#' }
+  if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
+    throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
+  }
+  return Object.assign(requirements, headers);
+}
+
 tests['distbin can be imported'] = () => {
   assert(distbin, 'distbin is truthy')
 }
@@ -24,14 +39,21 @@ tests['can send http requests to a distbin.Server'] = async function() {
   // #TODO - distbin home (or /activitypub root) should have 'outbox' link to /outbox for discoverability
 
   // The outbox must be an OrderedCollection.
-  // #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be' this type
-  // #assumption - It accepts GET requests, so I'll test
+  // #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be an OrderedCollection' (see isOrderedCollection function)
+  // #assumption - interpretation is that outbox MUST accept GET requests, so I'll test
 tests['The outbox must be an OrderedCollection'] = async function () {
-  const res = await sendRequest(distbin(), '/outbox')
+  const res = await sendRequest(distbin(), {
+    path: '/outbox',
+    headers: activitypub.clientHeaders()
+  })
   assert.equal(res.statusCode, 200);
   const resBody = await readResponseBody(res);
-  const outbox = JSON.parse(resBody);
-  assert.equal(outbox.type, "OrderedCollection");
+  const isOrderedCollection = (something) => {
+    const obj = typeof something === 'string' ? JSON.parse(something) : something
+    // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
+    assert.equal(obj.type, "OrderedCollection");    
+  }
+  isOrderedCollection(resBody)
 }
 
   /*
