@@ -6,10 +6,10 @@ let tests = module.exports
 
 // given a handler function like (req, res), make it listen
 // then send http.request, return a Promise or response
-const sendRequest = (handler, request) => {
+const sendRequest = async function(handler, request) {
   const server = http.createServer(handler)
   let listened
-  return new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     server
     .once('error', () => {
       if (!listened) reject()
@@ -19,13 +19,13 @@ const sendRequest = (handler, request) => {
       resolve()
     })
   })
-  .then(() => new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const requestOptions = Object.assign({
       hostname: 'localhost',
       method: 'get',
       path: '/',
       port: server.address().port
-    }, request)
+    }, typeof(request) === 'string' ? { path: request } : request)
     http
       .request(requestOptions, (res) => {
         res.destroy()
@@ -33,7 +33,7 @@ const sendRequest = (handler, request) => {
       })
       .on('error', reject)
       .end()
-  }))
+  })
 }
 
 tests['distbin can be imported'] = () => {
@@ -44,15 +44,30 @@ tests['can create a distbin'] = () => {
   distbin()
 }
 
-tests['can send http requests to a distbin.Server'] = () => {
-  return sendRequest(distbin(), { method: 'get' }).then((res) => {
-    assert.equal(res.statusCode, 200)
-  })
+tests['can send http requests to a distbin.Server'] = async function() {
+  const res = await sendRequest(distbin())
+  assert.equal(res.statusCode, 200)
 }
+
+tests['can request the public Collection'] = async function () {
+  const res = await sendRequest(distbin(), '/public')
+  assert.equal(res.statusCode, 200);
+}
+
+// tests['can post a Note'] = async function() {
+//   const res = await sendRequest(distbin(), { method: 'get' })
+// }
 
 // Run tests if this file is executed
 if (require.main === module) {
-  Promise.all(
+  run(tests)
+    .then(() => process.exit())
+    .catch(() => proceess.exit(1))
+}
+
+// execute some tests
+async function run(tests) {
+  const results = await Promise.all(
     // map to array of promises of logged errors
     // (or falsy if the test passed)
     Object.keys(tests)
@@ -76,17 +91,9 @@ if (require.main === module) {
         return err
       })
     })
-  ).catch((err) => {
-    console.error('ERROR IN TEST RUNNER', err)
-    process.exit(1)
-  })
-  .then((results) => {
-    const failures = results.filter(Boolean)
-    if (failures.length) {
-      console.error(`${failures.length} test failures`)
-      process.exit(1)
-      return
-    }
-    process.exit()
-  })
+  )
+  const failures = results.filter(Boolean)
+  if (failures.length) {
+    console.error(`${failures.length} test failures`)
+  }
 }
