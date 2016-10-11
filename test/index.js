@@ -106,6 +106,7 @@ let likeOfArticle = {
 /*
 To submit new Activities to a user's server, clients must discover the URL of the user's outbox from their profile
   and then must make an HTTP POST request to to this URL with the Content-Type of application/ld+json; profile="https://www.w3.org/ns/activitystreams#".
+  #critique: no mention of application/activity+json even though it is the most correct mimetype of ActivityStreams
 
 The request must be authenticated with the credentials of the user to whom the outbox belongs.
   #critique - I think this is superfluous. Security could be out of band, e.g. through firewalls or other network layers, or intentionally nonexistent. Instead of saying what the client MUST do, say that the server MAY require authorization.
@@ -162,6 +163,41 @@ If an Activity is submitted with a value in the id property, servers must ignore
   A mismatch between addressing of the Create activity and its object is likely to lead to confusion. As such, a server should copy any recipients of the Create activity to its object upon initial distribution, and likewise with copying recipients from the object to the wrapping Create activity. Note that it is acceptable for the object's addressing may be changed later without changing the Create's addressing (for example via an Update activity).
     # urgh, see #critique on previous line. Small little copying adjustments are weird and not-very REST because they're changing what the client sent without telling it instead of just being strict about accepting what the client sends. Can lead to ambiguity in client representation.
   */
+
+tests['can submit a Create Activity to the Outbox'] = async function() {
+  const req = await requestForListener(distbin(), {
+    headers: activitypub.clientHeaders({
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+    }),
+    method: 'post',
+    path: '/outbox'
+  });
+  req.write(JSON.stringify({
+    "@context": "https://www.w3.org/ns/activitypub",
+    "type": "Create", // #TODO: comma was missing here, fix in spec
+    "id": "https://example.net/~mallory/87374", // #TODO: comma was missing here, fix in spec
+    "actor": "https://example.net/~mallory",
+    "object": {
+      "id": "https://example.com/~mallory/note/72",
+      "type": "Note",
+      "attributedTo": "https://example.net/~mallory",
+      "content": "This is a note",
+      "published": "2015-02-10T15:04:55Z",
+      "to": ["https://example.org/~john/"],
+      "cc": ["https://example.com/~erik/followers"]
+    },
+    "published": "2015-02-10T15:04:55Z",
+    "to": ["https://example.org/~john/"],
+    "cc": ["https://example.com/~erik/followers"]
+  }))
+  const res = await sendRequest(req);
+  // Servers MUST return a 201 Created HTTP code...
+  assert.equal(res.statusCode, 201);
+  // ...with the new URL in the Location header.
+  const location = res.headers.location;
+  assert(location, 'Location header is present in response')
+  // #TODO assert its a URL
+}
 
 // 7.1.1 Object creation without a Create Activity - https://w3c.github.io/activitypub/#object-without-create
 
