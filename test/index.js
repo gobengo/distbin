@@ -10,7 +10,8 @@ let activitypub = {};
 
 // 3.2 Methods on Objects - https://w3c.github.io/activitypub/#obj-methods
 
-// The client must specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
+// The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
+//  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
 activitypub.clientHeaders = (headers = {}) => {
   const requirements = { accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#' }
   if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
@@ -28,7 +29,7 @@ tests['can create a distbin'] = () => {
 }
 
 tests['can send http requests to a distbin.Server'] = async function() {
-  const res = await sendRequest(distbin())
+  const res = await sendRequest(await requestForListener(distbin()))
   assert.equal(res.statusCode, 200)
 }
 
@@ -42,28 +43,34 @@ tests['can send http requests to a distbin.Server'] = async function() {
   // #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be an OrderedCollection' (see isOrderedCollection function)
   // #assumption - interpretation is that outbox MUST accept GET requests, so I'll test
 tests['The outbox must be an OrderedCollection'] = async function () {
-  const res = await sendRequest(distbin(), {
+  const res = await sendRequest(await requestForListener(distbin(), {
     path: '/outbox',
     headers: activitypub.clientHeaders()
-  })
+  }))
   assert.equal(res.statusCode, 200);
   const resBody = await readResponseBody(res);
   const isOrderedCollection = (something) => {
     const obj = typeof something === 'string' ? JSON.parse(something) : something
     // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
-    assert.equal(obj.type, "OrderedCollection");    
+    assert.equal(obj.type, "OrderedCollection");   
+    return true; 
   }
-  isOrderedCollection(resBody)
+  assert(isOrderedCollection(resBody))
 }
 
   /*
-  The outbox stream contains objects the user has published, subject to the ability of the requestor to retrieve the object (that is, the contents of the outbox are filtered by the permissions of the person reading it). If a user submits a request without Authorization the server should respond with all of the Public posts. This could potentially be all relevant objects published by the user, though the number of available items is left to the discretion of those implementing and deploying the server.
-  The outbox accepts HTTP POST requests, with behaviour described in Client to Server Interactions.
+  #TODO
+  The outbox stream contains objects the user has published, subject to the ability of the requestor to retrieve the object (that is, the contents of the outbox are filtered by the permissions of the person reading it).
+    #TODO assert that outbox collection object has '.items'
+  If a user submits a request without Authorization the server should respond with all of the Public posts. This could potentially be all relevant objects published by the user, though the number of available items is left to the discretion of those implementing and deploying the server.
   */
+
+  // The outbox accepts HTTP POST requests, with behaviour described in Client to Server Interactions.
+  // see section 7
 
 // 5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
 tests['can request the public Collection'] = async function () {
-  const res = await sendRequest(distbin(), '/public')
+  const res = await sendRequest(await requestForListener(distbin(), '/public'))
   assert.equal(res.statusCode, 200);
 }
 
@@ -82,7 +89,7 @@ let article = {
   "to": "https://rhiaro.co.uk/followers/", 
   "cc": "https://e14n.com/evan"
 }
-// example 7
+// Example 7
 let likeOfArticle = {
   "@context": "https://www.w3.org/ns/activitypub",
   "type": "Like",
@@ -96,8 +103,82 @@ let likeOfArticle = {
   "cc": "https://e14n.com/evan"
 }
 
+/*
+To submit new Activities to a user's server, clients must discover the URL of the user's outbox from their profile
+  and then must make an HTTP POST request to to this URL with the Content-Type of application/ld+json; profile="https://www.w3.org/ns/activitystreams#".
+
+The request must be authenticated with the credentials of the user to whom the outbox belongs.
+  #critique - I think this is superfluous. Security could be out of band, e.g. through firewalls or other network layers, or intentionally nonexistent. Instead of saying what the client MUST do, say that the server MAY require authorization.
+
+The body of the POST request must contain a single Activity (which may contain embedded objects), or a single non-Activity object which will be wrapped in a Create activity by the server.
+*/
+
+// Example 8,9: Submitting an Activity to the Outbox
+tests['can submit an Activity to the Outbox'] = async function() {
+  const req = await requestForListener(distbin(), {
+    headers: activitypub.clientHeaders({
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+    }),
+    method: 'post',
+    path: '/outbox'
+  });
+  req.write(JSON.stringify({
+    "@context": "https://www.w3.org/ns/activitypub",
+    "type": "Like",
+    "actor": "https://dustycloud.org/chris/", // #TODO fix that there was a missing comma here in spec
+    "name": "Chris liked 'Minimal ActivityPub update client'",
+    "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+    "to": ["https://dustycloud.org/followers", "https://rhiaro.co.uk/followers/"],
+    "cc": "https://e14n.com/evan"
+  }))
+  const res = await sendRequest(req);
+  // Servers MUST return a 201 Created HTTP code...
+  assert.equal(res.statusCode, 201);
+  // ...with the new URL in the Location header.
+  const location = res.headers.location;
+  assert(location, 'Location header is present in response')
+  // #TODO assert its a URL
+}
+
+/*
+If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.
+  #critique - noooo. It's better to block requests that already have IDs than ignore what the client sends. I think a 409 Conflict or 400 Bad Request would be better.
+  #critique - If there *is not* an id, is the server supposed to generate one? Implied but not stated
+  #TODO - skipping for now. test later
+*/
+
+
+
+// The server adds this new Activity to the outbox collection. Depending on the type of Activity, servers may then be required to carry out further side effects.
 
 // 7.1 Create Activity - https://w3c.github.io/activitypub/#create-activity-outbox
+
+  /*
+  The Create activity is used to when posting a new object. This has the side effect that the object embedded within the Activity (in the object property) is created.
+
+  When a Create activity is posted, the actor of the activity should be copied onto the object's attributedTo field.
+    #critique like... at what stage of processing? And does .attributedTo always have to be included when the activity is sent/retrieved later? And why is this so important? If it's required for logical consistency, maybe the server should require the Client to submit activities that have attribution? It's odd for the server to make tiny semantic adjustments to the representation provided by the client. Just be strict about what the client must do.
+
+  A mismatch between addressing of the Create activity and its object is likely to lead to confusion. As such, a server should copy any recipients of the Create activity to its object upon initial distribution, and likewise with copying recipients from the object to the wrapping Create activity. Note that it is acceptable for the object's addressing may be changed later without changing the Create's addressing (for example via an Update activity).
+    # urgh, see #critique on previous line. Small little copying adjustments are weird and not-very REST because they're changing what the client sent without telling it instead of just being strict about accepting what the client sends. Can lead to ambiguity in client representation.
+  */
+
+// 7.1.1 Object creation without a Create Activity - https://w3c.github.io/activitypub/#object-without-create
+
+/**
+For client to server posting, it is possible to create a new object without a surrounding activity.
+The server must accept a valid [ActivityStreams] object
+  that isn't a subtype of Activity in the POST request to the outbox.
+    #critique: Does this mean it should reject subtypes of Activities? No, right, because Activities are normal to send to outbox. Maybe then you're just saying that, if it's not an Activity subtype, initiate this 'Create-wrapping' algorithm.
+The server then must attach this object as the object of a Create Activity.
+
+NOTE
+The Location value returned by the server should be the URL of the new Create activity (rather than the object).
+  #critique: 'should' or 'MUST'
+
+The audience specified on the object must be copied over to the new Create activity by the server.
+*/
+
 
 // Run tests if this file is executed
 if (require.main === module) {
@@ -149,10 +230,8 @@ async function run(tests) {
   }
 }
 
-// given a node.http handler function accepting (req, res), make it listen
-// then send an http.request, return a Promise of response
-async function sendRequest(handler, request) {
-  const server = http.createServer(handler)
+async function requestForListener(listener, requestOptions) {
+  const server = http.createServer(listener)
   let listened
   await new Promise((resolve, reject) => {
     server
@@ -164,19 +243,23 @@ async function sendRequest(handler, request) {
       resolve()
     })
   })
+
+  const request = http.request(Object.assign({
+    hostname: 'localhost',
+    method: 'get',
+    path: '/',
+    port: server.address().port
+  }, typeof(requestOptions) === 'string' ? { path: requestOptions } : requestOptions))
+
+  return request
+}
+
+// given a node.http handler function accepting (req, res), make it listen
+// then send an http.request, return a Promise of response
+async function sendRequest(request) {
   return new Promise((resolve, reject) => {
-    const requestOptions = Object.assign({
-      hostname: 'localhost',
-      method: 'get',
-      path: '/',
-      port: server.address().port
-    }, typeof(request) === 'string' ? { path: request } : request)
-    http
-      .request(requestOptions, (res) => {
-        res.destroy()
-        resolve(res)
-      })
-      .on('error', reject)
-      .end()
+    request.once('response', resolve);
+    request.once('error', reject);
+    request.end();
   })
 }

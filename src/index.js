@@ -29,6 +29,7 @@ function index(req, res) {
 // route for ActivityPub Outbox
 // https://w3c.github.io/activitypub/#outbox
 function outbox(req, res) {
+  debugger;
   switch (req.method.toLowerCase()) {
     case 'get':
       res.writeHead(200);
@@ -36,6 +37,12 @@ function outbox(req, res) {
         type: "OrderedCollection"
       }, null, 2))
       break;
+    case 'post':
+      // #TODO: read request body, validate, and save it somewhere...
+      // #TODO: Return a real working location
+      const location = '/outbox/'+require('crypto').createHash('md5').update(Math.random().toString()).digest('hex')
+      res.writeHead(201, { location });
+      res.end();
     default:
       return error(405, 'Method not allowed: ')(req, res)
   }
