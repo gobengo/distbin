@@ -24,24 +24,16 @@ const store = new Store
 
 module.exports = function () {
   return async function (req, res) {
-    const handle = (handler) => {
-      try {
-        return handler(req, res);
-      } catch (err) {
-        return error(500, err)(req, res);
-      }
-    }
-    switch (url.parse(req.url).pathname) {
-      case '/':
-        return handle(index)
-      case '/recent':
-        return handle(recent)
-      case '/activitypub/outbox':
-        return handle(outbox)
-      case '/activitypub/public':
-        return handle(public)
-      default:
-        return handle(error(404))
+    const handler = {
+      '/': index,
+      '/recent': recent,
+      '/activitypub/outbox': outbox,
+      '/activitypub/public': public,
+    }[url.parse(req.url).pathname] || error(404)
+    try {
+      return handler(req, res);
+    } catch (err) {
+      return error(500, err)(req, res);
     }
   }
 }
