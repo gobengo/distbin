@@ -6,7 +6,9 @@
   "directories": {
     "test": "test"
   },
-  "dependencies": {},
+  "dependencies": {
+    "node-uuid": "^1.4.7"
+  },
   "devDependencies": {
     "eslint": "^3.7.1"
   },

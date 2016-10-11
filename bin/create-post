@@ -7,21 +7,24 @@ set -e
 # verbose
 # set -x
 
-collection_url="http://localhost:8000/collection/"
+collection_url="$1"
 
 # TODO: Not a good AS2 Post
 request_body=$(cat <<EOF
-
 {
-    "field1": "test",
-    "field2": {
-        "foo": "bar"
-    }
+  "@context": "https://www.w3.org/ns/activitypub",
+  "id": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+  "type": "Article",
+  "name": "Minimal ActivityPub update client",
+  "content": "Today I finished morph, a client for posting ActivityStreams2...",
+  "attributedTo": "https://rhiaro.co.uk/#amy",
+  "to": "https://rhiaro.co.uk/followers/", 
+  "cc": "https://e14n.com/evan"
 }
 EOF)
 
 # Make the Request
-curl -XPOST "$collection_url" \
+curl -v -XPOST "$collection_url" \
 -H 'Content-Type: text/json; charset=utf-8' \
 -d "$request_body"
 

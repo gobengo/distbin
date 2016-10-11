@@ -27,7 +27,22 @@ tests['/ route can be fetched as JSONLD and includes pointers to things like out
   
   const resBody = await readResponseBody(res);
   const rootResource = JSON.parse(resBody);
+  // #TODO: maybe a more fancy JSON-LD-aware check
   assert(Object.keys(rootResource).includes('outbox'));
+}
+
+tests['can fetch /recent to see what\'s been going on'] = async function () {
+  const res = await sendRequest(await requestForListener(distbin(), {
+    path: '/recent',
+    headers: {
+      'accept': 'application/ld+json'
+    }
+  }));
+  assert.equal(res.statusCode, 200);
+  const resBody = await readResponseBody(res);
+  const recentCollection = JSON.parse(resBody);
+  assert.equal(recentCollection.type, 'OrderedCollection')
+  assert(Array.isArray(recentCollection.items), '.items is an Array')
 }
 
 /*
@@ -87,14 +102,13 @@ activitypub.clientHeaders = (headers = {}) => {
 
   // The outbox is discovered through the outbox property of an actor's profile.
   // #critique - Can only 'actors' have outboxes? Can a single distbin have one outbox?
-  // #TODO - distbin home (or /activitypub root) should have 'outbox' link to /outbox for discoverability
 
   // The outbox must be an OrderedCollection.
   // #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be an OrderedCollection' (see isOrderedCollection function)
   // #assumption - interpretation is that outbox MUST accept GET requests, so I'll test
 tests['The outbox must be an OrderedCollection'] = async function () {
   const res = await sendRequest(await requestForListener(distbin(), {
-    path: '/outbox',
+    path: '/activitypub/outbox',
     headers: activitypub.clientHeaders()
   }))
   assert.equal(res.statusCode, 200);
@@ -120,7 +134,7 @@ tests['The outbox must be an OrderedCollection'] = async function () {
 
 // 5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
 tests['can request the public Collection'] = async function () {
-  const res = await sendRequest(await requestForListener(distbin(), '/public'))
+  const res = await sendRequest(await requestForListener(distbin(), '/activitypub/public'))
   assert.equal(res.statusCode, 200);
 }
 
@@ -171,7 +185,7 @@ tests['can submit an Activity to the Outbox'] = async function() {
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
-    path: '/outbox'
+    path: '/activitypub/outbox'
   });
   req.write(JSON.stringify({
     "@context": "https://www.w3.org/ns/activitypub",
@@ -224,7 +238,7 @@ tests['can submit a Create Activity to the Outbox'] = async function() {
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
-    path: '/outbox'
+    path: '/activitypub/outbox'
   });
   req.write(JSON.stringify({
     "@context": "https://www.w3.org/ns/activitypub",
@@ -263,7 +277,7 @@ tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] 
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
-    path: '/outbox'
+    path: '/activitypub/outbox'
   });
   // Example 10: Object with audience targeting
   const example10 = {
