@@ -139,18 +139,20 @@ tests['can submit an Activity to the Outbox'] = async function() {
   const location = res.headers.location;
   assert(location, 'Location header is present in response')
   // #TODO assert its a URL
+
+  /*
+  If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.
+    #critique - noooo. It's better to block requests that already have IDs than ignore what the client sends. I think a 409 Conflict or 400 Bad Request would be better.
+    #critique - If there *is not* an id, is the server supposed to generate one? Implied but not stated
+    #TODO - skipping for now. test later
+  */
+
+  // The server adds this new Activity to the outbox collection. Depending on the type of Activity, servers may then be required to carry out further side effects.
+  // #TODO: Probably verify this by fetching the outbox collection. Keep in mind that tests all run in parallel right now so any assumption of isolation will be wrong.
+  // #critique - What's the best way to verify this, considering there is no requirement for the Activity POST response to include a representation, and another part of the spec currently says the server should ignore any .id provided by the client and set it's own. If the Client can provide its own ID, then it can instantly go in the outbox to verify something with that ID is there. If not, it first has to fetch the Location URL, see the ID, then look in the outbox and check for that ID. Eh. Ultimately not that crazy but I still feel strongly that bit about 'ignoring' the provided id and using a new one is really really bad.
+
 }
 
-/*
-If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.
-  #critique - noooo. It's better to block requests that already have IDs than ignore what the client sends. I think a 409 Conflict or 400 Bad Request would be better.
-  #critique - If there *is not* an id, is the server supposed to generate one? Implied but not stated
-  #TODO - skipping for now. test later
-*/
-
-
-
-// The server adds this new Activity to the outbox collection. Depending on the type of Activity, servers may then be required to carry out further side effects.
 
 // 7.1 Create Activity - https://w3c.github.io/activitypub/#create-activity-outbox
 
