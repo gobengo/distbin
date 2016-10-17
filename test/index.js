@@ -196,13 +196,18 @@ tests['can submit an Activity to the Outbox'] = async function() {
     "to": ["https://dustycloud.org/followers", "https://rhiaro.co.uk/followers/"],
     "cc": "https://e14n.com/evan"
   }))
-  const res = await sendRequest(req);
+  const postActivityRequest = await sendRequest(req);
   // Servers MUST return a 201 Created HTTP code...
-  assert.equal(res.statusCode, 201);
+  assert.equal(postActivityRequest.statusCode, 201);
   // ...with the new URL in the Location header.
-  const location = res.headers.location;
+  const location = postActivityRequest.headers.location;
   assert(location, 'Location header is present in response')
   // #TODO assert its a URL
+
+  // #question - Does this imply any requirements about what happens when GET that URL?
+  // going to test that it's GETtable for now
+  const getActivityRequest = await sendRequest(await requestForListener(distbin(), location));
+  assert.equal(getActivityRequest.statusCode, 200);
 
   /*
   If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.

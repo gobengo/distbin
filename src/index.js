@@ -20,21 +20,53 @@ class Store extends Map {
 }
 
 // #TODO: This should be provided to handlers in a way that is not module-scope, e.g. with a more top-level object
-const store = new Store
+const activityStore = new Store
 
+// given a non-uri activity id, return an activity URI
+const activityUri = (uuid) => `urn:uuid:${uuid}`
+
+// Factory function for another node.http handler function that defines distbin's web logic
+// (routes requests to sub-handlers with common error handling)
 module.exports = function () {
-  return async function (req, res) {
-    const handler = {
+  return function (req, res) {
+    const requestPath = url.parse(req.url).pathname;
+    const simpleRoutes = {
       '/': index,
       '/recent': recent,
       '/activitypub/outbox': outbox,
       '/activitypub/public': public,
-    }[url.parse(req.url).pathname] || error(404)
+    }
+    let handler = simpleRoutes[requestPath]
+
+    if ( ! handler) {
+      const activityUuidMatch = requestPath.match('^/activitypub/outbox/([^/]+)');
+      if (activityUuidMatch) {
+        const activityId = activityUuidMatch[1]
+        handler = activityHandler(activityId)
+      }
+    }
+
+    if ( ! handler) {
+      handler = error(404)
+    }
     try {
       return handler(req, res);
     } catch (err) {
       return error(500, err)(req, res);
     }
+  }
+}
+
+// get specific activity by id
+function activityHandler(activityUuid) {
+  return function (req, res) {
+    const activity = activityStore.get(activityUri(activityUuid));
+    if ( ! activity) {
+      return error(404, "There is no activity "+activityUuid)
+    }
+    // woo its here
+    res.writeHead(200);
+    res.end(JSON.stringify(activity, null, 2))
   }
 }
 
@@ -68,8 +100,8 @@ function recent(req, res) {
     "summary": "Things that have recently been created",
     "type": "OrderedCollection",
     // Get recent 10 items
-    "items": [...store.values()].reverse().slice(-1 * maxMemberCount),
-    "totalItems": store.size,
+    "items": [...activityStore.values()].reverse().slice(-1 * maxMemberCount),
+    "totalItems": activityStore.size,
     // empty string is relative URL for 'self'
     "current": "",
   }, null, 2))
@@ -92,13 +124,13 @@ async function outbox(req, res) {
       const newuuid = uuid()
       const newThing = Object.assign(JSON.parse(requestBody), {
         // #TODO: validate that newThing wasn't submitted with an .id, even though spec says to rewrite it
-        id: `urn:uuid:${newuuid}`,
+        id: activityUri(newuuid),
         // #TODO: what if it already had published?
         published: (new Date).toISOString()
       })
       // #TODO: read request body, validate, and save it somewhere...
       const location = '/activitypub/outbox/'+newuuid
-      store.set(newThing.id, newThing)
+      activityStore.set(newThing.id, newThing)
       res.writeHead(201, { location });
       res.end();
       break;
