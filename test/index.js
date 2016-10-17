@@ -180,7 +180,8 @@ The body of the POST request must contain a single Activity (which may contain e
 
 // Example 8,9: Submitting an Activity to the Outbox
 tests['can submit an Activity to the Outbox'] = async function() {
-  const req = await requestForListener(distbin(), {
+  const distbinListener = distbin();
+  const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
@@ -206,7 +207,7 @@ tests['can submit an Activity to the Outbox'] = async function() {
 
   // #question - Does this imply any requirements about what happens when GET that URL?
   // going to test that it's GETtable for now
-  const getActivityRequest = await sendRequest(await requestForListener(distbin(), location));
+  const getActivityRequest = await sendRequest(await requestForListener(distbinListener, location));
   assert.equal(getActivityRequest.statusCode, 200);
 
   /*
