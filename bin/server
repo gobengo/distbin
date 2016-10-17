@@ -2,10 +2,128 @@
 
 const distbin = require('../');
 const http = require('http');
+const querystring = require('querystring')
+const url = require('url')
 
-const server = http.createServer(distbin());
+// Run tests if this file is executed
+if (require.main === module) {
+  runServer()
+    .then(() => process.exit())
+    .catch((err) => {
+    	console.error("Uncaught Error", err)
+    	process.exit(1)
+    })
+}
 
-// console.log('http://localhost:6511')
-server.listen(0, () => {
-  process.stdout.write('http://localhost:' + server.address().port);
-})
+async function runServer() {
+	Object.keys({
+	  'SIGINT': 2,
+	  'SIGTERM': 15
+	}).forEach(function (signal) {
+	  process.on(signal, function () {
+	  	process.exit()
+	  });
+	});
+
+	const bin = distbin()
+
+	// api (anonymous port)
+	const apiServer = http.createServer(bin)
+	let apiServerUrl = await new Promise((resolve) => {
+		apiServer.listen(0, function (err) {
+			resolve(`http://localhost:${apiServer.address().port}`)
+		})
+	})
+
+	// html
+	const htmlServer = http.createServer(distbinHtml({ apiUrl: apiServerUrl }))
+	// frontline must listen
+	let htmlServerUrl = await new Promise((resolve) => {
+		htmlServer.listen(process.env.PORT || 0, (err) => {
+			resolve(`http://localhost:${htmlServer.address().port}`)
+		})
+	})
+
+	console.log(htmlServerUrl)
+	// now just like listen
+	await new Promise(function () {
+
+	})
+}
+
+function distbinHtml({ apiUrl }) {
+	return async function (req, res) {
+		switch (req.method.toLowerCase()) {
+			case 'get':
+				res.writeHead(200)
+				res.write("<h1>distbin-html</h1>")
+				// create new
+				res.write(`
+					<h2>Post a Note</h2>
+					<form method="post">
+						<textarea name="content"></textarea>
+						<input type="submit" value="post" />
+					</form>
+				`)
+				// recent
+				res.write(`
+					<h2>Public Activity</h2>
+					<pre>${
+						// #TODO: discover /public url via HATEOAS
+						await readableToString(await sendRequest(http.request(apiUrl+'/activitypub/public')))
+					}</pre>
+				`)
+				res.end()
+				return;			
+			case 'post':
+				const submission = await readableToString(req);
+				console.log('submission', submission)
+				// assuming application/x-www-form-urlencoded
+				const { content } = querystring.parse(submission);
+				// don't allow HTML
+				const safeContent = escape(content);
+				const note = {
+				  '@context': 'https://www.w3.org/ns/activitypub',
+				  'type': 'Note',
+				  'content': safeContent,
+				}
+				// submit to outbox
+				// #TODO is it more 'precise' to convert this to an activity here?
+				// #TODO discover outbox URL
+				const postToOutboxRequest = http.request(Object.assign(url.parse(apiUrl+'/activitypub/outbox'), {
+					headers: {
+			      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+					},
+					method: 'post',
+					path: '/activitypub/outbox'
+				}));
+				postToOutboxRequest.write(JSON.stringify(note));
+				const postToOutboxResponse = await sendRequest(postToOutboxRequest);
+				console.log('postToOutboxResponse', postToOutboxResponse.statusCode);
+				// handle form submission by posting to outbox
+				res.writeHead(302, { location: req.url })
+				res.end()
+		}
+	}
+}
+
+
+async function readableToString (readable) {
+  let body = ''
+  return new Promise((resolve, reject) => {
+    readable.on('error', reject)
+    readable.on('data', (chunk) => {
+      body += chunk
+      return body
+    })
+    readable.on('end', () => resolve(body))
+  })
+}
+
+async function sendRequest (request) {
+  return new Promise((resolve, reject) => {
+    request.once('response', resolve)
+    request.once('error', reject)
+    request.end()
+  })
+}

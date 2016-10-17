@@ -98,6 +98,7 @@ function recentHandler ({ activities }) {
 // https://w3c.github.io/activitypub/#outbox
 function outboxHandler ({ activities }) {
   return async function (req, res) {
+    console.log("Outbox receiving request", req.method);
     switch (req.method.toLowerCase()) {
       case 'get':
         res.writeHead(200)
@@ -118,6 +119,7 @@ function outboxHandler ({ activities }) {
         })
         // #TODO: read request body, validate, and save it somewhere...
         const location = '/activities/' + newuuid
+        console.log('outboxHandler setting', newThing)
         activities.set(newThing.id, newThing)
         res.writeHead(201, { location })
         res.end()
@@ -132,10 +134,17 @@ function outboxHandler ({ activities }) {
 // https://w3c.github.io/activitypub/#public-addressing
 function publicCollectionHandler ({ activities }) {
   return (req, res) => {
+    const maxMemberCount = requestMaxMemberCount(req) || 10
     const publicCollection = {
-      '@context': 'https://www.w3.org/ns/activitypub',
+      '@context': 'https://www.w3.org/ns/activitystreams',
       'id': 'https://www.w3.org/ns/activitypub/Public',
-      'type': 'Collection'
+      'type': 'Collection',
+      'type': 'Collection',
+      // Get recent 10 items
+      'items': [...activities.values()].reverse().slice(-1 * maxMemberCount),
+      'totalItems': activities.size,
+      // empty string is relative URL for 'self'
+      'current': ''
     }
     res.writeHead(200)
     res.end(JSON.stringify(publicCollection, null, 2))
