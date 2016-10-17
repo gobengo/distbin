@@ -1,31 +1,15 @@
 const url = require('url');
 const uuid = require('node-uuid');
 
-// Store is a Map that can only be added to.
-// #TODO: This should be size-bound e.g. LRU
-// #TODO: This should be persistent :P
-class Store extends Map {
-  clear() {
-    throw new Error("clearing not allowed")
-  }
-  delete() {
-    throw new Error("deleting not allowed")
-  }
-  set(key, val) {
-    if (this.has(key)) {
-      throw new Error("Can't set existing key "+key)
-    }
-    return super.set(key, val)
-  }
-}
-
 // given a non-uri activity id, return an activity URI
 const activityUri = (uuid) => `urn:uuid:${uuid}`
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
 module.exports = function () {
-  const activities = new Store;
+  // #TODO: This should be size-bound e.g. LRU
+  // #TODO: This should be persistent :P
+  const activities = new Map;
   return function (req, res) {
     const requestPath = url.parse(req.url).pathname;
     const simpleRoutes = {
