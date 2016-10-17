@@ -10,10 +10,13 @@
     "node-uuid": "^1.4.7"
   },
   "devDependencies": {
-    "eslint": "^3.7.1"
+    "eslint": "^3.7.1",
+    "eslint-config-standard": "^6.2.0",
+    "eslint-plugin-promise": "^3.0.0",
+    "eslint-plugin-standard": "^2.0.1"
   },
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint test src",
     "test": "node --harmony test"
   },
   "author": "",
