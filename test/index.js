@@ -12,7 +12,7 @@ tests['can create a distbin'] = () => {
   distbin()
 }
 
-tests['can send http requests to a distbin.Server'] = async function() {
+tests['can send http requests to a distbin.Server'] = async function () {
   const res = await sendRequest(await requestForListener(distbin()))
   assert.equal(res.statusCode, 200)
 }
@@ -22,13 +22,13 @@ tests['/ route can be fetched as JSONLD and includes pointers to things like out
     headers: {
       'accept': 'application/ld+json'
     }
-  }));
-  assert.equal(res.statusCode, 200);
-  
-  const resBody = await readResponseBody(res);
-  const rootResource = JSON.parse(resBody);
+  }))
+  assert.equal(res.statusCode, 200)
+
+  const resBody = await readResponseBody(res)
+  const rootResource = JSON.parse(resBody)
   // #TODO: maybe a more fancy JSON-LD-aware check
-  assert(Object.keys(rootResource).includes('outbox'));
+  assert(Object.keys(rootResource).includes('outbox'))
 }
 
 tests['can fetch /recent to see what\'s been going on'] = async function () {
@@ -37,10 +37,10 @@ tests['can fetch /recent to see what\'s been going on'] = async function () {
     headers: {
       'accept': 'application/ld+json'
     }
-  }));
-  assert.equal(res.statusCode, 200);
-  const resBody = await readResponseBody(res);
-  const recentCollection = JSON.parse(resBody);
+  }))
+  assert.equal(res.statusCode, 200)
+  const resBody = await readResponseBody(res)
+  const recentCollection = JSON.parse(resBody)
   assert.equal(recentCollection.type, 'OrderedCollection')
   assert(Array.isArray(recentCollection.items), '.items is an Array')
 }
@@ -53,7 +53,7 @@ Tests of ActivityPub functionality, including lots of text from the spec itself 
 
 // activitypub helpers
 // (will be added to from relevant spec sections below e.g. 3.2)
-let activitypub = {};
+let activitypub = {}
 
 /*
 3.1 Object Identifiers - https://w3c.github.io/activitypub/#obj-id
@@ -61,7 +61,7 @@ let activitypub = {};
 All Objects in [ActivityStreams] should have unique global identifiers. ActivityPub extends this requirement; all objects distributed by the ActivityPub protocol must have unique global identifiers; these identifiers must fall into one of the following groups:
 * Publicly dereferencable URIs, such as HTTPS URIs, with their authority belonging to that of their originating server. (Publicly facing content should use HTTPS URIs.)
 * An ID explicitly specified as the JSON null object, which implies an anonymous object (a part of its parent context)
-  #critique: There are no examples of this anywhere in the spec, and it's a weird deviation from AS2 which does not require 'explicit' null (I think...). 
+  #critique: There are no examples of this anywhere in the spec, and it's a weird deviation from AS2 which does not require 'explicit' null (I think...).
 
 Identifiers must be provided for activities posted in server to server communication.
 However, for client to server communication, a server receiving an object with no specified id should allocate an object ID in the user's namespace and attach it to the posted object.
@@ -74,9 +74,9 @@ type
 The type of the object
 */
 activitypub.objectHasRequiredProperties = (obj) => {
-  const requiredProperties = ['id', 'type'];
-  const missingProperties = requiredProperties.filter(p => obj[p]);
-  return missingProperties.length ? false : true;
+  const requiredProperties = ['id', 'type']
+  const missingProperties = requiredProperties.filter(p => obj[p])
+  return Boolean(!missingProperties.length)
 }
 
 // 3.2 Methods on Objects - https://w3c.github.io/activitypub/#obj-methods
@@ -91,7 +91,7 @@ activitypub.clientHeaders = (headers = {}) => {
   if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
     throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
   }
-  return Object.assign(requirements, headers);
+  return Object.assign(requirements, headers)
 }
 
 // 4 Actors - https://w3c.github.io/activitypub/#actors
@@ -111,13 +111,13 @@ tests['The outbox must be an OrderedCollection'] = async function () {
     path: '/activitypub/outbox',
     headers: activitypub.clientHeaders()
   }))
-  assert.equal(res.statusCode, 200);
-  const resBody = await readResponseBody(res);
+  assert.equal(res.statusCode, 200)
+  const resBody = await readResponseBody(res)
   const isOrderedCollection = (something) => {
     const obj = typeof something === 'string' ? JSON.parse(something) : something
     // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
-    assert.equal(obj.type, "OrderedCollection");   
-    return true; 
+    assert.equal(obj.type, 'OrderedCollection')
+    return true
   }
   assert(isOrderedCollection(resBody))
 }
@@ -135,7 +135,7 @@ tests['The outbox must be an OrderedCollection'] = async function () {
 // 5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
 tests['can request the public Collection'] = async function () {
   const res = await sendRequest(await requestForListener(distbin(), '/activitypub/public'))
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.statusCode, 200)
 }
 
 // 6 Binary Data - #TODO
@@ -143,29 +143,29 @@ tests['can request the public Collection'] = async function () {
 // 7 Client to Server Interactions - https://w3c.github.io/activitypub/#client-to-server-interactions
 
 // Example 6
-let article = {
-  "@context": "https://www.w3.org/ns/activitypub",
-  "id": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
-  "type": "Article",
-  "name": "Minimal ActivityPub update client",
-  "content": "Today I finished morph, a client for posting ActivityStreams2...",
-  "attributedTo": "https://rhiaro.co.uk/#amy",
-  "to": "https://rhiaro.co.uk/followers/", 
-  "cc": "https://e14n.com/evan"
-}
+// let article = {
+//   '@context': 'https://www.w3.org/ns/activitypub',
+//   'id': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
+//   'type': 'Article',
+//   'name': 'Minimal ActivityPub update client',
+//   'content': 'Today I finished morph, a client for posting ActivityStreams2...',
+//   'attributedTo': 'https://rhiaro.co.uk/#amy',
+//   'to': 'https://rhiaro.co.uk/followers/',
+//   'cc': 'https://e14n.com/evan'
+// }
 // Example 7
-let likeOfArticle = {
-  "@context": "https://www.w3.org/ns/activitypub",
-  "type": "Like",
-  // #TODO: Fix bug where a comma was missing at end of here
-  "actor": "https://dustycloud.org/chris/",
-  "name": "Chris liked 'Minimal ActivityPub update client'",
-  "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
-  "to": ["https://rhiaro.co.uk/#amy",
-         "https://dustycloud.org/followers",
-         "https://rhiaro.co.uk/followers/"],
-  "cc": "https://e14n.com/evan"
-}
+// let likeOfArticle = {
+//   '@context': 'https://www.w3.org/ns/activitypub',
+//   'type': 'Like',
+//   // #TODO: Fix bug where a comma was missing at end of here
+//   'actor': 'https://dustycloud.org/chris/',
+//   'name': "Chris liked 'Minimal ActivityPub update client'",
+//   'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
+//   'to': ['https://rhiaro.co.uk/#amy',
+//          'https://dustycloud.org/followers',
+//          'https://rhiaro.co.uk/followers/'],
+//   'cc': 'https://e14n.com/evan'
+// }
 
 /*
 To submit new Activities to a user's server, clients must discover the URL of the user's outbox from their profile
@@ -179,36 +179,36 @@ The body of the POST request must contain a single Activity (which may contain e
 */
 
 // Example 8,9: Submitting an Activity to the Outbox
-tests['can submit an Activity to the Outbox'] = async function() {
-  const distbinListener = distbin();
+tests['can submit an Activity to the Outbox'] = async function () {
+  const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
     path: '/activitypub/outbox'
-  });
+  })
   req.write(JSON.stringify({
-    "@context": "https://www.w3.org/ns/activitypub",
-    "type": "Like",
-    "actor": "https://dustycloud.org/chris/", // #TODO fix that there was a missing comma here in spec
-    "name": "Chris liked 'Minimal ActivityPub update client'",
-    "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
-    "to": ["https://dustycloud.org/followers", "https://rhiaro.co.uk/followers/"],
-    "cc": "https://e14n.com/evan"
+    '@context': 'https://www.w3.org/ns/activitypub',
+    'type': 'Like',
+    'actor': 'https://dustycloud.org/chris/', // #TODO fix that there was a missing comma here in spec
+    'name': "Chris liked 'Minimal ActivityPub update client'",
+    'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
+    'to': ['https://dustycloud.org/followers', 'https://rhiaro.co.uk/followers/'],
+    'cc': 'https://e14n.com/evan'
   }))
-  const postActivityRequest = await sendRequest(req);
+  const postActivityRequest = await sendRequest(req)
   // Servers MUST return a 201 Created HTTP code...
-  assert.equal(postActivityRequest.statusCode, 201);
+  assert.equal(postActivityRequest.statusCode, 201)
   // ...with the new URL in the Location header.
-  const location = postActivityRequest.headers.location;
+  const location = postActivityRequest.headers.location
   assert(location, 'Location header is present in response')
   // #TODO assert its a URL
 
   // #question - Does this imply any requirements about what happens when GET that URL?
   // going to test that it's GETtable for now
-  const getActivityRequest = await sendRequest(await requestForListener(distbinListener, location));
-  assert.equal(getActivityRequest.statusCode, 200);
+  const getActivityRequest = await sendRequest(await requestForListener(distbinListener, location))
+  assert.equal(getActivityRequest.statusCode, 200)
 
   /*
   If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.
@@ -222,9 +222,7 @@ tests['can submit an Activity to the Outbox'] = async function() {
   // The server adds this new Activity to the outbox collection. Depending on the type of Activity, servers may then be required to carry out further side effects.
   // #TODO: Probably verify this by fetching the outbox collection. Keep in mind that tests all run in parallel right now so any assumption of isolation will be wrong.
   // #critique - What's the best way to verify this, considering there is no requirement for the Activity POST response to include a representation, and another part of the spec currently says the server should ignore any .id provided by the client and set it's own. If the Client can provide its own ID, then it can instantly go in the outbox to verify something with that ID is there. If not, it first has to fetch the Location URL, see the ID, then look in the outbox and check for that ID. Eh. Ultimately not that crazy but I still feel strongly that bit about 'ignoring' the provided id and using a new one is really really bad.
-
 }
-
 
 // 7.1 Create Activity - https://w3c.github.io/activitypub/#create-activity-outbox
 
@@ -238,35 +236,35 @@ tests['can submit an Activity to the Outbox'] = async function() {
     # urgh, see #critique on previous line. Small little copying adjustments are weird and not-very REST because they're changing what the client sent without telling it instead of just being strict about accepting what the client sends. Can lead to ambiguity in client representation.
   */
 
-tests['can submit a Create Activity to the Outbox'] = async function() {
+tests['can submit a Create Activity to the Outbox'] = async function () {
   const req = await requestForListener(distbin(), {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
     path: '/activitypub/outbox'
-  });
+  })
   req.write(JSON.stringify({
-    "@context": "https://www.w3.org/ns/activitypub",
-    "type": "Create", // #TODO: comma was missing here, fix in spec
-    "id": "https://example.net/~mallory/87374", // #TODO: comma was missing here, fix in spec
-    "actor": "https://example.net/~mallory",
-    "object": {
-      "id": "https://example.com/~mallory/note/72",
-      "type": "Note",
-      "attributedTo": "https://example.net/~mallory",
-      "content": "This is a note",
-      "published": "2015-02-10T15:04:55Z",
-      "to": ["https://example.org/~john/"],
-      "cc": ["https://example.com/~erik/followers"]
+    '@context': 'https://www.w3.org/ns/activitypub',
+    'type': 'Create', // #TODO: comma was missing here, fix in spec
+    'id': 'https://example.net/~mallory/87374', // #TODO: comma was missing here, fix in spec
+    'actor': 'https://example.net/~mallory',
+    'object': {
+      'id': 'https://example.com/~mallory/note/72',
+      'type': 'Note',
+      'attributedTo': 'https://example.net/~mallory',
+      'content': 'This is a note',
+      'published': '2015-02-10T15:04:55Z',
+      'to': ['https://example.org/~john/'],
+      'cc': ['https://example.com/~erik/followers']
     },
-    "published": "2015-02-10T15:04:55Z",
-    "to": ["https://example.org/~john/"],
-    "cc": ["https://example.com/~erik/followers"]
+    'published': '2015-02-10T15:04:55Z',
+    'to': ['https://example.org/~john/'],
+    'cc': ['https://example.com/~erik/followers']
   }))
-  const res = await sendRequest(req);
+  const res = await sendRequest(req)
   // Servers MUST return a 201 Created HTTP code...
-  assert.equal(res.statusCode, 201);
+  assert.equal(res.statusCode, 201)
 }
 
 // 7.1.1 Object creation without a Create Activity - https://w3c.github.io/activitypub/#object-without-create
@@ -277,47 +275,47 @@ The server must accept a valid [ActivityStreams] object
   that isn't a subtype of Activity in the POST request to the outbox.
     #critique: Does this mean it should reject subtypes of Activities? No, right, because Activities are normal to send to outbox. Maybe then you're just saying that, if it's not an Activity subtype, initiate this 'Create-wrapping' algorithm.
 */
-tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] = async function() {
+tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] = async function () {
   const req = await requestForListener(distbin(), {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
     path: '/activitypub/outbox'
-  });
+  })
   // Example 10: Object with audience targeting
   const example10 = {
-    "@context": "https://www.w3.org/ns/activitypub",
-    "type": "Note",
-    "content": "This is a note",
-    "published": "2015-02-10T15:04:55Z",
-    "to": ["https://example.org/~john/"],
-    "cc": ["https://example.com/~erik/followers"]
+    '@context': 'https://www.w3.org/ns/activitypub',
+    'type': 'Note',
+    'content': 'This is a note',
+    'published': '2015-02-10T15:04:55Z',
+    'to': ['https://example.org/~john/'],
+    'cc': ['https://example.com/~erik/followers']
   }
   req.write(JSON.stringify(example10))
   const res = await sendRequest(req)
   // Servers MUST return a 201 Created HTTP code...
-  assert.equal(res.statusCode, 201);
+  assert.equal(res.statusCode, 201)
 
   // The audience specified on the object must be copied over to the new Create activity by the server.
-  const example11 = {
-    "@context": "https://www.w3.org/ns/activitypub",
-    "type": "Create", // #TODO this comma was missing, fix in spec
-    "id": "https://example.net/~mallory/87374", // #TODO this comma was missing, fix in spec
-    "actor": "https://example.net/~mallory",
-    "object": {
-      "id": "https://example.com/~mallory/note/72",
-      "type": "Note",
-      "attributedTo": "https://example.net/~mallory",
-      "content": "This is a note",
-      "published": "2015-02-10T15:04:55Z",
-      "to": ["https://example.org/~john/"],
-      "cc": ["https://example.com/~erik/followers"]
-    },
-    "published": "2015-02-10T15:04:55Z",
-    "to": ["https://example.org/~john/"],
-    "cc": ["https://example.com/~erik/followers"]
-  }
+  // const example11 = {
+  //   '@context': 'https://www.w3.org/ns/activitypub',
+  //   'type': 'Create', // #TODO this comma was missing, fix in spec
+  //   'id': 'https://example.net/~mallory/87374', // #TODO this comma was missing, fix in spec
+  //   'actor': 'https://example.net/~mallory',
+  //   'object': {
+  //     'id': 'https://example.com/~mallory/note/72',
+  //     'type': 'Note',
+  //     'attributedTo': 'https://example.net/~mallory',
+  //     'content': 'This is a note',
+  //     'published': '2015-02-10T15:04:55Z',
+  //     'to': ['https://example.org/~john/'],
+  //     'cc': ['https://example.com/~erik/followers']
+  //   },
+  //   'published': '2015-02-10T15:04:55Z',
+  //   'to': ['https://example.org/~john/'],
+  //   'cc': ['https://example.com/~erik/followers']
+  // }
   /*
   #TODO: Somehow verify:
   The server then must attach this object as the object of a Create Activity.
@@ -334,21 +332,24 @@ tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] 
 if (require.main === module) {
   run(tests)
     .then(() => process.exit())
-    .catch(() => proceess.exit(1))
+    .catch(() => process.exit(1))
 }
 
 // Given an HTTP Response, read the whole response body and return as string
-async function readResponseBody(res) {
-  let body = '';
+async function readResponseBody (res) {
+  let body = ''
   return new Promise((resolve, reject) => {
-    res.on('error', reject);
-    res.on('data', (chunk) => body += chunk)
+    res.on('error', reject)
+    res.on('data', (chunk) => {
+      body += chunk
+      return body
+    })
     res.on('end', () => resolve(body))
   })
 }
 
 // execute some tests
-async function run(tests) {
+async function run (tests) {
   const results = await Promise.all(
     // map to array of promises of logged errors
     // (or falsy if the test passed)
@@ -380,7 +381,7 @@ async function run(tests) {
   }
 }
 
-async function requestForListener(listener, requestOptions) {
+async function requestForListener (listener, requestOptions) {
   const server = http.createServer(listener)
   let listened
   await new Promise((resolve, reject) => {
@@ -399,17 +400,17 @@ async function requestForListener(listener, requestOptions) {
     method: 'get',
     path: '/',
     port: server.address().port
-  }, typeof(requestOptions) === 'string' ? { path: requestOptions } : requestOptions))
+  }, typeof (requestOptions) === 'string' ? { path: requestOptions } : requestOptions))
 
   return request
 }
 
 // given a node.http handler function accepting (req, res), make it listen
 // then send an http.request, return a Promise of response
-async function sendRequest(request) {
+async function sendRequest (request) {
   return new Promise((resolve, reject) => {
-    request.once('response', resolve);
-    request.once('error', reject);
-    request.end();
+    request.once('response', resolve)
+    request.once('error', reject)
+    request.end()
   })
 }
