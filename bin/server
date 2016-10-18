@@ -77,7 +77,38 @@ function distbinHtml({ apiUrl }) {
 		switch (req.method.toLowerCase()) {
 			case 'get':
 				res.writeHead(200)
-				res.write("<h1>distbin-html</h1>")
+				res.write(`
+					<head>
+						<style>
+						html { font-size: 1.2vw; }
+						body {
+							margin: 0 auto;
+							max-width: 60em;
+						  padding: 1.5rem;
+						}
+						p {
+						  line-height: 1.5rem;
+						  margin-bottom: 1.5rem;
+						}
+						</style>
+					</head>
+					<h1>distbin</h1>
+						<p>
+							distbin is a <strong>dist</strong>ributed <a href="https://en.wikipedia.org/wiki/Pastebin">paste<strong>bin</strong></a>.
+							i.e. it is a web service where anyone can post documents. What makes distbin unique is that it supports distributed social interactions around these documents using candidate web standards emerging from the <a href="https://www.w3.org/wiki/Socialwg">W3C Social Web Working Group</a>, for example the <a href="https://www.w3.org/TR/activitystreams-core/">Activity Streams</a> vocabulary and <a href="https://www.w3.org/TR/activitypub/">ActivityPub</a> protocol.
+						</p>
+						<p>
+							Status: <strong>very</strong> much toy status right now. Activities are not persisted outside of process memory. No Authorization checks exist at all.
+						</p>
+					<h2>Feature Progress</h2>
+						<ul>
+							<li>ActivityPub - <a href="/activitypub">/activitypub</a>
+								<ul>
+									<li><a href="https://www.w3.org/TR/activitypub/#outbox">Outbox</a> exists and can activities can be POSTed to it - <a href="/activitypub/outbox">/activitypub/outbox</a></li>
+								</ul>
+							</li>
+						</ul>
+				`)
 				// create new
 				res.write(`
 					<h2>Post a Note</h2>
