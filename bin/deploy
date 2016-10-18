@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# build
+docker build . -t distbin
+# kill old
+docker rm -f distbin
+# run
+docker run -d -p 80:8080 --restart always --name distbin distbin
