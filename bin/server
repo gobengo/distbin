@@ -36,15 +36,36 @@ async function runServer() {
 	})
 
 	// html
-	const htmlServer = http.createServer(distbinHtml({ apiUrl: apiServerUrl }))
-	// frontline must listen
-	let htmlServerUrl = await new Promise((resolve) => {
-		htmlServer.listen(process.env.PORT || 0, (err) => {
-			resolve(`http://localhost:${htmlServer.address().port}`)
+	const htmlHandler = distbinHtml({ apiUrl: apiServerUrl })
+
+	// mainServer delegates to htmlHandler or distbin api handler based on Accept header
+	// of request
+	// #TODO this is awkard. Really the 'home page module' at / should now how to content negotiate, not this
+	const mainServer = http.createServer((req, res) => {
+		// htmlHandler only supports '/' right now (#TODO)
+		if (req.url === '/') {
+			const accept = req.headers.accept ? req.headers.accept.split(',') : [];
+			for (let mime of accept) {
+				switch (mime) {
+					case 'text/html':
+						return htmlHandler(req, res);
+					case 'application/json':
+						return bin(req, res);
+				}
+			}
+		}
+		// accept header not present or didn't match, default to api ?
+		// but maybe should be "Not Acceptable" status code
+		return bin(req, res);
+	})
+	// listen
+	let mainServerUrl = await new Promise((resolve) => {
+		mainServer.listen(process.env.PORT || 0, (err) => {
+			resolve(`http://localhost:${mainServer.address().port}`)
 		})
 	})
 
-	console.log(htmlServerUrl)
+	console.log(mainServerUrl)
 	// now just like listen
 	await new Promise(function () {
 
@@ -73,11 +94,17 @@ function distbinHtml({ apiUrl }) {
 						await readableToString(await sendRequest(http.request(apiUrl+'/activitypub/public')))
 					}</pre>
 				`)
+				// show other links
+				res.write(`
+					<h2>More Info/Links</h2>
+					<pre>${
+						await readableToString(await sendRequest(http.request(apiUrl)))
+					}</pre>
+				`)				
 				res.end()
 				return;			
 			case 'post':
 				const submission = await readableToString(req);
-				console.log('submission', submission)
 				// assuming application/x-www-form-urlencoded
 				const { content } = querystring.parse(submission);
 				// don't allow HTML
@@ -99,7 +126,6 @@ function distbinHtml({ apiUrl }) {
 				}));
 				postToOutboxRequest.write(JSON.stringify(note));
 				const postToOutboxResponse = await sendRequest(postToOutboxRequest);
-				console.log('postToOutboxResponse', postToOutboxResponse.statusCode);
 				// handle form submission by posting to outbox
 				res.writeHead(302, { location: req.url })
 				res.end()
