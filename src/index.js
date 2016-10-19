@@ -98,7 +98,6 @@ function recentHandler ({ activities }) {
 // https://w3c.github.io/activitypub/#outbox
 function outboxHandler ({ activities }) {
   return async function (req, res) {
-    console.log("Outbox receiving request", req.method);
     switch (req.method.toLowerCase()) {
       case 'get':
         res.writeHead(200)
@@ -111,7 +110,15 @@ function outboxHandler ({ activities }) {
       case 'post':
         const requestBody = await readableToString(req)
         const newuuid = uuid()
-        const newThing = Object.assign(JSON.parse(requestBody), {
+        let parsed;
+        try {
+          parsed = JSON.parse(requestBody)
+        } catch (e) {
+          res.writeHead(400);
+          res.end("Couldn't parse request body as JSON: "+requestBody)
+          return;
+        }
+        const newThing = Object.assign(parsed, {
           // #TODO: validate that newThing wasn't submitted with an .id, even though spec says to rewrite it
           id: activityUri(newuuid),
           // #TODO: what if it already had published?
@@ -119,7 +126,6 @@ function outboxHandler ({ activities }) {
         })
         // #TODO: read request body, validate, and save it somewhere...
         const location = '/activities/' + newuuid
-        console.log('outboxHandler setting', newThing)
         activities.set(newThing.id, newThing)
         res.writeHead(201, { location })
         res.end()
