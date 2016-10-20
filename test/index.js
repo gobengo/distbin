@@ -138,6 +138,44 @@ tests['can request the public Collection'] = async function () {
   assert.equal(res.statusCode, 200)
 }
 
+/*
+5.5 Inbox
+
+The inbox is discovered through the inbox property of an actor's profile.
+#TODO add .inbox with propert context to / JSON
+*/
+
+// The inbox must be an OrderedCollection.
+tests['The inbox must be an OrderedCollection'] = async function () {
+  const res = await sendRequest(await requestForListener(distbin(), {
+    path: '/activitypub/inbox',
+    headers: activitypub.clientHeaders()
+  }))
+  assert.equal(res.statusCode, 200)
+  const resBody = await readResponseBody(res)
+  const isOrderedCollection = (something) => {
+    const obj = typeof something === 'string' ? JSON.parse(something) : something
+    // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
+    assert.equal(obj.type, 'OrderedCollection')
+    return true
+  }
+  assert(isOrderedCollection(resBody))
+}
+
+/*
+
+The inbox stream contains all objects received by the user.
+The server should filter content according to the requester's permission.
+In general, the owner of an inbox is likely to be able to access all of their inbox contents.
+Depending on access control, some other content may be public, whereas other content may require authentication for non-owner users, if they can access the inbox at all.
+
+The server must perform de-duplication of activities returned by the inbox.
+Duplication can occur if an activity is addressed both to a user's followers, and a specific user who also follows the recipient user, and the server has failed to de-duplicate the recipients list.
+Such deduplication must be performed by comparing the id of the activities and dropping any activities already seen.
+
+The inbox accepts HTTP POST requests, with behaviour described in Delivery.
+*/
+
 // 6 Binary Data - #TODO
 
 // 7 Client to Server Interactions - https://w3c.github.io/activitypub/#client-to-server-interactions

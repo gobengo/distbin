@@ -15,6 +15,7 @@ module.exports = function () {
     const simpleRoutes = {
       '/': index,
       '/recent': recentHandler({ activities }),
+      '/activitypub/inbox': inboxHandler({ activities }),
       '/activitypub/outbox': outboxHandler({ activities }),
       '/activitypub/public': publicCollectionHandler({ activities })
     }
@@ -93,6 +94,49 @@ function recentHandler ({ activities }) {
     }, null, 2))
   }
 }
+
+// route for ActivityPub Inbox
+// https://w3c.github.io/activitypub/#inbox
+function inboxHandler ({ activities }) {
+  return async function (req, res) {
+    switch (req.method.toLowerCase()) {
+      case 'get':
+        res.writeHead(200)
+        res.end(JSON.stringify({
+          '@context': 'https://www.w3.org/ns/activitystreams',
+          type: 'OrderedCollection',
+          items: []
+        }, null, 2))
+        break
+      case 'post':
+        const requestBody = await readableToString(req)
+        const newuuid = uuid()
+        let parsed;
+        try {
+          parsed = JSON.parse(requestBody)
+        } catch (e) {
+          res.writeHead(400);
+          res.end("Couldn't parse request body as JSON: "+requestBody)
+          return;
+        }
+        const newThing = Object.assign(parsed, {
+          // #TODO: validate that newThing wasn't submitted with an .id, even though spec says to rewrite it
+          id: activityUri(newuuid),
+          // #TODO: what if it already had published?
+          published: (new Date()).toISOString()
+        })
+        // #TODO: read request body, validate, and save it somewhere...
+        const location = '/activities/' + newuuid
+        activities.set(newThing.id, newThing)
+        res.writeHead(201, { location })
+        res.end()
+        break
+      default:
+        return error(405, 'Method not allowed: ')(req, res)
+    }
+  }
+}
+
 
 // route for ActivityPub Outbox
 // https://w3c.github.io/activitypub/#outbox
