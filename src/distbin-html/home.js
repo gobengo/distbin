@@ -108,16 +108,17 @@ exports.createHandler = function ({ apiUrl }) {
             In addition to using the above form, you can create posts via the ActivityPub API:
             <details>
               <pre>${encodeHtmlEntities(`
-    curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
-    {
-      "@context": "https://www.w3.org/ns/activitypub",
-      "type": "Note",
-      "content": "This is a note",
-      "published": "2015-02-10T15:04:55Z",
-      "to": ["https://example.org/~john/"],
-      "cc": ["https://example.com/~erik/followers"]
-    }
-    EOF`)}</pre>
+curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "type": "Note",
+  "content": "This is a note",
+  "published": "2015-02-10T15:04:55Z",
+  "to": ["https://example.org/~john/"],
+  "cc": ["https://example.com/~erik/followers"]
+}
+EOF`)}
+              </pre>
             </details>
           </p>
         `)
