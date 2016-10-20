@@ -1,4 +1,8 @@
-const { as2ObjectIsActivity, publicCollectionId } = require('./activitypub')
+const {
+  as2ObjectIsActivity,
+  targetAndDeliver,
+  publicCollectionId
+ } = require('./activitypub')
 const { readableToString } = require('./util')
 const url = require('url')
 const uuid = require('node-uuid')
@@ -12,13 +16,14 @@ module.exports = function () {
   // #TODO: This should be size-bound e.g. LRU
   // #TODO: This should be persistent :P
   const activities = new Map()
+  const inbox = new Map()
   const publicActivities = new Map()
   return function (req, res) {
     const requestPath = url.parse(req.url).pathname
     const simpleRoutes = {
       '/': index,
       '/recent': recentHandler({ activities }),
-      '/activitypub/inbox': inboxHandler({ activities }),
+      '/activitypub/inbox': inboxHandler({ activities, inbox }),
       '/activitypub/outbox': outboxHandler({ activities, publicActivities }),
       '/activitypub/public': publicCollectionHandler({ activities: publicActivities })
     }
@@ -68,12 +73,14 @@ function index (req, res) {
       'https://www.w3.org/ns/activitystreams',
       {
         'activitypub': 'https://www.w3.org/ns/activitypub#',
+        'inbox': 'activitypub:inbox',
         'outbox': 'activitypub:outbox'
       }
     ],
     'type': 'Service',
     'name': 'distbin',
     'summary': 'A public service to store and retrieve posts and enable (federated, standards-compliant) social interaction around them',
+    'inbox': '/activitypub/inbox',
     'outbox': '/activitypub/outbox',
     'recent': '/recent'
   }, null, 2))
@@ -101,20 +108,23 @@ function recentHandler ({ activities }) {
 
 // route for ActivityPub Inbox
 // https://w3c.github.io/activitypub/#inbox
-function inboxHandler ({ activities }) {
+function inboxHandler ({ activities, inbox }) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
       case 'get':
+        const maxMemberCount = requestMaxMemberCount(req) || 10
         res.writeHead(200)
         res.end(JSON.stringify({
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: 'OrderedCollection',
-          items: []
+          items: [...inbox.values()].reverse().slice(-1 * maxMemberCount),
+          totalItems: inbox.size,
+          // empty string is relative URL for 'self'
+          current: ''
         }, null, 2))
         break
       case 'post':
         const requestBody = await readableToString(req)
-        const newuuid = uuid()
         let parsed
         try {
           parsed = JSON.parse(requestBody)
@@ -123,16 +133,24 @@ function inboxHandler ({ activities }) {
           res.end("Couldn't parse request body as JSON: " + requestBody)
           return
         }
-        const newThing = Object.assign(parsed, {
-          // #TODO: validate that newThing wasn't submitted with an .id, even though spec says to rewrite it
-          id: activityUri(newuuid),
-          // #TODO: what if it already had published?
-          published: (new Date()).toISOString()
-        })
         // #TODO: read request body, validate, and save it somewhere...
-        const location = '/activities/' + newuuid
-        activities.set(newThing.id, newThing)
-        res.writeHead(201, { location })
+
+        if (parsed.id && inbox.get(parsed.id)) {
+          // duplicate!
+          res.writeHead(409)
+          res.end('There is already an activity in the inbox with id ' + parsed.id)
+          return
+        }
+
+        if (!parsed.id) {
+          parsed.id = activityUri(uuid())
+        }
+
+        inbox.set(parsed.id, parsed)
+        // todo: Probably setting on inbox should automagically add to global set of activities
+        activities.set(parsed.id, parsed)
+
+        res.writeHead(202)
         res.end()
         break
       default:
@@ -189,32 +207,53 @@ function outboxHandler ({ activities, publicActivities }) {
         // https://w3c.github.io/activitypub/#object-without-create
         // The server must accept a valid [ActivityStreams] object that isn't a subtype of Activity in the POST request to the outbox.
         // The server then must attach this object as the object of a Create Activity.
-        const submittedActivity = as2ObjectIsActivity(parsed) ? parsed : Object.assign({
-          '@context': 'https://www.w3.org/ns/activitystreams',
-          'type': 'Create',
-          'object': parsed
-        }, ['to', 'cc', 'bcc'].reduce((props, key) => {
-          if (key in parsed) props[key] = parsed[key]
-          return props
-        }, {}), {})
+        const submittedActivity = as2ObjectIsActivity(parsed) ? parsed : Object.assign(
+          {
+            '@context': 'https://www.w3.org/ns/activitystreams',
+            'type': 'Create',
+            'object': parsed
+          },
+          // copy over audience from submitted object to activity
+          ['to', 'cc', 'bcc'].reduce((props, key) => {
+            if (key in parsed) props[key] = parsed[key]
+            return props
+          }, {})
+        )
 
-        const activityToSave = Object.assign(submittedActivity, {
-          // #TODO: validate that activityToSave wasn't submitted with an .id, even though spec says to rewrite it
+        const newActivity = Object.assign(submittedActivity, {
+          // #TODO: validate that newActivity wasn't submitted with an .id, even though spec says to rewrite it
           id: activityUri(newuuid),
           // #TODO: what if it already had published?
           published: (new Date()).toISOString()
         })
-        // #TODO: validate
+        // #TODO: validate the activity. Like... you probably shouldn't be able to just send '{}'
         const location = '/activities/' + newuuid
 
-        activities.set(activityToSave.id, activityToSave)
+        // Save
+        activities.set(newActivity.id, newActivity)
         // #TODO: Consider moving this up and out into a sort of core model for storing activities
         // that automatically indexes public ones
-        if (activityHasTarget(activityToSave, publicCollectionId)) {
-          publicActivities.set(activityToSave.id, activityToSave)
+        if (activityHasTarget(newActivity, publicCollectionId)) {
+          publicActivities.set(newActivity.id, newActivity)
         }
 
         res.writeHead(201, { location })
+
+        try {
+          // Target and Deliver to other inboxes
+          await targetAndDeliver(newActivity)
+        } catch (e) {
+          if (e.name === 'SomeDeliveriesFailed') {
+            // #TODO: Retry some day
+            res.end(JSON.stringify({
+              content: "Activity was created, but delivery to some others servers' inbox failed. They will not be retried.",
+              failures: e.failures
+            }))
+            return
+          }
+          throw e
+        }
+
         res.end()
         break
       default:

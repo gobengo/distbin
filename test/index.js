@@ -1,7 +1,8 @@
+const activitypub = require('../src/activitypub')
 const assert = require('assert')
 const distbin = require('../')
 const http = require('http')
-const { readableToString } = require('../src/util');
+const { readableToString } = require('../src/util')
 
 let tests = module.exports
 
@@ -29,7 +30,8 @@ tests['/ route can be fetched as JSONLD and includes pointers to things like out
   const resBody = await readableToString(res)
   const rootResource = JSON.parse(resBody)
   // #TODO: maybe a more fancy JSON-LD-aware check
-  assert(Object.keys(rootResource).includes('outbox'))
+  assert(Object.keys(rootResource).includes('outbox'), '/ points to outbox')
+  assert(Object.keys(rootResource).includes('inbox'), '/ points to inbox')
 }
 
 tests['can fetch /recent to see what\'s been going on'] = async function () {
@@ -51,10 +53,6 @@ tests['can fetch /recent to see what\'s been going on'] = async function () {
 Tests of ActivityPub functionality, including lots of text from the spec itself and #critiques
 
 */
-
-// activitypub helpers
-// (will be added to from relevant spec sections below e.g. 3.2)
-let activitypub = {}
 
 /*
 3.1 Object Identifiers - https://w3c.github.io/activitypub/#obj-id
@@ -81,19 +79,6 @@ activitypub.objectHasRequiredProperties = (obj) => {
 }
 
 // 3.2 Methods on Objects - https://w3c.github.io/activitypub/#obj-methods
-
-// Create a headers map for http.request() incl. any specced requirements for ActivityPub Client requests
-activitypub.clientHeaders = (headers = {}) => {
-  const requirements = {
-    // The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
-    //  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
-    accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#'
-  }
-  if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
-    throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
-  }
-  return Object.assign(requirements, headers)
-}
 
 // 4 Actors - https://w3c.github.io/activitypub/#actors
 
@@ -145,16 +130,15 @@ tests['can request the public Collection'] = async function () {
 // In addition to [ActivityStreams] collections and objects, Activities may additionally be addressed to the special "public" collection, with the identifier https://www.w3.org/ns/activitystreams#Public. For example:
 // #critique: It would be helpful to show an example activity that is 'addressed to the public collection', as there aren't any currently in the spec
 //  Like... should the public collection id bein the 'to' or 'cc' or 'bcc' fields or does it matter?
-tests['can address activities to the public Collection when sending to outbox, '+
-      'and they show up in the public Collection'] = async function () {
-  const distbinListener = distbin();
+tests['can address activities to the public Collection when sending to outbox, and they show up in the public Collection'] = async function () {
+  const distbinListener = distbin()
 
   // post an activity addressed to public collection to outbox
   const activityToPublic = {
-    "@context": "https://www.w3.org/ns/activitystreams",
-    "type": "Like",
-    "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
-    "cc": ["https://www.w3.org/ns/activitystreams#Public"]
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    'type': 'Like',
+    'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
+    'cc': ['https://www.w3.org/ns/activitystreams#Public']
   }
   const postActivityRequest = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
@@ -163,18 +147,18 @@ tests['can address activities to the public Collection when sending to outbox, '
     method: 'post',
     path: '/activitypub/outbox'
   })
-  postActivityRequest.write(JSON.stringify(activityToPublic));
-  const postActivityResponse = await sendRequest(postActivityRequest);
-  assert.equal(postActivityResponse.statusCode, 201);
-  
+  postActivityRequest.write(JSON.stringify(activityToPublic))
+  const postActivityResponse = await sendRequest(postActivityRequest)
+  assert.equal(postActivityResponse.statusCode, 201)
+
   // k it's been POSTed to outbox. Verify it's in the public collection
-  const publicCollectionResponse = await sendRequest(await requestForListener(distbinListener, '/activitypub/public'));
-  const publicCollection = JSON.parse(await readableToString(publicCollectionResponse));
+  const publicCollectionResponse = await sendRequest(await requestForListener(distbinListener, '/activitypub/public'))
+  const publicCollection = JSON.parse(await readableToString(publicCollectionResponse))
   // #critique ... ok so this is an example of where it's hard to know whether its in the Collection
   // because of id generation and such
   assert(publicCollection.totalItems > 0, 'publicCollection has at least one item')
-  assert(1 === publicCollection.items.filter((a) => a.type === 'Like' && a.object === 'https://rhiaro.co.uk/2016/05/minimal-activitypub').length,
-    'publicCollection contains the activity that targeted it');
+  assert(publicCollection.items.filter((a) => a.type === 'Like' && a.object === 'https://rhiaro.co.uk/2016/05/minimal-activitypub').length === 1,
+    'publicCollection contains the activity that targeted it')
 }
 
 /*
@@ -270,9 +254,9 @@ tests['can submit an Activity to the Outbox'] = async function () {
     'type': 'Like',
     'actor': 'https://dustycloud.org/chris/', // #TODO fix that there was a missing comma here in spec
     'name': "Chris liked 'Minimal ActivityPub update client'",
-    'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
-    'to': ['https://dustycloud.org/followers', 'https://rhiaro.co.uk/followers/'],
-    'cc': 'https://e14n.com/evan'
+    'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub'
+    // 'to': ['https://dustycloud.org/followers', 'https://rhiaro.co.uk/followers/'],
+    // 'cc': 'https://e14n.com/evan'
   }))
   const postActivityRequest = await sendRequest(req)
   // Servers MUST return a 201 Created HTTP code...
@@ -331,13 +315,13 @@ tests['can submit a Create Activity to the Outbox'] = async function () {
       'type': 'Note',
       'attributedTo': 'https://example.net/~mallory',
       'content': 'This is a note',
-      'published': '2015-02-10T15:04:55Z',
-      'to': ['https://example.org/~john/'],
-      'cc': ['https://example.com/~erik/followers']
+      'published': '2015-02-10T15:04:55Z'
+      // 'to': ['https://example.org/~john/'],
+      // 'cc': ['https://example.com/~erik/followers']
     },
-    'published': '2015-02-10T15:04:55Z',
-    'to': ['https://example.org/~john/'],
-    'cc': ['https://example.com/~erik/followers']
+    'published': '2015-02-10T15:04:55Z'
+    // 'to': ['https://example.org/~john/'],
+    // 'cc': ['https://example.com/~erik/followers']
   }))
   const res = await sendRequest(req)
   // Servers MUST return a 201 Created HTTP code...
@@ -353,7 +337,7 @@ The server must accept a valid [ActivityStreams] object
     #critique: Does this mean it should reject subtypes of Activities? No, right, because Activities are normal to send to outbox. Maybe then you're just saying that, if it's not an Activity subtype, initiate this 'Create-wrapping' algorithm.
 */
 tests['can submit a non-Activity to the Outbox, and it is converted to a Create'] = async function () {
-  const distbinListener = distbin();
+  const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
@@ -367,8 +351,7 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
     'type': 'Note',
     'content': 'This is a note',
     'published': '2015-02-10T15:04:55Z',
-    'to': ['https://example.org/~john/'],
-    'cc': ['https://example.com/~erik/followers']
+    'to': [activitypub.publicCollectionId]
   }
   req.write(JSON.stringify(example10))
   const res = await sendRequest(req)
@@ -377,15 +360,15 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
 
   const newCreateActivityResponse = await sendRequest(await requestForListener(distbinListener, res.headers.location))
   assert.equal(newCreateActivityResponse.statusCode, 200)
-  const newCreateActivity = JSON.parse(await readableToString(newCreateActivityResponse));
+  const newCreateActivity = JSON.parse(await readableToString(newCreateActivityResponse))
 
   // The server then must attach this object as the object of a Create Activity.
   assert.equal(newCreateActivity.type, 'Create')
-  assert.deepEqual(newCreateActivity.object, example10);
+  assert.deepEqual(newCreateActivity.object, example10)
   // The audience specified on the object must be copied over to the new Create activity by the server.
-  assert.deepEqual(newCreateActivity.to, example10.to);
-  assert.deepEqual(newCreateActivity.cc, example10.cc);
-  assert.deepEqual(newCreateActivity.bcc, example10.bcc);
+  assert.deepEqual(newCreateActivity.to, example10.to)
+  assert.deepEqual(newCreateActivity.cc, example10.cc)
+  assert.deepEqual(newCreateActivity.bcc, example10.bcc)
 }
 
 /*
@@ -407,7 +390,29 @@ These fields will have been populated appropriately by the client which posted t
 */
 
 tests['targets and delivers targeted activities sent to Outbox'] = async function () {
-  // TODO
+  // ok so we're going to make to distbins, A and B, and test that A delivers to B
+  const distbinA = distbin()
+  const distbinB = distbin()
+  const distbinBUrl = await listen(http.createServer(distbinB))
+  // post an Activity to distbinA that has cc distbinB
+  const a = {
+    type: 'Note',
+    content: 'Man, distbinB is really killing it today.',
+    cc: distbinBUrl
+  }
+  const postNoteRequest = await requestForListener(distbinA, {
+    headers: activitypub.clientHeaders({
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+    }),
+    method: 'post',
+    path: '/activitypub/outbox'
+  })
+  postNoteRequest.write(JSON.stringify(a))
+  const postNoteResponse = await sendRequest(postNoteRequest)
+  assert.equal(postNoteResponse.statusCode, 201)
+  // then verify that it is in distbinB's inbox
+  const distbinBInbox = JSON.parse(await readableToString(await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))))
+  assert(distbinBInbox.items.length > 0, 'there are items in distbin B inbox')
 }
 
 /*
@@ -441,6 +446,7 @@ async function run (tests) {
       function logFailure (err) {
         console.error(`TEST FAIL: ${testName}\n${err.stack}\n`)
       }
+      // console.log('TEST: ', testName)
       let result
       try {
         result = runTest()
@@ -450,7 +456,9 @@ async function run (tests) {
       }
       // result allowed to be a promise
       return Promise.resolve(result)
-      .then(() => {}) // return nothing if success
+      .then(() => {
+        // console.log("PASS", testName)
+      }) // return nothing if success
       .catch(err => {
         logFailure(err)
         return err
@@ -463,19 +471,10 @@ async function run (tests) {
   }
 }
 
+// Return Promise of an http.Request that will be sent to an http.createServer listener
 async function requestForListener (listener, requestOptions) {
   const server = http.createServer(listener)
-  let listened
-  await new Promise((resolve, reject) => {
-    server
-    .once('error', () => {
-      if (!listened) reject()
-    })
-    .listen(0, () => {
-      listened = true
-      resolve()
-    })
-  })
+  await listen(server)
 
   const request = http.request(Object.assign({
     hostname: 'localhost',
@@ -485,6 +484,21 @@ async function requestForListener (listener, requestOptions) {
   }, typeof (requestOptions) === 'string' ? { path: requestOptions } : requestOptions))
 
   return request
+}
+
+// given an http.Server, return a promise of it listening on a port
+async function listen (server, port = 0, ...args) {
+  let listened
+  return new Promise((resolve, reject) => {
+    server
+    .once('error', () => {
+      if (!listened) reject()
+    })
+    .listen(port, ...args, () => {
+      listened = true
+      resolve(`http://localhost:${server.address().port}`)
+    })
+  })
 }
 
 // given a node.http handler function accepting (req, res), make it listen
