@@ -1,4 +1,4 @@
-const { publicCollectionId } = require('./activitypub')
+const { as2ObjectIsActivity, publicCollectionId } = require('./activitypub')
 const url = require('url')
 const uuid = require('node-uuid')
 
@@ -47,6 +47,7 @@ function activityHandler ({ activities, activityUuid }) {
   return function (req, res) {
     const uri = activityUri(activityUuid)
     const activity = activities.get(uri)
+    // #TODO: If the activity isn't addressed to the public, we should enforce access controls here.
     if (!activity) {
       res.writeHead(404)
       res.end('There is no activity ' + uri)
@@ -113,13 +114,13 @@ function inboxHandler ({ activities }) {
       case 'post':
         const requestBody = await readableToString(req)
         const newuuid = uuid()
-        let parsed;
+        let parsed
         try {
           parsed = JSON.parse(requestBody)
         } catch (e) {
-          res.writeHead(400);
-          res.end("Couldn't parse request body as JSON: "+requestBody)
-          return;
+          res.writeHead(400)
+          res.end("Couldn't parse request body as JSON: " + requestBody)
+          return
         }
         const newThing = Object.assign(parsed, {
           // #TODO: validate that newThing wasn't submitted with an .id, even though spec says to rewrite it
@@ -141,18 +142,18 @@ function inboxHandler ({ activities }) {
 
 // given a AS2 object, return it's JSON-LD @id
 const getJsonLdId = (obj) => {
-  const jsonLdId = typeof obj === 'string' ? obj : (obj.id || obj['@id']);
-  return jsonLdId;
+  const jsonLdId = typeof obj === 'string' ? obj : (obj.id || obj['@id'])
+  return jsonLdId
 }
 
 // return whether a given activity targets another resource (e.g. in to, cc, bcc)
 const activityHasTarget = (activity, target) => {
   const targetId = getJsonLdId(target)
-  if ( ! targetId) {
-    throw new Error("Couldn't determine @id of " + target);
+  if (!targetId) {
+    throw new Error("Couldn't determine @id of " + target)
   }
-  for (targetList of [activity.to, activity.cc, activity.bcc]) {
-    if ( ! targetList) continue
+  for (const targetList of [activity.to, activity.cc, activity.bcc]) {
+    if (!targetList) continue
     const idsOfTargets = (Array.isArray(targetList) ? targetList : [targetList]).map(getJsonLdId)
     if (idsOfTargets.includes(targetId)) return true
   }
@@ -175,16 +176,29 @@ function outboxHandler ({ activities, publicActivities }) {
       case 'post':
         const requestBody = await readableToString(req)
         const newuuid = uuid()
-        let parsed;
+        let parsed
         try {
           parsed = JSON.parse(requestBody)
         } catch (e) {
-          res.writeHead(400);
-          res.end("Couldn't parse request body as JSON: "+requestBody)
-          return;
+          res.writeHead(400)
+          res.end("Couldn't parse request body as JSON: " + requestBody)
+          return
         }
-        const newActivity = Object.assign(parsed, {
-          // #TODO: validate that newActivity wasn't submitted with an .id, even though spec says to rewrite it
+
+        // https://w3c.github.io/activitypub/#object-without-create
+        // The server must accept a valid [ActivityStreams] object that isn't a subtype of Activity in the POST request to the outbox.
+        // The server then must attach this object as the object of a Create Activity.
+        const submittedActivity = as2ObjectIsActivity(parsed) ? parsed : Object.assign({
+          '@context': 'https://www.w3.org/ns/activitystreams',
+          'type': 'Create',
+          'object': parsed
+        }, ['to', 'cc', 'bcc'].reduce((props, key) => {
+          if (key in parsed) props[key] = parsed[key]
+          return props
+        }, {}), {})
+
+        const activityToSave = Object.assign(submittedActivity, {
+          // #TODO: validate that activityToSave wasn't submitted with an .id, even though spec says to rewrite it
           id: activityUri(newuuid),
           // #TODO: what if it already had published?
           published: (new Date()).toISOString()
@@ -192,11 +206,11 @@ function outboxHandler ({ activities, publicActivities }) {
         // #TODO: validate
         const location = '/activities/' + newuuid
 
-        activities.set(newActivity.id, newActivity)
+        activities.set(activityToSave.id, activityToSave)
         // #TODO: Consider moving this up and out into a sort of core model for storing activities
         // that automatically indexes public ones
-        if (activityHasTarget(newActivity, publicCollectionId)) {
-          publicActivities.set(newActivity.id, newActivity)
+        if (activityHasTarget(activityToSave, publicCollectionId)) {
+          publicActivities.set(activityToSave.id, activityToSave)
         }
 
         res.writeHead(201, { location })
@@ -212,12 +226,10 @@ function outboxHandler ({ activities, publicActivities }) {
 // https://w3c.github.io/activitypub/#public-addressing
 function publicCollectionHandler ({ activities }) {
   return (req, res) => {
-    debugger;
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const publicCollection = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       'id': 'https://www.w3.org/ns/activitypub/Public',
-      'type': 'Collection',
       'type': 'Collection',
       // Get recent 10 items
       'items': [...activities.values()].reverse().slice(-1 * maxMemberCount),

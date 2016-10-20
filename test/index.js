@@ -352,8 +352,9 @@ The server must accept a valid [ActivityStreams] object
   that isn't a subtype of Activity in the POST request to the outbox.
     #critique: Does this mean it should reject subtypes of Activities? No, right, because Activities are normal to send to outbox. Maybe then you're just saying that, if it's not an Activity subtype, initiate this 'Create-wrapping' algorithm.
 */
-tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] = async function () {
-  const req = await requestForListener(distbin(), {
+tests['can submit a non-Activity to the Outbox, and it is converted to a Create'] = async function () {
+  const distbinListener = distbin();
+  const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
@@ -362,7 +363,7 @@ tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] 
   })
   // Example 10: Object with audience targeting
   const example10 = {
-    '@context': 'https://www.w3.org/ns/activitypub',
+    '@context': 'https://www.w3.org/ns/activitystreams',
     'type': 'Note',
     'content': 'This is a note',
     'published': '2015-02-10T15:04:55Z',
@@ -374,35 +375,17 @@ tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] 
   // Servers MUST return a 201 Created HTTP code...
   assert.equal(res.statusCode, 201)
 
+  const newCreateActivityResponse = await sendRequest(await requestForListener(distbinListener, res.headers.location))
+  assert.equal(newCreateActivityResponse.statusCode, 200)
+  const newCreateActivity = JSON.parse(await readableToString(newCreateActivityResponse));
+
+  // The server then must attach this object as the object of a Create Activity.
+  assert.equal(newCreateActivity.type, 'Create')
+  assert.deepEqual(newCreateActivity.object, example10);
   // The audience specified on the object must be copied over to the new Create activity by the server.
-  // const example11 = {
-  //   '@context': 'https://www.w3.org/ns/activitypub',
-  //   'type': 'Create', // #TODO this comma was missing, fix in spec
-  //   'id': 'https://example.net/~mallory/87374', // #TODO this comma was missing, fix in spec
-  //   'actor': 'https://example.net/~mallory',
-  //   'object': {
-  //     'id': 'https://example.com/~mallory/note/72',
-  //     'type': 'Note',
-  //     'attributedTo': 'https://example.net/~mallory',
-  //     'content': 'This is a note',
-  //     'published': '2015-02-10T15:04:55Z',
-  //     'to': ['https://example.org/~john/'],
-  //     'cc': ['https://example.com/~erik/followers']
-  //   },
-  //   'published': '2015-02-10T15:04:55Z',
-  //   'to': ['https://example.org/~john/'],
-  //   'cc': ['https://example.com/~erik/followers']
-  // }
-  /*
-  #TODO: Somehow verify:
-  The server then must attach this object as the object of a Create Activity.
-
-  NOTE
-  The Location value returned by the server should be the URL of the new Create activity (rather than the object).
-    #critique: 'should' or 'MUST'
-
-  The audience specified on the object must be copied over to the new Create activity by the server.
-  */
+  assert.deepEqual(newCreateActivity.to, example10.to);
+  assert.deepEqual(newCreateActivity.cc, example10.cc);
+  assert.deepEqual(newCreateActivity.bcc, example10.bcc);
 }
 
 /*

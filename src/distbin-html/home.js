@@ -158,10 +158,10 @@ exports.createHandler = function ({ apiUrl }) {
         //   'cc': publicCollectionId
         // }
         let note = {
-          "@context": "https://www.w3.org/ns/activitystreams",
-          "type": "Note",
-          "content": safeContent,
-          "cc": publicCollectionId
+          '@context': 'https://www.w3.org/ns/activitystreams',
+          'type': 'Note',
+          'content': safeContent,
+          'cc': publicCollectionId
         }
         // submit to outbox
         // #TODO is it more 'precise' to convert this to an activity here?
