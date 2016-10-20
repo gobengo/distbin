@@ -1,4 +1,5 @@
 const { as2ObjectIsActivity, publicCollectionId } = require('./activitypub')
+const { readableToString } = require('./util')
 const url = require('url')
 const uuid = require('node-uuid')
 
@@ -261,16 +262,4 @@ function requestMaxMemberCount (req) {
   if (headerMatch) return parseInt(headerMatch[1], 10)
   // check querystring
   return parseInt(url.parse(req.url, true).query['max-member-count'], 10)
-}
-
-async function readableToString (readable) {
-  let body = ''
-  return new Promise((resolve, reject) => {
-    readable.on('error', reject)
-    readable.on('data', (chunk) => {
-      body += chunk
-      return body
-    })
-    readable.on('end', () => resolve(body))
-  })
 }
