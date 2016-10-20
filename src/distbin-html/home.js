@@ -1,12 +1,13 @@
 const http = require('http')
+const { publicCollectionId } = require('../activitypub')
 const querystring = require('querystring')
 const url = require('url')
+const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
+
 const htmlEntities = {
   checked: '&#x2611;',
   unchecked: '&#x2610;'
 }
-const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
-
 const requestUrl = (req) => `http://${req.headers.host}${req.url}`
 
 exports.createHandler = function ({ apiUrl }) {
@@ -104,19 +105,21 @@ exports.createHandler = function ({ apiUrl }) {
             <input type="submit" value="post" />
           </form>
           <p>
-            In addition to using the above form, you can create posts via ActivityPub like
+            In addition to using the above form, you can create posts via the ActivityPub API:
+            <details>
+              <pre>${encodeHtmlEntities(`
+    curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
+    {
+      "@context": "https://www.w3.org/ns/activitypub",
+      "type": "Note",
+      "content": "This is a note",
+      "published": "2015-02-10T15:04:55Z",
+      "to": ["https://example.org/~john/"],
+      "cc": ["https://example.com/~erik/followers"]
+    }
+    EOF`)}</pre>
+            </details>
           </p>
-          <pre>${encodeHtmlEntities(`
-curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
-{
-  "@context": "https://www.w3.org/ns/activitypub",
-  "type": "Note",
-  "content": "This is a note",
-  "published": "2015-02-10T15:04:55Z",
-  "to": ["https://example.org/~john/"],
-  "cc": ["https://example.com/~erik/followers"]
-}
-EOF`)}</pre>
         `)
         // recent
         res.write(`
@@ -145,10 +148,20 @@ EOF`)}</pre>
         const { content } = querystring.parse(submission)
         // don't allow HTML
         const safeContent = escape(content)
-        const note = {
-          '@context': 'https://www.w3.org/ns/activitypub',
-          'type': 'Note',
-          'content': safeContent
+        // let note = {
+        //   "@context": "https://www.w3.org/ns/activitystreams",
+        //   "type": "Create",
+        //   "object": {
+        //     "type": "Note",
+        //     "content": safeContent,
+        //   },
+        //   'cc': publicCollectionId
+        // }
+        let note = {
+          "@context": "https://www.w3.org/ns/activitystreams",
+          "type": "Note",
+          "content": safeContent,
+          "cc": publicCollectionId
         }
         // submit to outbox
         // #TODO is it more 'precise' to convert this to an activity here?

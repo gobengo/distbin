@@ -1,9 +1,9 @@
+const { publicCollectionId } = require('./activitypub')
 const url = require('url')
 const uuid = require('node-uuid')
 
 // given a non-uri activity id, return an activity URI
 const activityUri = (uuid) => `urn:uuid:${uuid}`
-const publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
