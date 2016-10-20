@@ -1,6 +1,7 @@
 const assert = require('assert')
 const distbin = require('../')
 const http = require('http')
+const { readableToString } = require('../src/util');
 
 let tests = module.exports
 
@@ -25,7 +26,7 @@ tests['/ route can be fetched as JSONLD and includes pointers to things like out
   }))
   assert.equal(res.statusCode, 200)
 
-  const resBody = await readResponseBody(res)
+  const resBody = await readableToString(res)
   const rootResource = JSON.parse(resBody)
   // #TODO: maybe a more fancy JSON-LD-aware check
   assert(Object.keys(rootResource).includes('outbox'))
@@ -39,7 +40,7 @@ tests['can fetch /recent to see what\'s been going on'] = async function () {
     }
   }))
   assert.equal(res.statusCode, 200)
-  const resBody = await readResponseBody(res)
+  const resBody = await readableToString(res)
   const recentCollection = JSON.parse(resBody)
   assert.equal(recentCollection.type, 'OrderedCollection')
   assert(Array.isArray(recentCollection.items), '.items is an Array')
@@ -112,7 +113,7 @@ tests['The outbox must be an OrderedCollection'] = async function () {
     headers: activitypub.clientHeaders()
   }))
   assert.equal(res.statusCode, 200)
-  const resBody = await readResponseBody(res)
+  const resBody = await readableToString(res)
   const isOrderedCollection = (something) => {
     const obj = typeof something === 'string' ? JSON.parse(something) : something
     // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
@@ -127,15 +128,53 @@ tests['The outbox must be an OrderedCollection'] = async function () {
   The outbox stream contains objects the user has published, subject to the ability of the requestor to retrieve the object (that is, the contents of the outbox are filtered by the permissions of the person reading it).
     #TODO assert that outbox collection object has '.items'
   If a user submits a request without Authorization the server should respond with all of the Public posts. This could potentially be all relevant objects published by the user, though the number of available items is left to the discretion of those implementing and deploying the server.
+    #critique - "All of the public posts"? Or all of the public posts that have been sent through this outbox?
   */
 
   // The outbox accepts HTTP POST requests, with behaviour described in Client to Server Interactions.
   // see section 7
 
-// 5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
+/*
+5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
+*/
 tests['can request the public Collection'] = async function () {
   const res = await sendRequest(await requestForListener(distbin(), '/activitypub/public'))
   assert.equal(res.statusCode, 200)
+}
+
+// In addition to [ActivityStreams] collections and objects, Activities may additionally be addressed to the special "public" collection, with the identifier https://www.w3.org/ns/activitystreams#Public. For example:
+// #critique: It would be helpful to show an example activity that is 'addressed to the public collection', as there aren't any currently in the spec
+//  Like... should the public collection id bein the 'to' or 'cc' or 'bcc' fields or does it matter?
+tests['can address activities to the public Collection when sending to outbox, '+
+      'and they show up in the public Collection'] = async function () {
+  const distbinListener = distbin();
+
+  // post an activity addressed to public collection to outbox
+  const activityToPublic = {
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "type": "Like",
+    "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+    "cc": ["https://www.w3.org/ns/activitystreams#Public"]
+  }
+  const postActivityRequest = await requestForListener(distbinListener, {
+    headers: activitypub.clientHeaders({
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+    }),
+    method: 'post',
+    path: '/activitypub/outbox'
+  })
+  postActivityRequest.write(JSON.stringify(activityToPublic));
+  const postActivityResponse = await sendRequest(postActivityRequest);
+  assert.equal(postActivityResponse.statusCode, 201);
+  
+  // k it's been POSTed to outbox. Verify it's in the public collection
+  const publicCollectionResponse = await sendRequest(await requestForListener(distbinListener, '/activitypub/public'));
+  const publicCollection = JSON.parse(await readableToString(publicCollectionResponse));
+  // #critique ... ok so this is an example of where it's hard to know whether its in the Collection
+  // because of id generation and such
+  assert(publicCollection.totalItems > 0, 'publicCollection has at least one item')
+  assert(1 === publicCollection.items.filter((a) => a.type === 'Like' && a.object === 'https://rhiaro.co.uk/2016/05/minimal-activitypub').length,
+    'publicCollection contains the activity that targeted it');
 }
 
 /*
@@ -152,7 +191,7 @@ tests['The inbox must be an OrderedCollection'] = async function () {
     headers: activitypub.clientHeaders()
   }))
   assert.equal(res.statusCode, 200)
-  const resBody = await readResponseBody(res)
+  const resBody = await readableToString(res)
   const isOrderedCollection = (something) => {
     const obj = typeof something === 'string' ? JSON.parse(something) : something
     // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
@@ -366,24 +405,46 @@ tests['can submit a non-Activity to the Outbox, and it is treated as a Create'] 
   */
 }
 
+/*
+8.2 Delivery
+
+An activity is delivered to its targets (which are actors) by first looking up the targets' inboxes and then posting the activity to those inboxes.
+The inbox property is determined by first retrieving the target actor's json-ld representation and then looking up the inbox property.
+An HTTP POST request (with authorization of the submitting user) is then made to to the inbox, with the Activity as the body of the request.
+This Activity is added by the receiver as an item in the inbox OrderedCollection.
+
+For federated servers performing delivery to a 3rd party server, delivery should be performed asynchronously, and should additionally retry delivery to recipients if it fails due to network error.
+
+8.2.1 Outbox Delivery
+
+When objects are received in the outbox, the server MUST target and deliver to:
+
+The to, cc or bcc fields if their values are individuals, or Collections owned by the actor.
+These fields will have been populated appropriately by the client which posted the Activity to the outbox.
+*/
+
+tests['targets and delivers targeted activities sent to Outbox'] = async function () {
+  // TODO
+}
+
+/*
+8.2.2 Inbox Delivery
+
+When Activities are received in the inbox, the server needs to forward these to recipients that the origin was unable to deliver them to.
+To do this, the server must target and deliver to the values of to, cc and/or bcc if and only if all of the following are true:
+
+This is the first time the server has seen this Activity.
+The values of to, cc and/or bcc contain a Collection owned by the server.
+The values of inReplyTo, object, target and/or tag are objects owned by the server. The server should recurse through these values to look for linked objects owned by the server, and should set a maximum limit for recursion (ie. the point at which the thread is so deep the recipients followers may not mind if they are no longer getting updates that don't directly involve the recipient). The server must only target the values of to, cc and/or bcc on the original object being forwarded, and not pick up any new addressees whilst recursing through the linked objects (in case these addressees were purposefully amended by or via the client).
+
+The server may filter its delivery targets according to implementation-specific rules, for example, spam filtering.
+*/
+
 // Run tests if this file is executed
 if (require.main === module) {
   run(tests)
     .then(() => process.exit())
     .catch(() => process.exit(1))
-}
-
-// Given an HTTP Response, read the whole response body and return as string
-async function readResponseBody (res) {
-  let body = ''
-  return new Promise((resolve, reject) => {
-    res.on('error', reject)
-    res.on('data', (chunk) => {
-      body += chunk
-      return body
-    })
-    res.on('end', () => resolve(body))
-  })
 }
 
 // execute some tests

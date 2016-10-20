@@ -3,6 +3,7 @@ const uuid = require('node-uuid')
 
 // given a non-uri activity id, return an activity URI
 const activityUri = (uuid) => `urn:uuid:${uuid}`
+const publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
@@ -10,14 +11,15 @@ module.exports = function () {
   // #TODO: This should be size-bound e.g. LRU
   // #TODO: This should be persistent :P
   const activities = new Map()
+  const publicActivities = new Map()
   return function (req, res) {
     const requestPath = url.parse(req.url).pathname
     const simpleRoutes = {
       '/': index,
       '/recent': recentHandler({ activities }),
       '/activitypub/inbox': inboxHandler({ activities }),
-      '/activitypub/outbox': outboxHandler({ activities }),
-      '/activitypub/public': publicCollectionHandler({ activities })
+      '/activitypub/outbox': outboxHandler({ activities, publicActivities }),
+      '/activitypub/public': publicCollectionHandler({ activities: publicActivities })
     }
     let handler = simpleRoutes[requestPath]
 
@@ -137,10 +139,29 @@ function inboxHandler ({ activities }) {
   }
 }
 
+// given a AS2 object, return it's JSON-LD @id
+const getJsonLdId = (obj) => {
+  const jsonLdId = typeof obj === 'string' ? obj : (obj.id || obj['@id']);
+  return jsonLdId;
+}
+
+// return whether a given activity targets another resource (e.g. in to, cc, bcc)
+const activityHasTarget = (activity, target) => {
+  const targetId = getJsonLdId(target)
+  if ( ! targetId) {
+    throw new Error("Couldn't determine @id of " + target);
+  }
+  for (targetList of [activity.to, activity.cc, activity.bcc]) {
+    if ( ! targetList) continue
+    const idsOfTargets = (Array.isArray(targetList) ? targetList : [targetList]).map(getJsonLdId)
+    if (idsOfTargets.includes(targetId)) return true
+  }
+  return false
+}
 
 // route for ActivityPub Outbox
 // https://w3c.github.io/activitypub/#outbox
-function outboxHandler ({ activities }) {
+function outboxHandler ({ activities, publicActivities }) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
       case 'get':
@@ -162,15 +183,22 @@ function outboxHandler ({ activities }) {
           res.end("Couldn't parse request body as JSON: "+requestBody)
           return;
         }
-        const newThing = Object.assign(parsed, {
-          // #TODO: validate that newThing wasn't submitted with an .id, even though spec says to rewrite it
+        const newActivity = Object.assign(parsed, {
+          // #TODO: validate that newActivity wasn't submitted with an .id, even though spec says to rewrite it
           id: activityUri(newuuid),
           // #TODO: what if it already had published?
           published: (new Date()).toISOString()
         })
-        // #TODO: read request body, validate, and save it somewhere...
+        // #TODO: validate
         const location = '/activities/' + newuuid
-        activities.set(newThing.id, newThing)
+
+        activities.set(newActivity.id, newActivity)
+        // #TODO: Consider moving this up and out into a sort of core model for storing activities
+        // that automatically indexes public ones
+        if (activityHasTarget(newActivity, publicCollectionId)) {
+          publicActivities.set(newActivity.id, newActivity)
+        }
+
         res.writeHead(201, { location })
         res.end()
         break
@@ -184,6 +212,7 @@ function outboxHandler ({ activities }) {
 // https://w3c.github.io/activitypub/#public-addressing
 function publicCollectionHandler ({ activities }) {
   return (req, res) => {
+    debugger;
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const publicCollection = {
       '@context': 'https://www.w3.org/ns/activitystreams',
