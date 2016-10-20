@@ -126,10 +126,10 @@ EOF`)}
         res.write(`
           <h2>Public Activity</h2>
           <p>Fetched from <a href="/activitypub/public">/activitypub/public</a></p>
-          <pre>${
+          <pre>${encodeHtmlEntities(
             // #TODO: discover /public url via HATEOAS
             await readableToString(await sendRequest(http.request(apiUrl + '/activitypub/public')))
-          }</pre>
+          )}</pre>
         `)
         // show other links
         res.write(`
@@ -137,9 +137,9 @@ EOF`)}
           <p>
             This URL as application/json (<code>curl -H "Accept: application/json" ${requestUrl(req)}</code>)
           </p>
-          <pre>${
+          <pre>${encodeHtmlEntities(
             await readableToString(await sendRequest(http.request(apiUrl)))
-          }</pre>
+          )}</pre>
         `)
         res.end()
         return
@@ -147,21 +147,10 @@ EOF`)}
         const submission = await readableToString(req)
         // assuming application/x-www-form-urlencoded
         const { content } = querystring.parse(submission)
-        // don't allow HTML
-        const safeContent = escape(content)
-        // let note = {
-        //   "@context": "https://www.w3.org/ns/activitystreams",
-        //   "type": "Create",
-        //   "object": {
-        //     "type": "Note",
-        //     "content": safeContent,
-        //   },
-        //   'cc': publicCollectionId
-        // }
         let note = {
           '@context': 'https://www.w3.org/ns/activitystreams',
           'type': 'Note',
-          'content': safeContent,
+          'content': content,
           'cc': publicCollectionId
         }
         // submit to outbox
