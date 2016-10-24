@@ -26,7 +26,7 @@ const activityTargets = (activity) => {
   const primary = [].concat(activity.to, activity.cc, activity.bcc).filter(Boolean)
   const notification = [] // #TODO... https://github.com/w3c/activitypub/issues/161
   const targets = Array.from(new Set([].concat(primary, notification)))
-  return targets;
+  return targets
 }
 
 // Create a headers map for http.request() incl. any specced requirements for ActivityPub Client requests
@@ -122,7 +122,7 @@ exports.targetAndDeliver = async function (activity, targets = activityTargets(a
     .map((target) => {
       // Don't actually deliver to publicCollection URI as it is 'special'
       if (target === exports.publicCollectionId) {
-        return Promise.resolve(target);
+        return Promise.resolve(target)
       }
       return deliverActivity(activity, target)
       .then(d => deliveries.push(d))
