@@ -101,6 +101,7 @@ exports.createHandler = function ({ apiUrl }) {
           }
           </style>
           <form class="post-form" method="post">
+            <label>in reply to (optional)</label> <input name="inReplyTo" type="text" placeholder="URL"></input>
             <textarea name="content"></textarea>
             <input type="submit" value="post" />
           </form>
@@ -114,8 +115,7 @@ curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
   "type": "Note",
   "content": "This is a note",
   "published": "2015-02-10T15:04:55Z",
-  "to": ["https://example.org/~john/"],
-  "cc": ["https://example.com/~erik/followers"]
+  "cc": ["${publicCollectionId}"]
 }
 EOF`)}
               </pre>
@@ -146,13 +146,16 @@ EOF`)}
       case 'post':
         const submission = await readableToString(req)
         // assuming application/x-www-form-urlencoded
-        const { content } = querystring.parse(submission)
-        let note = {
-          '@context': 'https://www.w3.org/ns/activitystreams',
-          'type': 'Note',
-          'content': content,
-          'cc': publicCollectionId
-        }
+        const { content, inReplyTo } = querystring.parse(submission)
+        let note = Object.assign(
+          {
+            '@context': 'https://www.w3.org/ns/activitystreams',
+            'type': 'Note',
+            'content': content,
+            'cc': publicCollectionId
+          },
+          inReplyTo ? { inReplyTo } : {}
+        )
         // submit to outbox
         // #TODO is it more 'precise' to convert this to an activity here?
         // #TODO discover outbox URL
@@ -168,6 +171,7 @@ EOF`)}
         // handle form submission by posting to outbox
         res.writeHead(302, { location: req.url })
         res.end()
+        return
     }
   }
 }
