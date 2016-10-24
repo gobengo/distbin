@@ -15,11 +15,10 @@ request_body=$(cat <<EOF
   "@context": "https://www.w3.org/ns/activitypub",
   "id": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
   "type": "Article",
-  "name": "Minimal ActivityPub update client",
+  "name": "Sample Article from ./bin/create-post",
   "content": "Today I finished morph, a client for posting ActivityStreams2...",
   "attributedTo": "https://rhiaro.co.uk/#amy",
-  "to": "https://rhiaro.co.uk/followers/", 
-  "cc": "https://e14n.com/evan"
+  "cc": "https://www.w3.org/ns/activitystreams#Public"
 }
 EOF)
 

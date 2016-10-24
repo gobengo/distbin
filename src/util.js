@@ -10,6 +10,23 @@ exports.readableToString = async function (readable) {
   })
 }
 
+// given a map of strings/regexes to listener factories,
+// return a matching route (or undefined if no match)
+exports.route = (routes, req) => {
+  for (let [route, createHandler] of routes.entries()) {
+    if (typeof route === 'string') {
+      // exact match
+      if (req.url !== route) continue
+      return createHandler()
+    }
+    if (route instanceof RegExp) {
+      let match = req.url.match(route);
+      if ( ! match) continue
+      return createHandler(...match.slice(1))
+    }
+  }
+}
+
 exports.sendRequest = async function (request) {
   return new Promise((resolve, reject) => {
     request.once('response', resolve)
