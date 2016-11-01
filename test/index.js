@@ -361,7 +361,6 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
   const newCreateActivityResponse = await sendRequest(await requestForListener(distbinListener, res.headers.location))
   assert.equal(newCreateActivityResponse.statusCode, 200)
   const newCreateActivity = JSON.parse(await readableToString(newCreateActivityResponse))
-
   // The server then must attach this object as the object of a Create Activity.
   assert.equal(newCreateActivity.type, 'Create')
   assert.deepEqual(newCreateActivity.object, example10)

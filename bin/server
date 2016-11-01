@@ -2,8 +2,10 @@
 
 const distbin = require('../');
 const http = require('http');
+const path = require('path')
 const querystring = require('querystring')
 const url = require('url')
+const { FileMap } = require('../src/filemap');
 
 const distbinHtml= require('../src/distbin-html')
 const { readableToString, sendRequest } = require('../src/util');
@@ -28,7 +30,11 @@ async function runServer() {
 	  });
 	});
 
-	const apiHandler = distbin()
+	const apiHandler = distbin({
+		activities: new FileMap(path.join(__dirname, '../db/activities/')),
+		publicActivities: new FileMap(path.join(__dirname, '../db/publicActivities/')),
+		inbox: new FileMap(path.join(__dirname, '../db/inbox/')),
+	})
 
 	// api
 	const apiServer = http.createServer(apiHandler)

@@ -12,12 +12,14 @@ const activityUri = (uuid) => `urn:uuid:${uuid}`
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
-module.exports = function () {
+const distbin = module.exports = ({
+  // Juse use Map as default, but users should provide more bette data structures
   // #TODO: This should be size-bound e.g. LRU
   // #TODO: This should be persistent :P
-  const activities = new Map()
-  const inbox = new Map()
-  const publicActivities = new Map()
+  activities = new Map,
+  inbox = new Map,
+  publicActivities = new Map
+}={}) => {
   return function (req, res) {
     const requestPath = url.parse(req.url).pathname
     const simpleRoutes = {
@@ -50,9 +52,9 @@ module.exports = function () {
 
 // get specific activity by id
 function activityHandler ({ activities, activityUuid }) {
-  return function (req, res) {
+  return async function (req, res) {
     const uri = activityUri(activityUuid)
-    const activity = activities.get(uri)
+    const activity = await Promise.resolve(activities.get(uri))
     // #TODO: If the activity isn't addressed to the public, we should enforce access controls here.
     if (!activity) {
       res.writeHead(404)
