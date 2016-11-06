@@ -59,3 +59,16 @@ exports.encodeHtmlEntities = function encodeEntities (value) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 }
+
+// given a function that accepts a "node-style" errback as its last argument, return
+// a function that returns a promise instead
+exports.denodeify = function denodeify(funcThatAcceptsErrback) {
+  return function (...args) {
+    return new Promise((resolve, reject) => {
+      funcThatAcceptsErrback.apply(this, args.concat([(err, ...results) => {
+        if (err) return reject(err);
+        return resolve.apply(this, results)
+      }]))
+    })
+  }.bind(this);
+}
