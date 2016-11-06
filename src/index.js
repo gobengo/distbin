@@ -1,9 +1,11 @@
 const {
   as2ObjectIsActivity,
   targetAndDeliver,
-  publicCollectionId
+  publicCollectionId,
  } = require('./activitypub')
-const { readableToString } = require('./util')
+const {
+  readableToString,
+} = require('./util')
 const url = require('url')
 const uuid = require('node-uuid')
 
@@ -90,7 +92,7 @@ function index (req, res) {
 
 // fetch a collection of recent Activities/things
 function recentHandler ({ activities }) {
-  return (req, res) => {
+  return async function (req, res) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     res.writeHead(200, {
       'Access-Control-Allow-Origin': '*'
@@ -100,8 +102,8 @@ function recentHandler ({ activities }) {
       'summary': 'Things that have recently been created',
       'type': 'OrderedCollection',
       // Get recent 10 items
-      'items': [...activities.values()].reverse().slice(-1 * maxMemberCount),
-      'totalItems': activities.size,
+      'items': [...(await Promise.resolve(activities.values()))].reverse().slice(-1 * maxMemberCount),
+      'totalItems': await activities.size,
       // empty string is relative URL for 'self'
       'current': ''
     }, null, 2))
@@ -119,8 +121,8 @@ function inboxHandler ({ activities, inbox }) {
         res.end(JSON.stringify({
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: 'OrderedCollection',
-          items: [...inbox.values()].reverse().slice(-1 * maxMemberCount),
-          totalItems: inbox.size,
+          items: [...(await Promise.resolve(inbox.values()))].reverse().slice(-1 * maxMemberCount),
+          totalItems: await inbox.size,
           // empty string is relative URL for 'self'
           current: ''
         }, null, 2))
@@ -267,15 +269,15 @@ function outboxHandler ({ activities, publicActivities }) {
 // route for ActivityPub Public Collection
 // https://w3c.github.io/activitypub/#public-addressing
 function publicCollectionHandler ({ activities }) {
-  return (req, res) => {
+  return async function (req, res) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const publicCollection = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       'id': 'https://www.w3.org/ns/activitypub/Public',
       'type': 'Collection',
       // Get recent 10 items
-      'items': [...activities.values()].reverse().slice(-1 * maxMemberCount),
-      'totalItems': activities.size,
+      'items': [...(await Promise.resolve(activities.values()))].reverse().slice(-1 * maxMemberCount),
+      'totalItems': await activities.size,
       // empty string is relative URL for 'self'
       'current': ''
     }

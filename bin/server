@@ -5,7 +5,7 @@ const http = require('http');
 const path = require('path')
 const querystring = require('querystring')
 const url = require('url')
-const { FileMap } = require('../src/filemap');
+const { JSONFileMapAsync } = require('../src/filemap');
 
 const distbinHtml= require('../src/distbin-html')
 const { readableToString, sendRequest } = require('../src/util');
@@ -31,9 +31,9 @@ async function runServer() {
 	});
 
 	const apiHandler = distbin({
-		activities: new FileMap(path.join(__dirname, '../db/activities/')),
-		publicActivities: new FileMap(path.join(__dirname, '../db/publicActivities/')),
-		inbox: new FileMap(path.join(__dirname, '../db/inbox/')),
+		activities: new JSONFileMapAsync(path.join(__dirname, '../db/activities/')),
+		publicActivities: new JSONFileMapAsync(path.join(__dirname, '../db/publicActivities/')),
+		inbox: new JSONFileMapAsync(path.join(__dirname, '../db/inbox/')),
 	})
 
 	// api
