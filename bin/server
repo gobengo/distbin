@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const distbin = require('../');
+const fs = require('fs')
 const http = require('http');
 const path = require('path')
 const querystring = require('querystring')
@@ -8,7 +9,7 @@ const url = require('url')
 const { JSONFileMapAsync } = require('../src/filemap');
 
 const distbinHtml= require('../src/distbin-html')
-const { readableToString, sendRequest } = require('../src/util');
+const { debuglog, denodeify, readableToString, sendRequest } = require('../src/util');
 
 // Run tests if this file is executed
 if (require.main === module) {
@@ -30,10 +31,24 @@ async function runServer() {
 	  });
 	});
 
+	const dbDir = process.env.DB_DIR || fs.mkdtempSync('/tmp/distbin-');
+	// ensure subdirs exist
+	await Promise.all(['activities', 'publicActivities', 'inbox'].map(dir => {
+		return denodeify(fs.mkdir)(path.join(dbDir, dir))
+		.catch((err) => {
+			switch (err.code) {
+				case 'EEXIST':
+					// folder exists, no prob
+					return;
+			}
+			throw err;
+		})
+	}));
+	debuglog("using db directory", dbDir)
 	const apiHandler = distbin({
-		activities: new JSONFileMapAsync(path.join(__dirname, '../db/activities/')),
-		publicActivities: new JSONFileMapAsync(path.join(__dirname, '../db/publicActivities/')),
-		inbox: new JSONFileMapAsync(path.join(__dirname, '../db/inbox/')),
+		activities: new JSONFileMapAsync(path.join(dbDir, 'activities/')),
+		publicActivities: new JSONFileMapAsync(path.join(dbDir, 'publicActivities/')),
+		inbox: new JSONFileMapAsync(path.join(dbDir, 'inbox/')),
 	})
 
 	// api

@@ -1,3 +1,5 @@
+exports.debuglog = require('util').debuglog('distbin')
+
 exports.readableToString = async function (readable) {
   let body = ''
   return new Promise((resolve, reject) => {

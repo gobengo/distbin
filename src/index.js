@@ -4,6 +4,7 @@ const {
   publicCollectionId,
  } = require('./activitypub')
 const {
+  debuglog,
   readableToString,
 } = require('./util')
 const url = require('url')
@@ -128,6 +129,7 @@ function inboxHandler ({ activities, inbox }) {
         }, null, 2))
         break
       case 'post':
+        debuglog('receiving inbox POST')
         const requestBody = await readableToString(req)
         let parsed
         try {

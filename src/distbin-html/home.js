@@ -152,7 +152,7 @@ EOF`)}
             '@context': 'https://www.w3.org/ns/activitystreams',
             'type': 'Note',
             'content': content,
-            'cc': publicCollectionId
+            'cc': [publicCollectionId, inReplyTo].filter(Boolean)
           },
           inReplyTo ? { inReplyTo } : {}
         )
