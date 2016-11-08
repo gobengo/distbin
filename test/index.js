@@ -6,7 +6,9 @@ if (require.main === module) {
 }
 
 // execute some tests (tests are object with test name/msg as key and func as val)
+// if env var TEST_FILTER is defined, only tests whose names contain that string will run
 async function run (tests) {
+  const testFilter = process.env.TEST_FILTER
   const results = await Promise.all(
     // map to array of promises of logged errors
     // (or falsy if the test passed)
@@ -15,6 +17,10 @@ async function run (tests) {
     .map(([testName, runTest]) => {
       function logFailure (err) {
         console.error(`TEST FAIL: ${testName}\n${err.stack}\n`)
+      }
+      if (testFilter && testName.indexOf(testFilter) === -1) {
+        // skip, doesn't match filter
+        return;
       }
       // console.log('TEST: ', testName)
       let result
