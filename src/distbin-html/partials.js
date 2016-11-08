@@ -12,8 +12,9 @@ exports.everyPageHead = () => `
     padding: 2em;
   }
   pre {
+    line-height: 1em;
     max-width: 100%;
-    overflow: auto;
+    overflow-x: auto;
   }
   </style>
 `

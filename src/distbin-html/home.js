@@ -3,6 +3,7 @@ const { publicCollectionId } = require('../activitypub')
 const querystring = require('querystring')
 const url = require('url')
 const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
+const { everyPageHead } = require('./partials')
 
 const htmlEntities = {
   checked: '&#x2611;',
@@ -17,22 +18,7 @@ exports.createHandler = function ({ apiUrl }) {
         res.writeHead(200)
         res.write(`
           <head>
-            <style>
-            html {
-              font-family: Georgia, "Times New Roman", serif;
-              font-size: 18px;
-              line-height: 1.5em;
-            }
-            body {
-              margin: 0 auto;
-              max-width: 42em;
-              padding: 2em;
-            }
-            pre {
-              max-width: 100%;
-              overflow: auto;
-            }
-            </style>
+            ${everyPageHead}
           </head>
           <h1>distbin</h1>
             <p>
