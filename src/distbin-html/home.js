@@ -44,8 +44,12 @@ exports.createHandler = function ({ apiUrl }) {
                           <li>${htmlEntities.checked} Respect 'max-member-count' param in <a href="https://tools.ietf.org/html/rfc7240">RFC7240</a> HTTP Prefer request header (or querystring for URIs)</li>
                         </ul>
                       </li>
-                      <li>${htmlEntities.unchecked} when activities are received in the outbox, <a href="https://www.w3.org/TR/activitypub/#server-to-server-interactions">notify/deliver</a> to other mentioned servers</li>
-                      <li>${htmlEntities.unchecked} receive/render activities from other parts of the web according to <a href="https://www.w3.org/TR/activitypub/#inbox-delivery">Inbox Delivery</a></li> 
+                      <li>${htmlEntities.checked} when activities are received in the outbox, <a href="https://www.w3.org/TR/activitypub/#server-to-server-interactions">notify/deliver</a> to other targeted servers</li>
+                      <li>${htmlEntities.checked} receive activities from other parts of the web according to <a href="https://www.w3.org/TR/activitypub/#inbox-delivery">Inbox Delivery</a>
+                        <ul>
+                          <li>${htmlEntities.unchecked} Render these related activities on the target's html representation</li>
+                        </ul>
+                      </li> 
                     </ul>
                   </li>
                   <li><a href="https://www.w3.org/TR/micropub">Micropub</a>
