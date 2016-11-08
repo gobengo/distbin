@@ -1,11 +1,11 @@
 const {
   as2ObjectIsActivity,
   targetAndDeliver,
-  publicCollectionId,
+  publicCollectionId
  } = require('./activitypub')
 const {
   debuglog,
-  readableToString,
+  readableToString
 } = require('./util')
 const url = require('url')
 const uuid = require('node-uuid')
@@ -15,14 +15,14 @@ const activityUri = (uuid) => `urn:uuid:${uuid}`
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
-const distbin = module.exports = ({
+module.exports = function distbin({
   // Juse use Map as default, but users should provide more bette data structures
   // #TODO: This should be size-bound e.g. LRU
   // #TODO: This should be persistent :P
-  activities = new Map,
-  inbox = new Map,
-  publicActivities = new Map
-}={}) => {
+  activities = new Map(),
+  inbox = new Map(),
+  publicActivities = new Map()
+} = {}) {
   return function (req, res) {
     const requestPath = url.parse(req.url).pathname
     const simpleRoutes = {
@@ -64,9 +64,28 @@ function activityHandler ({ activities, activityUuid }) {
       res.end('There is no activity ' + uri)
       return
     }
+    // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
+    let inboxUrl = '/activitypub/inbox' // TODO should this be an inbox specific to this activity?
+    let inbox
+    switch (typeof activity.inbox) {
+      case 'object':
+        if (Array.isArray(activity.inbox)) {
+          inbox = activity.inbox.concat(inboxUrl)
+        }
+        break
+      case 'string':
+        inbox = [activity.inbox, inboxUrl]
+        break
+      case 'undefined':
+        inbox = inboxUrl
+        break
+      default:
+        throw new Error('Unexpected previous value of activity.inbox: ' + activity.inbox)
+    }
+    const extendedActivity = Object.assign({}, activity, { inbox })
     // woo its here
     res.writeHead(200)
-    res.end(JSON.stringify(activity, null, 2))
+    res.end(JSON.stringify(extendedActivity, null, 2))
   }
 }
 
@@ -140,8 +159,8 @@ function inboxHandler ({ activities, inbox }) {
           return
         }
         // #TODO: read request body, validate, and save it somewhere...
-
-        if (parsed.id && inbox.get(parsed.id)) {
+        const existsAlready = parsed.id ? await Promise.resolve(inbox.get(parsed.id)) : false
+        if (existsAlready) {
           // duplicate!
           res.writeHead(409)
           res.end('There is already an activity in the inbox with id ' + parsed.id)
@@ -152,9 +171,11 @@ function inboxHandler ({ activities, inbox }) {
           parsed.id = activityUri(uuid())
         }
 
-        inbox.set(parsed.id, parsed)
-        // todo: Probably setting on inbox should automagically add to global set of activities
-        activities.set(parsed.id, parsed)
+        await Promise.all([
+          inbox.set(parsed.id, parsed),
+          // todo: Probably setting on inbox should automagically add to global set of activities
+          activities.set(parsed.id, parsed),
+        ])
 
         res.writeHead(202)
         res.end()

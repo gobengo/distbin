@@ -107,7 +107,6 @@ const deliverActivity = async function (activity, target) {
     throw new deliveryErrors.DeliveryRequestFailed(e.message)
   }
   // const delivery = await readableToString(deliveryResponse);
-  // debugger;
   // #TODO handle retry/timeout?
   return target
 }
