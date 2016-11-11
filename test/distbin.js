@@ -94,22 +94,6 @@ tests['Posting a reply will notify be received the inReplyTo inbox (even if anot
   // ok so we're going to make to distbins, A and B, and test that A delivers to B
   const distbinA = distbin()
   const distbinB = distbin()
-  // post an activity to a distbin, and return its absolute url
-  async function postActivity(distbinListener, activity) {
-    const distbinUrl = await listen(http.createServer(distbinListener))
-    const req = http.request(Object.assign(url.parse(distbinUrl), {
-      headers: activitypub.clientHeaders({
-        'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
-      }),
-      method: 'post',
-      path: '/activitypub/outbox'      
-    }))
-    req.write(JSON.stringify(activity))
-    const res = await sendRequest(req)
-    assert.equal(res.statusCode, 201)
-    const activityUrl = url.resolve(distbinUrl, res.headers.location)
-    return activityUrl
-  }
   // post a parent to distbinA
   const parentUrl = await postActivity(distbinA, {
     type: 'Note',
@@ -127,4 +111,38 @@ tests['Posting a reply will notify be received the inReplyTo inbox (even if anot
   const distbinAInbox = JSON.parse(await readableToString(await sendRequest(
     await requestForListener(distbinA, '/activitypub/inbox'))))
   assert(distbinAInbox.items.find(a => a.id === replyId), 'distbinA inbox contains reply')
+}
+
+tests['GET an activity has a .url that resolves'] = async function () {
+  const activityUrl = await postActivity(distbin(), {
+    type: 'Note',
+    content: 'you can read this without knowing wtf JSON is!'
+  })
+  const activityResponse = await sendRequest(http.request(Object.assign(url.parse(activityUrl), {
+    headers: {
+      accept: 'text/html'
+    }
+  })));
+  assert.equal(activityResponse.statusCode, 200)
+  const fetchedActivity = JSON.parse(await readableToString(activityResponse))
+  assert(fetchedActivity.url, 'has .url property')
+  const urlResponse = await sendRequest(http.request(url.resolve(activityUrl, fetchedActivity.url)))
+  assert.equal(urlResponse.statusCode, 200)
+}
+
+// post an activity to a distbin, and return its absolute url
+async function postActivity(distbinListener, activity) {
+  const distbinUrl = await listen(http.createServer(distbinListener))
+  const req = http.request(Object.assign(url.parse(distbinUrl), {
+    headers: activitypub.clientHeaders({
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+    }),
+    method: 'post',
+    path: '/activitypub/outbox'      
+  }))
+  req.write(JSON.stringify(activity))
+  const res = await sendRequest(req)
+  assert.equal(res.statusCode, 201)
+  const activityUrl = url.resolve(distbinUrl, res.headers.location)
+  return activityUrl
 }

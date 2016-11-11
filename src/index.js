@@ -53,6 +53,39 @@ module.exports = function distbin({
   }
 }
 
+// Return new value for a JSON-LD object's value, appending to any existing one
+function jsonldAppend(oldVal, valToAppend) {
+  let newVal;
+  switch (typeof oldVal) {
+    case 'object':
+      if (Array.isArray(oldVal)) {
+        newVal = oldVal.concat(valToAppend)
+      } else {
+        newVal = [oldVal, valToAppend]
+      }
+      break
+    case 'undefined':
+      newVal = valToAppend
+      break
+    default:
+      newVal = [oldVal, valToAppend]
+      break
+  }
+  return newVal
+}
+
+const distbinHostedActivity = function (activity) {
+  const uuidMatch = activity.id.match(/^urn:uuid:([^$]+)$/);
+  if ( ! uuidMatch) throw new Error("Couldn't determine UUID for activity with id", activity.id)
+  const uuid = uuidMatch[1]
+  // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
+  let inboxUrl = '/activitypub/inbox' // TODO should this be an inbox specific to this activity?
+  return Object.assign({}, activity, {
+    inbox: jsonldAppend(activity.inbox, inboxUrl),
+    url: jsonldAppend(activity.url, '/activities/'+uuid)
+  }) 
+}
+
 // get specific activity by id
 function activityHandler ({ activities, activityUuid }) {
   return async function (req, res) {
@@ -64,25 +97,7 @@ function activityHandler ({ activities, activityUuid }) {
       res.end('There is no activity ' + uri)
       return
     }
-    // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
-    let inboxUrl = '/activitypub/inbox' // TODO should this be an inbox specific to this activity?
-    let inbox
-    switch (typeof activity.inbox) {
-      case 'object':
-        if (Array.isArray(activity.inbox)) {
-          inbox = activity.inbox.concat(inboxUrl)
-        }
-        break
-      case 'string':
-        inbox = [activity.inbox, inboxUrl]
-        break
-      case 'undefined':
-        inbox = inboxUrl
-        break
-      default:
-        throw new Error('Unexpected previous value of activity.inbox: ' + activity.inbox)
-    }
-    const extendedActivity = Object.assign({}, activity, { inbox })
+    const extendedActivity = distbinHostedActivity(activity)
     // woo its here
     res.writeHead(200)
     res.end(JSON.stringify(extendedActivity, null, 2))
@@ -299,7 +314,7 @@ function publicCollectionHandler ({ activities }) {
       'id': 'https://www.w3.org/ns/activitypub/Public',
       'type': 'Collection',
       // Get recent 10 items
-      'items': [...(await Promise.resolve(activities.values()))].reverse().slice(-1 * maxMemberCount),
+      'items': [...(await Promise.resolve(activities.values()))].reverse().slice(-1 * maxMemberCount).map(distbinHostedActivity),
       'totalItems': await activities.size,
       // empty string is relative URL for 'self'
       'current': ''
