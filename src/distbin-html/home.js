@@ -18,7 +18,7 @@ exports.createHandler = function ({ apiUrl }) {
         res.writeHead(200)
         res.write(`
           <head>
-            ${everyPageHead}
+            ${everyPageHead()}
           </head>
           <h1>distbin</h1>
             <p>
