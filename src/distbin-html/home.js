@@ -112,14 +112,17 @@ EOF`)}
             </details>
           </p>
         `)
+        const publicCollectionStr = encodeHtmlEntities(
+            // #TODO: discover /public url via HATEOAS
+            await readableToString(await sendRequest(http.request(apiUrl + '/activitypub/public')))
+          )
+          // linkify values of 'url' property (quotes encode to &#34;)
+          .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')
         // recent
         res.write(`
           <h2>Public Activity</h2>
           <p>Fetched from <a href="/activitypub/public">/activitypub/public</a></p>
-          <pre>${encodeHtmlEntities(
-            // #TODO: discover /public url via HATEOAS
-            await readableToString(await sendRequest(http.request(apiUrl + '/activitypub/public')))
-          )}</pre>
+          <pre>${publicCollectionStr}</pre>
         `)
         // show other links
         res.write(`
