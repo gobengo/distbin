@@ -11,5 +11,4 @@ ENV DB_DIR=/distbin-db
 
 ENV PORT=8080
 EXPOSE 8080
-RUN ls -altr /distbin-db
 CMD ["--harmony", "bin/server" ]
