@@ -28,9 +28,6 @@ exports.createHandler = function ({ apiUrl }) {
             <p>
               What makes distbin unique is that it [eventually] supports distributed social interactions around these documents using candidate web standards emerging from the <a href="https://www.w3.org/wiki/Socialwg">W3C Social Web Working Group</a>, for example the <a href="https://www.w3.org/TR/activitystreams-core/">Activity Streams</a> vocabulary and <a href="https://www.w3.org/TR/webmention/">Webmention</a>, <a href="https://www.w3.org/TR/activitypub/">ActivityPub</a>, and <a href="https://www.w3.org/TR/ldn/">Linked Data Notifications</a> protocols.
             </p>
-            <p>
-              Status: <strong>very</strong> much toy status right now. Activities are not persisted outside of process memory. No Authorization checks exist at all.
-            </p>
           <h2>Planned Features and Progress</h2>
           <details>
             <ul>
