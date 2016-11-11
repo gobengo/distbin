@@ -1,16 +1,15 @@
 FROM seegno/node:7
 
-# Create app directory
-#RUN mkdir -p /usr/src/app
-#WORKDIR /usr/src/app
-
-# Install app dependencies
-#COPY package.json /usr/src/app/
-#RUN npm install
-
-# Bundle app source
-#COPY . /usr/src/app
+# distbin will store data as files in this directory
+VOLUME /distbin-db
+USER root
+RUN mkdir -p /distbin-db
+RUN chown -R node /distbin-db
+USER node
+# read by ./bin/server
+ENV DB_DIR=/distbin-db
 
 ENV PORT=8080
 EXPOSE 8080
+RUN ls -altr /distbin-db
 CMD ["--harmony", "bin/server" ]
