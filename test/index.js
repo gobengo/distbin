@@ -1,12 +1,17 @@
 // Run tests if this file is executed
 if (require.main === module) {
-  Promise.all([require('./distbin'), require('./activitypub')].map(run))
+  Promise.all([
+    require('./activitypub'),
+    require('./distbin'),
+    require('./filemap'),
+  ].map(run))
     .then(() => process.exit())
     .catch(() => process.exit(1))
 }
 
 // execute some tests (tests are object with test name/msg as key and func as val)
 // if env var TEST_FILTER is defined, only tests whose names contain that string will run
+exports.run = run
 async function run (tests) {
   const testFilter = process.env.TEST_FILTER
   const results = await Promise.all(

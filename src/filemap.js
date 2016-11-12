@@ -20,7 +20,7 @@ exports.JSONFileMap = class JSONFileMap extends Map {
   ['set'] (key, val) {
     // coerce to string
     const filePath = path.join(this[FileMapPrivates.dir], key)
-    const valString = typeof val === 'string' ? val : JSON.stringify(val, null, 2)
+    const valString = JSON.stringify(val, null, 2)
     fs.writeFileSync(filePath, valString)
     return this
   }
@@ -41,8 +41,30 @@ exports.JSONFileMap = class JSONFileMap extends Map {
   ['delete'] (key) {
     throw new Error('TODO implement JSONFileMap#delete')
   }
+  [Symbol.iterator] () {
+    return this.keys()[Symbol.iterator]()
+  }
   keys () {
-    return fs.readdirSync(this[FileMapPrivates.dir])
+    const dir = this[FileMapPrivates.dir]
+    const files = fs.readdirSync(dir)
+    const sortedAscByCreation = files
+      .map(name => {
+        const stat = fs.statSync(path.join(dir, name))
+        return ({ name, stat })
+      })
+      .sort(function(a, b) {
+        const timeDelta = a.stat.ctime.getTime() - b.stat.ctime.getTime();
+        if (timeDelta === 0) {
+          // fall back to assumption of increasing inodes. I have no idea if
+          // this is guaranteed, but think it is
+          // If this is bad, then maybe this whole method should just use 'ls'
+          // (delegate to the OS) since node isn't good enough here
+          return a.stat.ino - b.stat.ino;
+        }
+        return timeDelta
+      })
+      .map(({ name }) => name);
+    return sortedAscByCreation;
   }
   values () {
     return Array.from(this.keys()).map(file => this.get(file))
@@ -84,8 +106,31 @@ exports.JSONFileMapAsync = class JSONFileMapAsync extends Map {
   ['delete'] (key) {
     throw new Error('TODO implement JSONFileMap#delete')
   }
-  async keys () {
-    return denodeify(fs.readdir)(this[FileMapPrivates.dir])
+  [Symbol.iterator] () {
+    return this.keys()[Symbol.iterator]()
+  }
+  // todo make async
+  keys () {
+    const dir = this[FileMapPrivates.dir]
+    const files = fs.readdirSync(dir)
+    const sortedAscByCreation = files
+      .map(name => {
+        const stat = fs.statSync(path.join(dir, name))
+        return ({ name, stat })
+      })
+      .sort(function(a, b) {
+        const timeDelta = a.stat.ctime.getTime() - b.stat.ctime.getTime();
+        if (timeDelta === 0) {
+          // fall back to assumption of increasing inodes. I have no idea if
+          // this is guaranteed, but think it is
+          // If this is bad, then maybe this whole method should just use 'ls'
+          // (delegate to the OS) since node isn't good enough here
+          return a.stat.ino - b.stat.ino;
+        }
+        return timeDelta
+      })
+      .map(({ name }) => name);
+    return sortedAscByCreation;
   }
   async values () {
     const files = await this.keys()
