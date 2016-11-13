@@ -21,7 +21,6 @@ module.exports = function distbin({
   // #TODO: This should be persistent :P
   activities = new Map(),
   inbox = new Map(),
-  publicActivities = new Map()
 } = {}) {
   return function (req, res) {
     const requestPath = url.parse(req.url).pathname
@@ -29,8 +28,8 @@ module.exports = function distbin({
       '/': index,
       '/recent': recentHandler({ activities }),
       '/activitypub/inbox': inboxHandler({ activities, inbox }),
-      '/activitypub/outbox': outboxHandler({ activities, publicActivities }),
-      '/activitypub/public': publicCollectionHandler({ activities: publicActivities })
+      '/activitypub/outbox': outboxHandler({ activities }),
+      '/activitypub/public': publicCollectionHandler({ activities })
     }
     let handler = simpleRoutes[requestPath]
 
@@ -223,7 +222,7 @@ const activityHasTarget = (activity, target) => {
 
 // route for ActivityPub Outbox
 // https://w3c.github.io/activitypub/#outbox
-function outboxHandler ({ activities, publicActivities }) {
+function outboxHandler ({ activities }) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
       case 'get':
@@ -273,11 +272,6 @@ function outboxHandler ({ activities, publicActivities }) {
 
         // Save
         activities.set(newActivity.id, newActivity)
-        // #TODO: Consider moving this up and out into a sort of core model for storing activities
-        // that automatically indexes public ones
-        if (activityHasTarget(newActivity, publicCollectionId)) {
-          publicActivities.set(newActivity.id, newActivity)
-        }
 
         res.writeHead(201, { location })
 
@@ -309,12 +303,17 @@ function outboxHandler ({ activities, publicActivities }) {
 function publicCollectionHandler ({ activities }) {
   return async function (req, res) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
+    const publicActivities = []
+    for (let activity of [...await Promise.resolve(activities.values())].reverse()) {
+      if (activityHasTarget(activity, publicCollectionId)) publicActivities.push(activity)
+      if (publicActivities.length >= maxMemberCount) break;
+    }
     const publicCollection = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       'id': 'https://www.w3.org/ns/activitypub/Public',
       'type': 'Collection',
       // Get recent 10 items
-      'items': [...(await Promise.resolve(activities.values()))].reverse().slice(-1 * maxMemberCount).map(distbinHostedActivity),
+      'items': publicActivities.map(distbinHostedActivity),
       'totalItems': await activities.size,
       // empty string is relative URL for 'self'
       'current': ''

@@ -33,7 +33,7 @@ async function runServer() {
 
 	const dbDir = process.env.DB_DIR || fs.mkdtempSync('/tmp/distbin-');
 	// ensure subdirs exist
-	await Promise.all(['activities', 'publicActivities', 'inbox'].map(dir => {
+	await Promise.all(['activities', 'inbox'].map(dir => {
 		return denodeify(fs.mkdir)(path.join(dbDir, dir))
 		.catch((err) => {
 			switch (err.code) {
@@ -47,7 +47,6 @@ async function runServer() {
 	debuglog("using db directory", dbDir)
 	const apiHandler = distbin({
 		activities: new JSONFileMapAsync(path.join(dbDir, 'activities/')),
-		publicActivities: new JSONFileMapAsync(path.join(dbDir, 'publicActivities/')),
 		inbox: new JSONFileMapAsync(path.join(dbDir, 'inbox/')),
 	})
 
