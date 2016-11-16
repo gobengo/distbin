@@ -113,6 +113,39 @@ tests['Posting a reply will notify be received the inReplyTo inbox (even if anot
   assert(distbinAInbox.items.find(a => a.id === replyId), 'distbinA inbox contains reply')
 }
 
+tests['When GET an activity, it has information about any replies it may have'] = async function () {
+  // ok so we're going to make to distbins, A and B, and test that A delivers to B
+  const distbinA = distbin()
+  // post a parent to distbinA
+  const parentUrl = await postActivity(distbinA, {
+    type: 'Note',
+    content: 'Reply to this if you think FSW could happen'
+  })
+  // ok now to post the reply to distbinB
+  const replyUrl = await postActivity(distbinA, {
+    type: 'Note',
+    content: 'Dear Anonymous, I believe in FSW',
+    inReplyTo: parentUrl,
+    cc: [parentUrl],
+  })
+  const replyId = JSON.parse(await readableToString(await sendRequest(http.get(replyUrl)))).id
+  // this is a reply to something else to test filtering
+  const notReplyUrl = await postActivity(distbinA, {
+    type: 'Note',
+    content: 'Not a reply',
+    inReplyTo: parentUrl+'foo',
+  })
+  const parent = JSON.parse(await readableToString(await sendRequest(http.get(parentUrl))))
+  assert.equal(typeof parent.replies, 'string', 'has .replies URL')
+  const repliesResponse = await sendRequest(http.get(url.resolve(parentUrl, parent.replies)))
+  assert.equal(repliesResponse.statusCode, 200, 'can fetch URL of .replies and get response')
+  const repliesCollection = JSON.parse(await readableToString(repliesResponse))
+  // should be one reply
+  assert.equal(repliesCollection.totalItems, 1, 'replies collection .totalItems is right')
+  assert(repliesCollection.items, 'has .items')
+  assert.equal(repliesCollection.items[0].id, replyId, '.items contains the reply')
+}
+
 tests['GET an activity has a .url that resolves'] = async function () {
   const activityUrl = await postActivity(distbin(), {
     type: 'Note',
@@ -129,6 +162,8 @@ tests['GET an activity has a .url that resolves'] = async function () {
   const urlResponse = await sendRequest(http.request(url.resolve(activityUrl, fetchedActivity.url)))
   assert.equal(urlResponse.statusCode, 200)
 }
+
+
 
 // post an activity to a distbin, and return its absolute url
 async function postActivity(distbinListener, activity) {

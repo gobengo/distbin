@@ -5,8 +5,10 @@ const {
  } = require('./activitypub')
 const {
   debuglog,
-  readableToString
+  readableToString,
+  route,
 } = require('./util')
+const path = require('path')
 const url = require('url')
 const uuid = require('node-uuid')
 
@@ -24,22 +26,19 @@ module.exports = function distbin({
 } = {}) {
   return function (req, res) {
     const requestPath = url.parse(req.url).pathname
-    const simpleRoutes = {
-      '/': index,
-      '/recent': recentHandler({ activities }),
-      '/activitypub/inbox': inboxHandler({ activities, inbox }),
-      '/activitypub/outbox': outboxHandler({ activities }),
-      '/activitypub/public': publicCollectionHandler({ activities })
-    }
-    let handler = simpleRoutes[requestPath]
+    const routes = new Map([
+      ['/', () => index],
+      ['/recent', () => recentHandler({ activities })],
+      ['/activitypub/inbox', () => inboxHandler({ activities, inbox })],
+      ['/activitypub/outbox', () => outboxHandler({ activities })],
+      ['/activitypub/public', () => publicCollectionHandler({ activities })],
+      [/^\/activities\/([^\/]+)$/,
+        (activityUuid) => activityHandler({ activities, activityUuid })],
+      [/^\/activities\/([^\/]+)\/replies$/,
+        (activityUuid) => activityRepliesHandler({ activities, activityUuid })],
+    ])
 
-    if (!handler) {
-      const activityUuidMatch = requestPath.match('^/activities/([^/]+)')
-      if (activityUuidMatch) {
-        const activityUuid = activityUuidMatch[1]
-        handler = activityHandler({ activities, activityUuid })
-      }
-    }
+    let handler = route(routes, req)
 
     if (!handler) {
       handler = error(404)
@@ -79,9 +78,12 @@ const distbinHostedActivity = function (activity) {
   const uuid = uuidMatch[1]
   // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
   let inboxUrl = '/activitypub/inbox' // TODO should this be an inbox specific to this activity?
+  const activityUrl = '/activities/'+uuid
   return Object.assign({}, activity, {
     inbox: jsonldAppend(activity.inbox, inboxUrl),
-    url: jsonldAppend(activity.url, '/activities/'+uuid)
+    url: jsonldAppend(activity.url, activityUrl),
+    // #TODO: is '.replies' the best key name to use here? Is there something more standard to add to contxt?
+    replies: path.join(activityUrl, 'replies'),
   }) 
 }
 
@@ -96,10 +98,39 @@ function activityHandler ({ activities, activityUuid }) {
       res.end('There is no activity ' + uri)
       return
     }
+    // return the activity
     const extendedActivity = distbinHostedActivity(activity)
     // woo its here
     res.writeHead(200)
     res.end(JSON.stringify(extendedActivity, null, 2))
+  }
+}
+
+function activityRepliesHandler ({ activities, activityUuid }) {
+  return async function (req, res) {
+    const uri = activityUri(activityUuid)
+    const activity = await Promise.resolve(activities.get(uri))
+    // #TODO: If the activity isn't addressed to the public, we should enforce access controls here.
+    if (!activity) {
+      res.writeHead(404)
+      res.end('There is no activity ' + uri)
+      return
+    }
+    const allActivities = Array.from(await Promise.resolve(activities.values()))
+    const replies = Array.from(allActivities).filter(activity => {
+      const parent = activity && activity.object && activity.object.inReplyTo;
+      if ( ! parent) return;
+      // TODO .inReplyTo could be a urn, http URL, something else?
+      return url.parse(parent).pathname === '/activities/'+activityUuid
+    })
+    res.writeHead(200)
+    res.end(JSON.stringify({
+      type: 'Collection',
+      name: 'replies to item with UUID '+activityUuid,
+      totalItems: replies.length,
+      // TODO: sort/paginate/limit this
+      items: replies,
+    }, null, 2))
   }
 }
 

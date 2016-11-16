@@ -9,7 +9,8 @@ const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 // create handler to to render a single activity to a useful page
 exports.createHandler = ({apiUrl, activityId}) => {
   return async function (req, res) {
-    const activityRes = await sendRequest(http.request(apiUrl + req.url))
+    const activityUrl = apiUrl + req.url;
+    const activityRes = await sendRequest(http.request(activityUrl))
     if (activityRes.statusCode !== 200) {
       // proxy
       res.writeHead(activityRes.statusCode)
@@ -18,36 +19,6 @@ exports.createHandler = ({apiUrl, activityId}) => {
     }
     const activity = JSON.parse(await readableToString(activityRes))
     const ancestors = await fetchReplyAncestors(activity)
-    // Render a single ancestor activity
-    const renderAncestor = (ancestor) => {
-      if (ancestor[failedToFetch]) {
-        // assume its a broken link
-        return `
-          <article class="activity-item">
-            <a href="${ancestor.href}">${ancestor.href}</a> (couldn't fetch more info)
-          </article>
-        `
-      }
-      return `
-        <article class="activity-item">
-          <a href="${ancestor.url}">
-            <main>${encodeHtmlEntities(ancestor.object.content)}</main>
-          </a>
-        </article>
-      `
-    }
-
-    // Render an item and its ancestors for each ancestor in the array.
-    // This results in a nested structure conducive to indent-styling
-    const renderAncestorsSection = (ancestors) => {
-      const [ancestor, ...olderAncestors] = ancestors;
-      return `
-        <div class="ancestors">
-          ${olderAncestors.length ? renderAncestorsSection(olderAncestors) : ''}
-          ${renderAncestor(ancestor)}
-        </div>
-      `
-    }
 
     res.writeHead(200)
     res.end(`
@@ -79,8 +50,46 @@ exports.createHandler = ({apiUrl, activityId}) => {
         <summary>Raw</summary>
         <pre><code>${encodeHtmlEntities(JSON.stringify(activity, null, 2))}</code></pre>
       </details>
+
+      <hr />
+      <strong>Replies</strong>
+      <pre>
+        ${await readableToString(await sendRequest(http.get(url.resolve(activityUrl, activity.replies))))}
+      </pre>
+      <p>WIP</p>
     `)
   }
+}
+
+// Render a single ancestor activity
+function renderAncestor (ancestor) {
+  if (ancestor[failedToFetch]) {
+    // assume its a broken link
+    return `
+      <article class="activity-item">
+        <a href="${ancestor.href}">${ancestor.href}</a> (couldn't fetch more info)
+      </article>
+    `
+  }
+  return `
+    <article class="activity-item">
+      <a href="${ancestor.url}">
+        <main>${encodeHtmlEntities(ancestor.object.content)}</main>
+      </a>
+    </article>
+  `
+}
+
+// Render an item and its ancestors for each ancestor in the array.
+// This results in a nested structure conducive to indent-styling
+function renderAncestorsSection (ancestors) {
+  const [ancestor, ...olderAncestors] = ancestors;
+  return `
+    <div class="ancestors">
+      ${olderAncestors.length ? renderAncestorsSection(olderAncestors) : ''}
+      ${renderAncestor(ancestor)}
+    </div>
+  `
 }
 
 async function fetchReplyAncestors(activity) {
