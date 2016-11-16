@@ -18,6 +18,7 @@ exports.createHandler = ({ apiUrl }) => {
     Promise.resolve(handler(req, res))
       .catch((e) => {
         res.writeHead(500)
+        console.trace(e)
         res.end('Error: ' + e)
       })
   }
