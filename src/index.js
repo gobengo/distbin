@@ -129,7 +129,7 @@ function activityRepliesHandler ({ activities, activityUuid }) {
       name: 'replies to item with UUID '+activityUuid,
       totalItems: replies.length,
       // TODO: sort/paginate/limit this
-      items: replies,
+      items: replies.map(distbinHostedActivity),
     }, null, 2))
   }
 }

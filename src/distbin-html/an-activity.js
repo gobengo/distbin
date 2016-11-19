@@ -17,8 +17,23 @@ exports.createHandler = ({apiUrl, activityId}) => {
       activityRes.pipe(res, { end: true }).on('finish', res.end)
       return
     }
+
     const activity = JSON.parse(await readableToString(activityRes))
     const ancestors = await fetchReplyAncestors(activity)
+
+    const repliesUrl = url.resolve(activityUrl, activity.replies)
+    async function fetchDescendants(repliesUrl) {
+      const repliesCollection = JSON.parse(await readableToString(await sendRequest(http.get(repliesUrl))))
+      if (repliesCollection.totalItems <= 0) return repliesCollection
+      repliesCollection.items = await Promise.all(repliesCollection.items.map(async function(activity) {
+        // activity with resolved .replies collection
+        return Object.assign(activity, {
+          replies: await fetchDescendants(url.resolve(repliesUrl, activity.replies))
+        })
+      }))
+      return repliesCollection
+    }
+    const descendants = await fetchDescendants(repliesUrl)
 
     res.writeHead(200)
     res.end(`
@@ -26,7 +41,8 @@ exports.createHandler = ({apiUrl, activityId}) => {
       <head>
         ${everyPageHead()}
         <style>
-        .ancestors {
+        .ancestors,
+        .descendants {
           border-left: 1px solid #ddd;
           padding-left: 1em;
         }
@@ -37,28 +53,60 @@ exports.createHandler = ({apiUrl, activityId}) => {
       </head>
 
       ${renderAncestorsSection(ancestors)}
+      <hr />
 
-      <article class="activity-item">
-        ${activity.object.name
-          ? `<h1>${activity.object.name}</h1>`
-          : ''}
-        <main>${encodeHtmlEntities(activity.object.content)}</main>
-        ${/* TODO format published datetime, add byline */''}
-        <footer>at ${activity.published}</footer>
-      </article>
-      <details>
-        <summary>Raw</summary>
-        <pre><code>${encodeHtmlEntities(JSON.stringify(activity, null, 2))}</code></pre>
-      </details>
+      ${renderActivity(activity)}
 
       <hr />
-      <strong>Replies</strong>
-      <pre>
-        ${await readableToString(await sendRequest(http.get(url.resolve(activityUrl, activity.replies))))}
-      </pre>
-      <p>WIP</p>
+      <details>
+        <summary>Raw</summary>
+        <pre><code>${
+          JSON.stringify(descendants, null, 2)
+        }</code></pre>
+      </details>
+
+      ${renderDescendantsSection(descendants)}
+
     `)
   }
+}
+
+function renderDescendant(activity) {
+  return `
+    <div class="activity-descendant">
+      ${renderActivity(activity)}
+    </div>
+  `
+}
+
+function renderActivity(activity) {
+  return `
+    <article class="activity-item">
+      ${activity.object.name
+        ? `<h1>${activity.object.name}</h1>`
+        : ''}
+      <main>${encodeHtmlEntities(activity.object.content)}</main>
+      ${/* TODO format published datetime, add byline */''}
+      <footer><a href="${activity.url}" target="_blank">at ${activity.published}</a></footer>
+    </article>
+    <details>
+      <summary>Raw</summary>
+      <pre><code>${encodeHtmlEntities(JSON.stringify(activity, null, 2))}</code></pre>
+    </details>
+  `
+}
+
+function renderDescendantsSection(replies) {
+  if (replies.totalItems === 0) return '(no replies)'
+  if (replies.items.length === 0) return 'uh... totalItems > 0 but no items included. #TODO'
+  return `
+    <div class="descendants">
+      ${replies.items.map(a => `
+        ${renderActivity(a)}
+        ${renderDescendantsSection(a.replies)}
+      `).join('')}
+    </div>
+  `
 }
 
 // Render a single ancestor activity
@@ -71,18 +119,13 @@ function renderAncestor (ancestor) {
       </article>
     `
   }
-  return `
-    <article class="activity-item">
-      <a href="${ancestor.url}">
-        <main>${encodeHtmlEntities(ancestor.object.content)}</main>
-      </a>
-    </article>
-  `
+  return renderActivity(ancestor)
 }
 
 // Render an item and its ancestors for each ancestor in the array.
 // This results in a nested structure conducive to indent-styling
-function renderAncestorsSection (ancestors) {
+function renderAncestorsSection (ancestors=[]) {
+  if ( ! ancestors.length) return '';
   const [ancestor, ...olderAncestors] = ancestors;
   return `
     <div class="ancestors">
