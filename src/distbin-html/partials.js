@@ -1,5 +1,6 @@
 // HTML fragment that should appear in every page's <head> element
 exports.everyPageHead = () => `
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
   html {
     font-family: Georgia, "Times New Roman", serif;
