@@ -2,18 +2,16 @@
 exports.everyPageHead = () => `
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-  html {
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 18px;
-    line-height: 1.5em;
-  }
   body {
+    font-family: Georgia, "Times New Roman", serif;
     margin: 0 auto;
     max-width: 42em;
     padding: 2em;
+    font-size: 18px;
+  }
+  p {
   }
   pre {
-    line-height: 1em;
     max-width: 100%;
     overflow-x: auto;
   }

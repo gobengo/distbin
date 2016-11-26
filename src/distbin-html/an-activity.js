@@ -41,9 +41,12 @@ exports.createHandler = ({apiUrl, activityId}) => {
       <head>
         ${everyPageHead()}
         <style>
+        .primary-activity {
+          font-size: 1.2em;
+        }
         .ancestors,
         .descendants {
-          border-left: 1px solid #ddd;
+          border-left: 1px solid #efefef;
           padding-left: 1em;
         }
         .activity-item main {
@@ -53,20 +56,16 @@ exports.createHandler = ({apiUrl, activityId}) => {
       </head>
 
       ${renderAncestorsSection(ancestors)}
-      <hr />
 
-      ${renderActivity(activity)}
-
-      <hr />
-      <details>
-        <summary>Raw</summary>
-        <pre><code>${
-          JSON.stringify(descendants, null, 2)
-        }</code></pre>
-      </details>
+      <div class="primary-activity">
+        ${renderActivity(activity)}
+      </div>
 
       ${renderDescendantsSection(descendants)}
 
+      <script>
+      document.querySelector('.primary-activity').scrollIntoView()
+      </script>
     `)
   }
 }
@@ -79,6 +78,21 @@ function renderDescendant(activity) {
   `
 }
 
+// todo sandbox .content like
+/*
+<iframe
+        sandbox
+        width=100%
+        height=100%
+        srcdoc="${encodeHtmlEntities(activity.object.content)}"
+        marginwidth="0"
+        marginheight="0"
+        hspace="0"
+        vspace="0"
+        frameborder="0"
+        scrolling="no"
+      ></iframe>
+*/
 function renderActivity(activity) {
   return `
     <article class="activity-item">
@@ -86,6 +100,7 @@ function renderActivity(activity) {
         ? `<h1>${activity.object.name}</h1>`
         : ''}
       <main>${encodeHtmlEntities(activity.object.content)}</main>
+
       ${/* TODO format published datetime, add byline */''}
       <footer><a href="${activity.url}" target="_blank">at ${activity.published}</a></footer>
     </article>
@@ -97,7 +112,7 @@ function renderActivity(activity) {
 }
 
 function renderDescendantsSection(replies) {
-  if (replies.totalItems === 0) return '(no replies)'
+  if (replies.totalItems === 0) return ''
   if (replies.items.length === 0) return 'uh... totalItems > 0 but no items included. #TODO'
   return `
     <div class="descendants">
