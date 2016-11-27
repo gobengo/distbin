@@ -7,7 +7,6 @@ exports.everyPageHead = () => `
     margin: 0 auto;
     max-width: 42em;
     padding: 2em;
-    font-size: 18px;
   }
   p {
   }

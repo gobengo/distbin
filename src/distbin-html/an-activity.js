@@ -18,10 +18,16 @@ exports.createHandler = ({apiUrl, activityId}) => {
       return
     }
 
-    const activity = JSON.parse(await readableToString(activityRes))
+    const activityWithoutDescendants = JSON.parse(await readableToString(activityRes))
+    const repliesUrl = url.resolve(activityUrl, activityWithoutDescendants.replies)
+    const descendants = await fetchDescendants(repliesUrl)
+
+    const activity = Object.assign(activityWithoutDescendants, {
+      replies: descendants
+    })
+
     const ancestors = await fetchReplyAncestors(activity)
 
-    const repliesUrl = url.resolve(activityUrl, activity.replies)
     async function fetchDescendants(repliesUrl) {
       const repliesCollection = JSON.parse(await readableToString(await sendRequest(http.get(repliesUrl))))
       if (repliesCollection.totalItems <= 0) return repliesCollection
@@ -33,7 +39,6 @@ exports.createHandler = ({apiUrl, activityId}) => {
       }))
       return repliesCollection
     }
-    const descendants = await fetchDescendants(repliesUrl)
 
     res.writeHead(200)
     res.end(`
@@ -41,8 +46,11 @@ exports.createHandler = ({apiUrl, activityId}) => {
       <head>
         ${everyPageHead()}
         <style>
-        .primary-activity {
+        .primary-activity main {
           font-size: 1.2em;
+        }
+        .primary-activity {
+          margin: 2em auto;
         }
         .ancestors,
         .descendants {
@@ -52,6 +60,20 @@ exports.createHandler = ({apiUrl, activityId}) => {
         .activity-item main {
           margin: 1em auto; /* intended to be same as <p> to force same margins even if main content is not a p */
         }
+        .activity-footer-bar a {
+          text-decoration: none;
+        }
+        .activity-footer-bar > .action-show-raw > details,
+        .activity-footer-bar > .action-show-raw > details > summary {
+          display: inline
+        }
+
+        .activity-item .activity-footer-bar {
+          opacity: 0.3;
+        }
+        .activity-item:hover .activity-footer-bar {
+          opacity: inherit;
+        }
         </style>
       </head>
 
@@ -60,8 +82,7 @@ exports.createHandler = ({apiUrl, activityId}) => {
       <div class="primary-activity">
         ${renderActivity(activity)}
       </div>
-
-      ${renderDescendantsSection(descendants)}
+      ${renderDescendantsSection(activity.replies)} 
 
       <script>
       document.querySelector('.primary-activity').scrollIntoView()
@@ -102,12 +123,31 @@ function renderActivity(activity) {
       <main>${encodeHtmlEntities(activity.object.content)}</main>
 
       ${/* TODO format published datetime, add byline */''}
-      <footer><a href="${activity.url}" target="_blank">at ${activity.published}</a></footer>
+      <footer>
+        <div class="activity-footer-bar">
+          <span>
+            <a href="${activity.url}" target="_blank">${formatDate(new Date(Date.parse(activity.published)))}</a>
+          </span>
+          &nbsp;
+          <span class="action-show-raw">
+            <details>
+              <summary>{&hellip;}</summary>
+              <pre><code>${encodeHtmlEntities(JSON.stringify(activity, null, 2))}</code></pre>
+            </details>
+          </span>
+        </div>
+      </footer>
     </article>
-    <details>
-      <summary>Raw</summary>
-      <pre><code>${encodeHtmlEntities(JSON.stringify(activity, null, 2))}</code></pre>
-    </details>
+
+  `
+}
+
+function renderActivityTree(a) {
+  return `
+    <div class="activity-tree">
+      ${renderActivity(a)}
+      ${renderDescendantsSection(a.replies)}    
+    </div>
   `
 }
 
@@ -183,3 +223,35 @@ async function fetchActivity(activityUrl) {
 
   return JSON.parse(await readableToString(activityResponse))
 }
+
+function formatDate(date, relativeTo = new Date) {
+    var diffMs = date.getTime() - relativeTo.getTime(),
+        dateString;
+    // Future
+    if (diffMs > 0) {
+        throw new Error('formatDate cannot format dates in the future')
+    }
+    // Just now (0s)
+    if (diffMs > -1000) {
+        return '1s';
+    }
+    // Less than 60s ago -> 5s
+    if (diffMs > -60 * 1000) {
+        return Math.round( -1 * diffMs / 1000) + 's';
+    }
+    // Less than 1h ago -> 5m
+    if (diffMs > -60 * 60 * 1000) {
+        return Math.round( -1 * diffMs / (1000 * 60)) + 'm';
+    }
+    // Less than 24h ago -> 5h
+    if (diffMs > -60 * 60 * 24 * 1000) {
+        return Math.round( -1 * diffMs / (1000 * 60 * 60)) + 'hrs';
+    }
+    // >= 24h ago -> 6 Jul
+    dateString = date.getDate() + ' ' + MONTH_STRINGS[date.getMonth()];
+    // or like 6 Jul 2012 if the year if its different than the relativeTo year
+    if (date.getFullYear() !== relativeTo.getFullYear()) {
+        dateString += ' ' + date.getFullYear();
+    }
+    return dateString;
+};
