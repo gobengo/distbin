@@ -1,8 +1,10 @@
-const http = require('http')
-const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
-const url = require('url')
-
+const { distbinBodyTemplate } = require('./partials')
+const { encodeHtmlEntities } = require('../util')
 const { everyPageHead } = require('./partials')
+const http = require('http')
+const { readableToString } = require('../util')
+const { sendRequest } = require('../util')
+const url = require('url')
 
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 
@@ -71,22 +73,21 @@ exports.createHandler = ({apiUrl, activityId}) => {
         .activity-item .activity-footer-bar {
           opacity: 0.3;
         }
-        .activity-item:hover .activity-footer-bar {
-          opacity: inherit;
-        }
         </style>
       </head>
 
-      ${renderAncestorsSection(ancestors)}
+      ${distbinBodyTemplate(`
+        ${renderAncestorsSection(ancestors)}
 
-      <div class="primary-activity">
-        ${renderActivity(activity)}
-      </div>
-      ${renderDescendantsSection(activity.replies)} 
+        <div class="primary-activity">
+          ${renderActivity(activity)}
+        </div>
+        ${renderDescendantsSection(activity.replies)} 
 
-      <script>
-      document.querySelector('.primary-activity').scrollIntoView()
-      </script>
+        <script>
+        document.querySelector('.primary-activity').scrollIntoView()
+        </script>
+      `)}
     `)
   }
 }
@@ -225,6 +226,7 @@ async function fetchActivity(activityUrl) {
 }
 
 function formatDate(date, relativeTo = new Date) {
+    const MONTH_STRINGS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     var diffMs = date.getTime() - relativeTo.getTime(),
         dateString;
     // Future

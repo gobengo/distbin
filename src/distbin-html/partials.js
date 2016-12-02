@@ -6,7 +6,10 @@ exports.everyPageHead = () => `
     font-family: Georgia, "Times New Roman", serif;
     margin: 0 auto;
     max-width: 42em;
-    padding: 2em;
+  }
+  .distbin-body-main {
+    padding-left: 1em;    
+    padding-right: 1em;    
   }
   p {
   }
@@ -16,3 +19,26 @@ exports.everyPageHead = () => `
   }
   </style>
 `
+
+// wrap page with common body template for distbin-html (e.g. header/footer)
+exports.distbinBodyTemplate = (page) => `
+  ${header()}
+  <div class="distbin-body-main">
+    ${page}
+  </div>
+`
+
+function header() {
+  return '';
+  // todo
+  return `
+    <style>
+    .distbin-header {
+      padding: 1em;
+    }
+    </style>
+    <header class="distbin-header">
+      <a href="/">distbin</a>
+    </header>
+  `
+}

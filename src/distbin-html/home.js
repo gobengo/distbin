@@ -4,6 +4,7 @@ const querystring = require('querystring')
 const url = require('url')
 const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
 const { everyPageHead } = require('./partials')
+const { distbinBodyTemplate } = require('./partials')
 
 const htmlEntities = {
   checked: '&#x2611;',
@@ -14,9 +15,40 @@ const requestUrl = (req) => `http://${req.headers.host}${req.url}`
 exports.createHandler = function ({ apiUrl }) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
+      // POST is form submission to create a new post
+      case 'post':
+        const submission = await readableToString(req)
+        // assuming application/x-www-form-urlencoded
+        const { content, inReplyTo } = querystring.parse(submission)
+        let note = Object.assign(
+          {
+            '@context': 'https://www.w3.org/ns/activitystreams',
+            'type': 'Note',
+            'content': content,
+            'cc': [publicCollectionId, inReplyTo].filter(Boolean)
+          },
+          inReplyTo ? { inReplyTo } : {}
+        )
+        // submit to outbox
+        // #TODO is it more 'precise' to convert this to an activity here?
+        // #TODO discover outbox URL
+        const postToOutboxRequest = http.request(Object.assign(url.parse(apiUrl + '/activitypub/outbox'), {
+          headers: {
+            'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+          },
+          method: 'post',
+          path: '/activitypub/outbox'
+        }))
+        postToOutboxRequest.write(JSON.stringify(note))
+        await sendRequest(postToOutboxRequest)
+        // handle form submission by posting to outbox
+        res.writeHead(302, { location: req.url })
+        res.end()
+        return
+      // GET renders home page will all kinds of stuff
       case 'get':
         res.writeHead(200)
-        res.write(`
+        res.write(distbinBodyTemplate(`
           <head>
             ${everyPageHead()}
           </head>
@@ -28,6 +60,7 @@ exports.createHandler = function ({ apiUrl }) {
             <p>
               What makes distbin unique is that it [eventually] supports distributed social interactions around these documents using candidate web standards emerging from the <a href="https://www.w3.org/wiki/Socialwg">W3C Social Web Working Group</a>, for example the <a href="https://www.w3.org/TR/activitystreams-core/">Activity Streams</a> vocabulary and <a href="https://www.w3.org/TR/webmention/">Webmention</a>, <a href="https://www.w3.org/TR/activitypub/">ActivityPub</a>, and <a href="https://www.w3.org/TR/ldn/">Linked Data Notifications</a> protocols.
             </p>
+
           <h2>Planned Features and Progress</h2>
           <details>
             <ul>
@@ -74,9 +107,7 @@ exports.createHandler = function ({ apiUrl }) {
               </li>
             </ul>
           </details>
-        `)
-        // create new
-        res.write(`
+
           <h2>Post a Note</h2>
           <p>It will be added to the Public Collection
           <style>
@@ -108,21 +139,18 @@ EOF`)}
               </pre>
             </details>
           </p>
-        `)
-        const publicCollectionStr = encodeHtmlEntities(
-            // #TODO: discover /public url via HATEOAS
-            await readableToString(await sendRequest(http.request(apiUrl + '/activitypub/public')))
-          )
-          // linkify values of 'url' property (quotes encode to &#34;)
-          .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')
-        // recent
-        res.write(`
+
           <h2>Public Activity</h2>
           <p>Fetched from <a href="/activitypub/public">/activitypub/public</a></p>
-          <pre>${publicCollectionStr}</pre>
-        `)
-        // show other links
-        res.write(`
+          <pre>${
+            encodeHtmlEntities(
+              // #TODO: discover /public url via HATEOAS
+              await readableToString(await sendRequest(http.request(apiUrl + '/activitypub/public')))
+            )
+            // linkify values of 'url' property (quotes encode to &#34;)
+            .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')
+          }</pre>
+
           <h2>More Info/Links</h2>
           <p>
             This URL as application/json (<code>curl -H "Accept: application/json" ${requestUrl(req)}</code>)
@@ -130,36 +158,7 @@ EOF`)}
           <pre>${encodeHtmlEntities(
             await readableToString(await sendRequest(http.request(apiUrl)))
           )}</pre>
-        `)
-        res.end()
-        return
-      case 'post':
-        const submission = await readableToString(req)
-        // assuming application/x-www-form-urlencoded
-        const { content, inReplyTo } = querystring.parse(submission)
-        let note = Object.assign(
-          {
-            '@context': 'https://www.w3.org/ns/activitystreams',
-            'type': 'Note',
-            'content': content,
-            'cc': [publicCollectionId, inReplyTo].filter(Boolean)
-          },
-          inReplyTo ? { inReplyTo } : {}
-        )
-        // submit to outbox
-        // #TODO is it more 'precise' to convert this to an activity here?
-        // #TODO discover outbox URL
-        const postToOutboxRequest = http.request(Object.assign(url.parse(apiUrl + '/activitypub/outbox'), {
-          headers: {
-            'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
-          },
-          method: 'post',
-          path: '/activitypub/outbox'
-        }))
-        postToOutboxRequest.write(JSON.stringify(note))
-        await sendRequest(postToOutboxRequest)
-        // handle form submission by posting to outbox
-        res.writeHead(302, { location: req.url })
+        `))
         res.end()
         return
     }
