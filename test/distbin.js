@@ -163,7 +163,19 @@ tests['GET an activity has a .url that resolves'] = async function () {
   assert.equal(urlResponse.statusCode, 200)
 }
 
-
+tests['GET {activity.id}.json always sends json response, even if html if preferred by user-agent'] = async function () {
+  const activityUrl = await postActivity(distbin(), {
+    type: 'Note',
+    content: 'Hi'
+  })
+  const activityResponse = await sendRequest(http.request(Object.assign(url.parse(activityUrl + '.json'), {
+    headers: {
+      accept: 'text/html,*/*'
+    }
+  })));
+  assert.equal(activityResponse.statusCode, 200)
+  const fetchedActivity = JSON.parse(await readableToString(activityResponse))
+}
 
 // post an activity to a distbin, and return its absolute url
 async function postActivity(distbinListener, activity) {

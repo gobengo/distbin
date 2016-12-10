@@ -227,8 +227,8 @@ tests['can submit an Activity to the Outbox'] = async function () {
 
   // #question - Does this imply any requirements about what happens when GET that URL?
   // going to test that it's GETtable for now
-  const getActivityRequest = await sendRequest(await requestForListener(distbinListener, location))
-  assert.equal(getActivityRequest.statusCode, 200)
+  const getActivityResponse = await sendRequest(await requestForListener(distbinListener, location))
+  assert.equal(getActivityResponse.statusCode, 200)
 
   /*
   If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.

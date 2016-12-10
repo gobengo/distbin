@@ -34,6 +34,10 @@ module.exports = function distbin({
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox })],
       ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl })],
       ['/activitypub/public', () => publicCollectionHandler({ activities })],
+      // /activities/{activityUuid}.{format}
+      [/^\/activities\/([^\/]+?)(\.(.+))$/,
+        (activityUuid, _, format) => activityWithExtensionHandler({ activities, activityUuid, format })],
+      // /activities/{activityUuid}
       [/^\/activities\/([^\/]+)$/,
         (activityUuid) => activityHandler({ activities, activityUuid })],
       [/^\/activities\/([^\/]+)\/replies$/,
@@ -107,6 +111,17 @@ function activityHandler ({ activities, activityUuid }) {
     // woo its here
     res.writeHead(200)
     res.end(JSON.stringify(extendedActivity, null, 2))
+  }
+}
+
+function activityWithExtensionHandler({ activities, activityUuid, format }) {
+  return async function (req, res) {
+    if (format !== 'json') {
+      res.writeHead(404)
+      res.end('Unsupported activity extension .'+format)
+      return
+    }
+    return activityHandler({ activities, activityUuid })(req, res)
   }
 }
 
