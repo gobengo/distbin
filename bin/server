@@ -103,7 +103,7 @@ async function runServer() {
 	// listen
 	let mainServerUrl = await new Promise((resolve) => {
 		mainServer.listen(process.env.PORT || 0, (err) => {
-			resolve(`http://localhost:${mainServer.address().port}`)
+			resolve(externalUrl)
 		})
 	})
 
