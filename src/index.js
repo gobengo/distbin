@@ -90,7 +90,6 @@ const withDistbinProperties = function (activity, { externalUrl='' } = {}) {
   return Object.assign({}, activity, {
     inbox: jsonldAppend(activity.inbox, inboxUrl),
     url: jsonldAppend(activity.url, activityUrl),
-    // #TODO: is '.replies' the best key name to use here? Is there something more standard to add to contxt?
     replies: path.join(activityUrl, 'replies'),
   }) 
 }
