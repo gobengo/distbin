@@ -31,6 +31,7 @@ async function runServer() {
 	  });
 	});
 
+	const externalUrl = process.env.EXTERNAL_URL || `http://localhost:${process.env.PORT}`
 	const dbDir = process.env.DB_DIR || fs.mkdtempSync('/tmp/distbin-');
 	// ensure subdirs exist
 	await Promise.all(['activities', 'inbox'].map(dir => {
@@ -48,6 +49,7 @@ async function runServer() {
 	const apiHandler = distbin({
 		activities: new JSONFileMapAsync(path.join(dbDir, 'activities/')),
 		inbox: new JSONFileMapAsync(path.join(dbDir, 'inbox/')),
+		externalUrl,
 	})
 
 	// api

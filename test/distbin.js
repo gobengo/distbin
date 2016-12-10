@@ -89,7 +89,7 @@ tests['posted activities have an .inbox (e.g. to receive replies in)'] = async f
   assert(newActivity.inbox, 'activity should have an .inbox property')
 }
 
-// #TODO is notifying the .inReplyTo inbox even encouraged/allowed by activitypub await listen(http.createServer(distbinB))
+// #TODO is notifying the .inReplyTo inbox even encouraged/allowed by activitypub?
 tests['Posting a reply will notify be received the inReplyTo inbox (even if another distbin)'] = async function () {
   // ok so we're going to make to distbins, A and B, and test that A delivers to B
   const distbinA = distbin()

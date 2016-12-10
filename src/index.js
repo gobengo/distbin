@@ -23,14 +23,16 @@ module.exports = function distbin({
   // #TODO: This should be persistent :P
   activities = new Map(),
   inbox = new Map(),
+  // used for delivering to other inboxes so they can find this guy
+  externalUrl
 } = {}) {
   return function (req, res) {
-    const requestPath = url.parse(req.url).pathname
+    externalUrl = externalUrl || `http://${req.headers.host}${req.url}`
     const routes = new Map([
       ['/', () => index],
       ['/recent', () => recentHandler({ activities })],
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox })],
-      ['/activitypub/outbox', () => outboxHandler({ activities })],
+      ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl })],
       ['/activitypub/public', () => publicCollectionHandler({ activities })],
       [/^\/activities\/([^\/]+)$/,
         (activityUuid) => activityHandler({ activities, activityUuid })],
@@ -72,13 +74,15 @@ function jsonldAppend(oldVal, valToAppend) {
   return newVal
 }
 
-const distbinHostedActivity = function (activity) {
+// return a an extended version of provided activity with some extra metadata properties like 'inbox', 'url', 'replies'
+// if 'baseUrl' opt is provided, those extra properties will be absolute URLs, not relative
+const withDistbinProperties = function (activity, { externalUrl='' } = {}) {
   const uuidMatch = activity.id.match(/^urn:uuid:([^$]+)$/);
   if ( ! uuidMatch) throw new Error("Couldn't determine UUID for activity with id", activity.id)
   const uuid = uuidMatch[1]
   // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
-  let inboxUrl = '/activitypub/inbox' // TODO should this be an inbox specific to this activity?
-  const activityUrl = '/activities/'+uuid
+  let inboxUrl = url.resolve(externalUrl, '/activitypub/inbox') // TODO should this be an inbox specific to this activity?
+  const activityUrl = url.resolve(externalUrl, '/activities/'+uuid)
   return Object.assign({}, activity, {
     inbox: jsonldAppend(activity.inbox, inboxUrl),
     url: jsonldAppend(activity.url, activityUrl),
@@ -99,7 +103,7 @@ function activityHandler ({ activities, activityUuid }) {
       return
     }
     // return the activity
-    const extendedActivity = distbinHostedActivity(activity)
+    const extendedActivity = withDistbinProperties(activity)
     // woo its here
     res.writeHead(200)
     res.end(JSON.stringify(extendedActivity, null, 2))
@@ -129,7 +133,7 @@ function activityRepliesHandler ({ activities, activityUuid }) {
       name: 'replies to item with UUID '+activityUuid,
       totalItems: replies.length,
       // TODO: sort/paginate/limit this
-      items: replies.map(distbinHostedActivity),
+      items: replies.map(withDistbinProperties),
     }, null, 2))
   }
 }
@@ -195,6 +199,7 @@ function inboxHandler ({ activities, inbox }) {
       case 'post':
         debuglog('receiving inbox POST')
         const requestBody = await readableToString(req)
+        debuglog(requestBody)
         let parsed
         try {
           parsed = JSON.parse(requestBody)
@@ -253,7 +258,11 @@ const activityHasTarget = (activity, target) => {
 
 // route for ActivityPub Outbox
 // https://w3c.github.io/activitypub/#outbox
-function outboxHandler ({ activities }) {
+function outboxHandler ({
+  activities,
+  // external location of distbin (used for delivery)
+  externalUrl
+}) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
       case 'get':
@@ -308,7 +317,7 @@ function outboxHandler ({ activities }) {
 
         try {
           // Target and Deliver to other inboxes
-          await targetAndDeliver(newActivity)
+          await targetAndDeliver(withDistbinProperties(newActivity, { externalUrl }))
         } catch (e) {
           if (e.name === 'SomeDeliveriesFailed') {
             // #TODO: Retry some day
@@ -344,7 +353,7 @@ function publicCollectionHandler ({ activities }) {
       'id': 'https://www.w3.org/ns/activitypub/Public',
       'type': 'Collection',
       // Get recent 10 items
-      'items': publicActivities.map(distbinHostedActivity),
+      'items': publicActivities.map(withDistbinProperties),
       'totalItems': await activities.size,
       // empty string is relative URL for 'self'
       'current': ''

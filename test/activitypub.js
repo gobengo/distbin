@@ -370,7 +370,14 @@ tests['targets and delivers targeted activities sent to Outbox'] = async functio
   assert.equal(postNoteResponse.statusCode, 201)
   // then verify that it is in distbinB's inbox
   const distbinBInbox = JSON.parse(await readableToString(await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))))
-  assert(distbinBInbox.items.length > 0, 'there are items in distbin B inbox')
+  assert.equal(distbinBInbox.items.length, 1, 'there is 1 item in distbin B inbox')
+  // Ensure that the activity has a URL that is absolute
+  // #todo this tests what comes out of the inbox but probably it's a more accurate test to verify what the /inbox *receives from distbinA (the receiver doesn't strictly need to be a distbinB, but any endpoint)
+  // #todo resolvable via @context.@base (https://www.w3.org/TR/json-ld/#base-iri) would also be fine, but not using right now. can check later.
+  assert(function isProprablyAbsoluteUrl(url) {
+    const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i');
+    return absoluteUrlPattern.test(url)
+  }(distbinBInbox.items[0].url), '.url should be an absolute url')
 }
 
 /*
