@@ -11,5 +11,7 @@ docker run -d \
 	--restart always \
 	--name distbin \
 	-v /var/lib/distbin/db:/distbin-db \
+        -e "EXTERNAL_URL=http://distbin.com" \
+        -e "NODE_DEBUG=distbin" \
 	distbin
 
