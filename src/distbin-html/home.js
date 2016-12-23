@@ -61,8 +61,10 @@ exports.createHandler = function ({ apiUrl }) {
               What makes distbin unique is that it [eventually] supports distributed social interactions around these documents using candidate web standards emerging from the <a href="https://www.w3.org/wiki/Socialwg">W3C Social Web Working Group</a>, for example the <a href="https://www.w3.org/TR/activitystreams-core/">Activity Streams</a> vocabulary and <a href="https://www.w3.org/TR/webmention/">Webmention</a>, <a href="https://www.w3.org/TR/activitypub/">ActivityPub</a>, and <a href="https://www.w3.org/TR/ldn/">Linked Data Notifications</a> protocols.
             </p>
 
-          <h2>Planned Features and Progress</h2>
           <details>
+            <summary>
+              Planned Features and Progress
+            </summary>
             <ul>
               <li>distbin-api
                 <ul>
@@ -77,7 +79,7 @@ exports.createHandler = function ({ apiUrl }) {
                       <li>${htmlEntities.checked} when activities are received in the outbox, <a href="https://www.w3.org/TR/activitypub/#server-to-server-interactions">notify/deliver</a> to other targeted servers</li>
                       <li>${htmlEntities.checked} receive activities from other parts of the web according to <a href="https://www.w3.org/TR/activitypub/#inbox-delivery">Inbox Delivery</a>
                         <ul>
-                          <li>${htmlEntities.unchecked} Render these related activities on the target's html representation</li>
+                          <li>${htmlEntities.checked} Render these related activities on the target's html representation</li>
                         </ul>
                       </li> 
                     </ul>
@@ -102,7 +104,8 @@ exports.createHandler = function ({ apiUrl }) {
                 distbin-html - UI to consume and interact with posts in distbin. Hopefully a pure one-way dependency to distbin-api and thus swappable for other UI preferences
                 <ul>
                   <li>${htmlEntities.checked} This homepage</li>
-                  <li>${htmlEntities.unchecked} shareable pages for each created post and maybe each activity</li>
+                  <li>${htmlEntities.checked} shareable pages for each activity</li>
+                  <li>${htmlEntities.unchecked} activities and Posts are different things. Sometimes activities create posts; sometimes not. Differentiate between how these are rendered (or defensibly decide not to).</li>
                 </ul>
               </li>
             </ul>
