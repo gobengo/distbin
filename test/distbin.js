@@ -115,6 +115,14 @@ tests['Posting a reply will notify be received the inReplyTo inbox (even if anot
   assert(replyFromDistbinAInbox, 'distbinA inbox contains reply')
   assert.equal(isProbablyAbsoluteUrl(replyFromDistbinAInbox.replies), true,
     'activity is delivered with .replies as a valid absolute url')
+
+  // So now distbinA is storing a replicated copy of the reply canonically hosted on distbinB.
+  // What happens if we try to request this reply's id on distbinA
+  const replicatedReplyResponse = await sendRequest(await requestForListener(distbinA, {
+    path: '/activities/'+replyFromDistbinAInbox.uuid
+  }))
+  assert.equal(replicatedReplyResponse.statusCode, 302)
+  assert(isProbablyAbsoluteUrl(replicatedReplyResponse.headers.location), 'location header is absolute URL')
 }
 
 tests['When GET an activity, it has information about any replies it may have'] = async function () {

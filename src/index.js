@@ -99,6 +99,7 @@ const locallyHostedActivity = function (activity, { externalUrl='' } = {}) {
   return Object.assign({}, activity, {
     inbox: jsonldAppend(activity.inbox, inboxUrl),
     url: jsonldAppend(activity.url, activityUrl),
+    uuid: uuid,
     replies: repliesUrl,
   }) 
 }
@@ -113,6 +114,21 @@ function activityHandler ({ activities, activityUuid }) {
       res.writeHead(404)
       res.end('There is no activity ' + uri)
       return
+    }
+    // redirect to remote ones if we know a URL
+    if ( ! isHostedLocally(activity)) {
+      if (activity.url) {
+        // see other
+        res.writeHead(302, {
+          location: activity.url
+        })
+        res.end(activity.url)
+        return  
+      } else {
+        res.writeHead(404)
+        res.end(`Activity ${activityUuid} has been seen before, but it's not canonically hosted here, and I can't seem to find it's canonical URL. Sorry.`)
+        return
+      }
     }
     // return the activity
     const extendedActivity = locallyHostedActivity(activity)

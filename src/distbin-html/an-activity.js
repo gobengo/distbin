@@ -15,7 +15,7 @@ exports.createHandler = ({apiUrl, activityId}) => {
     const activityRes = await sendRequest(http.request(activityUrl))
     if (activityRes.statusCode !== 200) {
       // proxy
-      res.writeHead(activityRes.statusCode)
+      res.writeHead(activityRes.statusCode, activityRes.headers)
       activityRes.pipe(res, { end: true }).on('finish', res.end)
       return
     }
