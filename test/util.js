@@ -35,3 +35,8 @@ async function listen (server, port = 0, ...args) {
   })
 }
 
+exports.isProbablyAbsoluteUrl = isProbablyAbsoluteUrl
+function isProbablyAbsoluteUrl(url) {
+  const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i');
+  return absoluteUrlPattern.test(url)
+}

@@ -4,6 +4,7 @@ const activitypub = require('../src/activitypub')
 const assert = require('assert')
 const distbin = require('../')
 const http = require('http')
+const { isProbablyAbsoluteUrl } = require('./util')
 const { listen } = require('./util')
 const { readableToString } = require('../src/util')
 const { requestForListener } = require('./util')
@@ -110,7 +111,10 @@ tests['Posting a reply will notify be received the inReplyTo inbox (even if anot
   const replyId = JSON.parse(await readableToString(await sendRequest(http.request(replyUrl)))).id
   const distbinAInbox = JSON.parse(await readableToString(await sendRequest(
     await requestForListener(distbinA, '/activitypub/inbox'))))
-  assert(distbinAInbox.items.find(a => a.id === replyId), 'distbinA inbox contains reply')
+  const replyFromDistbinAInbox = distbinAInbox.items.find(a => a.id === replyId)
+  assert(replyFromDistbinAInbox, 'distbinA inbox contains reply')
+  assert.equal(isProbablyAbsoluteUrl(replyFromDistbinAInbox.replies), true,
+    'activity is delivered with .replies as a valid absolute url')
 }
 
 tests['When GET an activity, it has information about any replies it may have'] = async function () {
@@ -121,7 +125,7 @@ tests['When GET an activity, it has information about any replies it may have'] 
     type: 'Note',
     content: 'Reply to this if you think FSW could happen'
   })
-  // ok now to post the reply to distbinB
+  // ok now to post the reply
   const replyUrl = await postActivity(distbinA, {
     type: 'Note',
     content: 'Dear Anonymous, I believe in FSW',

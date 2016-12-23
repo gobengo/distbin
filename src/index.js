@@ -78,19 +78,28 @@ function jsonldAppend(oldVal, valToAppend) {
   return newVal
 }
 
+function isHostedLocally(activityFreshFromStorage) {
+  return ! activityFreshFromStorage.hasOwnProperty('url')
+}
+
 // return a an extended version of provided activity with some extra metadata properties like 'inbox', 'url', 'replies'
 // if 'baseUrl' opt is provided, those extra properties will be absolute URLs, not relative
-const withDistbinProperties = function (activity, { externalUrl='' } = {}) {
+const locallyHostedActivity = function (activity, { externalUrl='' } = {}) {
+  if (activity.url) {
+    debuglog("Unexpected .url property when processing activity assumed to be locally hosted\n"+JSON.stringify(activity))
+    throw new Error("Unexpected .url property when processing activity assumed to be locally hosted")
+  }
   const uuidMatch = activity.id.match(/^urn:uuid:([^$]+)$/);
   if ( ! uuidMatch) throw new Error("Couldn't determine UUID for activity with id", activity.id)
   const uuid = uuidMatch[1]
   // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
   let inboxUrl = url.resolve(externalUrl, '/activitypub/inbox') // TODO should this be an inbox specific to this activity?
   const activityUrl = url.resolve(externalUrl, '/activities/'+uuid)
+  const repliesUrl = url.resolve(externalUrl, '/activities/'+uuid+'/replies')
   return Object.assign({}, activity, {
     inbox: jsonldAppend(activity.inbox, inboxUrl),
     url: jsonldAppend(activity.url, activityUrl),
-    replies: path.join(activityUrl, 'replies'),
+    replies: repliesUrl,
   }) 
 }
 
@@ -106,7 +115,7 @@ function activityHandler ({ activities, activityUuid }) {
       return
     }
     // return the activity
-    const extendedActivity = withDistbinProperties(activity)
+    const extendedActivity = locallyHostedActivity(activity)
     // woo its here
     res.writeHead(200)
     res.end(JSON.stringify(extendedActivity, null, 2))
@@ -135,19 +144,26 @@ function activityRepliesHandler ({ activities, activityUuid }) {
       return
     }
     const allActivities = Array.from(await Promise.resolve(activities.values()))
-    const replies = Array.from(allActivities).filter(activity => {
-      const parent = activity && activity.object && activity.object.inReplyTo;
-      if ( ! parent) return;
-      // TODO .inReplyTo could be a urn, http URL, something else?
-      return url.parse(parent).pathname === '/activities/'+activityUuid
-    })
+    const replies = Array.from(allActivities)
+      .filter(activity => {
+        const parent = activity && activity.object && activity.object.inReplyTo;
+        if ( ! parent) return;
+        // TODO .inReplyTo could be a urn, http URL, something else?
+        return url.parse(parent).pathname === '/activities/'+activityUuid
+      })
+      .map(activity => {
+        if (isHostedLocally(activity)) {
+          return locallyHostedActivity(activity)
+        }
+        return activity
+      })
     res.writeHead(200)
     res.end(JSON.stringify({
       type: 'Collection',
       name: 'replies to item with UUID '+activityUuid,
       totalItems: replies.length,
       // TODO: sort/paginate/limit this
-      items: replies.map(withDistbinProperties),
+      items: replies,
     }, null, 2))
   }
 }
@@ -222,9 +238,8 @@ function inboxHandler ({ activities, inbox }) {
           res.end("Couldn't parse request body as JSON: " + requestBody)
           return
         }
-        // #TODO: read request body, validate, and save it somewhere...
-        const existsAlready = parsed.id ? await Promise.resolve(inbox.get(parsed.id)) : false
-        if (existsAlready) {
+        const existsAlreadyInInbox = parsed.id ? await Promise.resolve(inbox.get(parsed.id)) : false
+        if (existsAlreadyInInbox) {
           // duplicate!
           res.writeHead(409)
           res.end('There is already an activity in the inbox with id ' + parsed.id)
@@ -235,10 +250,18 @@ function inboxHandler ({ activities, inbox }) {
           parsed.id = activityUri(uuid())
         }
 
+        // If receiving a notification about an activity we've seen before (e.g. it is canonically hosted here),
+        // this will be true
+        const existsAlreadyInActivities = parsed.id ? await Promise.resolve(activities.get(parsed.id)) : false
+        if (existsAlreadyInActivities) {
+          // #TODO merge or something? Consider storing local ones and remote ones in different places
+          debuglog('Inbox received activity already stored in activities store. Not overwriting internal one. But #TODO')
+        }
+
         await Promise.all([
           inbox.set(parsed.id, parsed),
           // todo: Probably setting on inbox should automagically add to global set of activities
-          activities.set(parsed.id, parsed),
+          existsAlreadyInActivities ? null : activities.set(parsed.id, parsed),
         ])
 
         res.writeHead(202)
@@ -331,7 +354,8 @@ function outboxHandler ({
 
         try {
           // Target and Deliver to other inboxes
-          await targetAndDeliver(withDistbinProperties(newActivity, { externalUrl }))
+          const activityToDeliver = locallyHostedActivity(newActivity, { externalUrl })
+          await targetAndDeliver(activityToDeliver)
         } catch (e) {
           if (e.name === 'SomeDeliveriesFailed') {
             // #TODO: Retry some day
@@ -367,7 +391,12 @@ function publicCollectionHandler ({ activities }) {
       'id': 'https://www.w3.org/ns/activitypub/Public',
       'type': 'Collection',
       // Get recent 10 items
-      'items': publicActivities.map(withDistbinProperties),
+      'items': publicActivities.map(activity => {
+        if (isHostedLocally(activity)) {
+          return locallyHostedActivity(activity);
+        }
+        return activity
+      }),
       'totalItems': await activities.size,
       // empty string is relative URL for 'self'
       'current': ''

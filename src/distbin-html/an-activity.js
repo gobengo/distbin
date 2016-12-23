@@ -31,7 +31,13 @@ exports.createHandler = ({apiUrl, activityId}) => {
     const ancestors = await fetchReplyAncestors(activity)
 
     async function fetchDescendants(repliesUrl) {
-      const repliesCollection = JSON.parse(await readableToString(await sendRequest(http.get(repliesUrl))))
+      const repliesCollectionResponse = await sendRequest(http.get(repliesUrl))
+      if (repliesCollectionResponse.statusCode !== 200) {
+        return {
+          name: `Failed to fetch replies at ${repliesUrl} (code ${repliesCollectionResponse.statusCode})`
+        }
+      }
+      const repliesCollection = JSON.parse(await readableToString(repliesCollectionResponse))
       if (repliesCollection.totalItems <= 0) return repliesCollection
       repliesCollection.items = await Promise.all(repliesCollection.items.map(async function(activity) {
         // activity with resolved .replies collection
@@ -153,14 +159,21 @@ function renderActivityTree(a) {
 }
 
 function renderDescendantsSection(replies) {
+  let inner = '';
   if (replies.totalItems === 0) return ''
-  if (replies.items.length === 0) return 'uh... totalItems > 0 but no items included. #TODO'
+  if ( ! replies.items && replies.name) {
+    inner = replies.name
+  } else if (replies.items.length === 0) {
+    inner = 'uh... totalItems > 0 but no items included. #TODO'
+  } else {
+    inner = replies.items.map(a => `
+      ${renderActivity(a)}
+      ${renderDescendantsSection(a.replies)}
+    `).join('')
+  }
   return `
     <div class="descendants">
-      ${replies.items.map(a => `
-        ${renderActivity(a)}
-        ${renderDescendantsSection(a.replies)}
-      `).join('')}
+      ${inner}
     </div>
   `
 }
