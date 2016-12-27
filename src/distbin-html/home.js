@@ -55,16 +55,31 @@ exports.createHandler = function ({ apiUrl }) {
           <h1>distbin</h1>
             <p>
               <dfn>distbin</dfn> is a <strong>dist</strong>ributed <a href="https://en.wikipedia.org/wiki/Pastebin">paste<strong>bin</strong></a>.
-              i.e. it is a service where anyone can post documents on the web.
+              i.e. it is a service where anyone can post things on the web, and others can react by posting anywhere else on the web (including here).
             </p>
             <p>
-              What makes distbin unique is that it [eventually] supports distributed social interactions around these documents using candidate web standards emerging from the <a href="https://www.w3.org/wiki/Socialwg">W3C Social Web Working Group</a>, for example the <a href="https://www.w3.org/TR/activitystreams-core/">Activity Streams</a> vocabulary and <a href="https://www.w3.org/TR/webmention/">Webmention</a>, <a href="https://www.w3.org/TR/activitypub/">ActivityPub</a>, and <a href="https://www.w3.org/TR/ldn/">Linked Data Notifications</a> protocols.
+              Of course, theres lots of other places you can post things. Most people communicate online dozens of times per day. But all these places where we post and talk and learn are isolated. We talk <i>in</i> them, but they don't talk to each other.
             </p>
-
+            <p>
+              Because they're isolated, we don't get much choice in how we communicate with our friends. We react to things wherever we find them. Your contributions to the web are fragmented, with no easy way to go back and remember or save them.
+            </p>
+            <p>
+              Participating in places we don't choose also has some hidden risks. What if one of them goes down, gets bought, censored, surveiled, or moderated by policies you don't agree with?
+            </p>
+            <p>
+              What makes distbin unique is that it supports distributed social interactions. For example, your reply to a post on this distbin can be hosted by another distbin. Or your personal blog. Or your corporate intranet. The conversation can be spread out across the web, instead of siloed in just one place. 
+            </p>
+            <p>
+              With a distributed social web, you could have long term ownership of the things you create online and the way you consume and socialize around them. distbin is the first tool anyone (especially non-programmers!) can use to communicate in this way.
+            </p>
+            <p>Sound interesting? Post your thoughts below to get started.</p>
           <details>
             <summary>
-              Planned Features and Progress
+              Technical Info, Planned Features, and Progress
             </summary>
+            <p>
+              Distributed social features are powered by candidate web standards emerging from the <a href="https://www.w3.org/wiki/Socialwg">W3C Social Web Working Group</a>, for example the <a href="https://www.w3.org/TR/activitystreams-core/">Activity Streams</a> vocabulary and <a href="https://www.w3.org/TR/webmention/">Webmention</a>, <a href="https://www.w3.org/TR/activitypub/">ActivityPub</a>, and <a href="https://www.w3.org/TR/ldn/">Linked Data Notifications</a> protocols.
+            </p>
             <ul>
               <li>distbin-api
                 <ul>
