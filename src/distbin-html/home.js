@@ -5,7 +5,7 @@ const url = require('url')
 const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
 const { everyPageHead } = require('./partials')
 const { distbinBodyTemplate } = require('./partials')
-
+const { aboveFold } = require('./partials')
 const { requestUrl } = require('../util')
 
 exports.createHandler = function ({ apiUrl }) {
@@ -36,47 +36,66 @@ exports.createHandler = function ({ apiUrl }) {
           path: '/activitypub/outbox'
         }))
         postToOutboxRequest.write(JSON.stringify(note))
-        await sendRequest(postToOutboxRequest)
+        postToOutboxResponse = await sendRequest(postToOutboxRequest)
         // handle form submission by posting to outbox
-        res.writeHead(302, { location: req.url })
+        res.writeHead(302, { location: postToOutboxResponse.headers.location })
         res.end()
         return
       // GET renders home page will all kinds of stuff
       case 'get':
         res.writeHead(200)
-        res.write(distbinBodyTemplate(`
-          <h2>Post a Note</h2>
-          <p>It will be added to the Public Collection
+        res.write(distbinBodyTemplate(aboveFold(`
           <style>
           .post-form textarea {
-            width: 100%;
+            height: calc(100% - 10em); /* everything except the rest of this form */
+            min-height: 4em;
           }
-          .post-form input[type=submit] {
-            width: 100%;
+          .post-form textarea,
+          .post-form input {
+            border: 0;
+            font: inherit;
+            padding: 1em;
+            width:100%;
+            margin-bottom: 2px; /* account for webkit :focus glow overflow */
+          }
+          .post-form textarea,
+          .post-form input {
+            width: calc(100% + 2em);
+            margin-left: -1em;
+            margin-right: -1em;
+          }
+          .post-form .post-form-label-with-input {
+            margin: 1em 0;
           }
           </style>
           <form class="post-form" method="post">
-            <label>in reply to (optional)</label> <input name="inReplyTo" type="text" placeholder="URL"></input>
-            <textarea name="content"></textarea>
+            <input name="name" type="text" placeholder="Title"></input>
+            <textarea name="content" placeholder="Write anonymously, get feedback"></textarea>
+            <input name="inReplyTo" type="text" placeholder="in reply to (optional)"></input>
             <input type="submit" value="post" />
           </form>
-          <p>
-            In addition to using the above form, you can create posts via the ActivityPub API:
-            <details>
-              <pre>${encodeHtmlEntities(`
+          <script>
+          (function () {
+            var contentInput = document.querySelector('.post-form *[name=content]')
+            contentInput.scrollIntoViewIfNeeded();
+            contentInput.focus();
+          }())
+          </script>
+          <details>
+            <summary>or POST via API</summary>
+            <pre>${encodeHtmlEntities(`
 curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
 {
-  "@context": "https://www.w3.org/ns/activitystreams",
-  "type": "Note",
-  "content": "This is a note",
-  "published": "2015-02-10T15:04:55Z",
-  "cc": ["${publicCollectionId}"]
+"@context": "https://www.w3.org/ns/activitystreams",
+"type": "Note",
+"content": "This is a note",
+"published": "2015-02-10T15:04:55Z",
+"cc": ["${publicCollectionId}"]
 }
 EOF`)}
-              </pre>
-            </details>
-          </p>
-        `))
+            </pre>
+          </details>
+        `)))
         res.end()
         return
     }
