@@ -4,7 +4,7 @@ exports.createHandler = function () {
   return (req, res) => {
     res.writeHead(200)
     res.end(distbinBodyTemplate(`
- 			${createAboutMessage()}
+		${createAboutMessage()}
     `))
   }
 }

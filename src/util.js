@@ -12,6 +12,8 @@ exports.readableToString = async function (readable) {
   })
 }
 
+exports.requestUrl = (req) => `http://${req.headers.host}${req.url}`
+
 // given a map of strings/regexes to listener factories,
 // return a matching route (or undefined if no match)
 exports.route = (routes, req) => {

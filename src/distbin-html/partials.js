@@ -53,7 +53,7 @@ function header() {
         text-align: right;
       }
        .distbin-header-section.right .distbin-header-item {
-        text-align: right;
+        margin-left: 0.5em;
       }
       .distbin-header-item {
       }
@@ -66,6 +66,7 @@ function header() {
         <a href="/" class="distbin-header-item name">distbin</a>
       </div>
       <div class="distbin-header-section right">
+        <a href="/public" class="distbin-header-item public">public</a>
         <a href="/about" class="distbin-header-item about">about</a>
       </div>
     </header>

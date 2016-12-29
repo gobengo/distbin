@@ -6,7 +6,7 @@ const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
 const { everyPageHead } = require('./partials')
 const { distbinBodyTemplate } = require('./partials')
 
-const requestUrl = (req) => `http://${req.headers.host}${req.url}`
+const { requestUrl } = require('../util')
 
 exports.createHandler = function ({ apiUrl }) {
   return async function (req, res) {
@@ -76,28 +76,27 @@ EOF`)}
               </pre>
             </details>
           </p>
-
-          <h2>Public Activity</h2>
-          <p>Fetched from <a href="/activitypub/public">/activitypub/public</a></p>
-          <pre>${
-            encodeHtmlEntities(
-              // #TODO: discover /public url via HATEOAS
-              await readableToString(await sendRequest(http.request(apiUrl + '/activitypub/public')))
-            )
-            // linkify values of 'url' property (quotes encode to &#34;)
-            .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')
-          }</pre>
-
-          <h2>More Info/Links</h2>
-          <p>
-            This URL as application/json (<code>curl -H "Accept: application/json" ${requestUrl(req)}</code>)
-          </p>
-          <pre>${encodeHtmlEntities(
-            await readableToString(await sendRequest(http.request(apiUrl)))
-          )}</pre>
         `))
         res.end()
         return
     }
   }
 }
+
+// function createMoreInfo(req, apiUrl) {
+//   return `
+//     <h2>More Info/Links</h2>
+//     <p>
+//       This URL as application/json (<code>curl -H "Accept: application/json" ${requestUrl(req)}</code>)
+//     </p>
+//     <pre>${
+//       encodeHtmlEntities(
+//         await readableToString(
+//           await sendRequest(
+//             http.request(apiUrl)
+//           )
+//         )
+//       )
+//     }</pre>
+//   `
+// }
