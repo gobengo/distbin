@@ -61,7 +61,7 @@ async function runServer() {
 	})
 
 	// html
-	const htmlServer = http.createServer(distbinHtml.createHandler({ apiUrl: apiServerUrl }))
+	const htmlServer = http.createServer(distbinHtml.createHandler({ apiUrl: apiServerUrl, externalUrl }))
 	const htmlServerUrl = await new Promise((resolve) => {
 		htmlServer.listen(0, function (err) {
 			resolve(`http://localhost:${htmlServer.address().port}`)

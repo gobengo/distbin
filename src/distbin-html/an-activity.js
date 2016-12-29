@@ -9,7 +9,7 @@ const url = require('url')
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 
 // create handler to to render a single activity to a useful page
-exports.createHandler = ({apiUrl, activityId}) => {
+exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
   return async function (req, res) {
     const activityUrl = apiUrl + req.url;
     const activityRes = await sendRequest(http.request(activityUrl))
@@ -20,7 +20,9 @@ exports.createHandler = ({apiUrl, activityId}) => {
       return
     }
 
-    const activityWithoutDescendants = JSON.parse(await readableToString(activityRes))
+    console.log('externalUrl is', externalUrl)
+
+    const activityWithoutDescendants = activityWithUrlsRelativeTo(JSON.parse(await readableToString(activityRes)), externalUrl)
     const repliesUrl = url.resolve(activityUrl, activityWithoutDescendants.replies)
     const descendants = await fetchDescendants(repliesUrl)
 
@@ -29,6 +31,13 @@ exports.createHandler = ({apiUrl, activityId}) => {
     })
 
     const ancestors = await fetchReplyAncestors(activity)
+
+    function activityWithUrlsRelativeTo(activity, relativeTo) {
+      return Object.assign(activity, {
+        replies: url.resolve(relativeTo, activity.replies),
+        url: url.resolve(relativeTo, activity.url),
+      })
+    }
 
     async function fetchDescendants(repliesUrl) {
       const repliesCollectionResponse = await sendRequest(http.get(repliesUrl))
@@ -41,8 +50,10 @@ exports.createHandler = ({apiUrl, activityId}) => {
       if (repliesCollection.totalItems <= 0) return repliesCollection
       repliesCollection.items = await Promise.all(repliesCollection.items.map(async function(activity) {
         // activity with resolved .replies collection
-        return Object.assign(activity, {
-          replies: await fetchDescendants(url.resolve(repliesUrl, activity.replies))
+        const withAbsoluteUrls = activityWithUrlsRelativeTo(activity, repliesUrl)
+        console.log("withAbsoluteUrls", withAbsoluteUrls)
+        return Object.assign(withAbsoluteUrls, {
+          replies: await fetchDescendants(withAbsoluteUrls.replies),
         })
       }))
       return repliesCollection
@@ -57,9 +68,9 @@ exports.createHandler = ({apiUrl, activityId}) => {
         .primary-activity main {
           font-size: 1.2em;
         }
-        .primary-activity {
+        /*.primary-activity {
           margin: 2em auto;
-        }
+        }*/
         .ancestors,
         .descendants {
           border-left: 1px solid #efefef;
@@ -134,6 +145,10 @@ function renderActivity(activity) {
         <div class="activity-footer-bar">
           <span>
             <a href="${activity.url}" target="_blank">${formatDate(new Date(Date.parse(activity.published)))}</a>
+          </span>
+          &nbsp;
+          <span>
+            <a href="/?inReplyTo=${activity.url}" target="_blank">reply</a>
           </span>
           &nbsp;
           <span class="action-show-raw">

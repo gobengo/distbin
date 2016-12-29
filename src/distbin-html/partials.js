@@ -48,7 +48,7 @@ function header() {
       box-sizing: border-box;
     }
     .distbin-header {
-      margin-bottom: 1em;
+      margin-bottom: 2em;
       width: 100%;
     }
     .distbin-header-inner {

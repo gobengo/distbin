@@ -4,13 +4,13 @@ const home = require('./home')
 const { route } = require('../util')
 const anActivity = require('./an-activity')
 
-exports.createHandler = ({ apiUrl }) => {
+exports.createHandler = ({ apiUrl, externalUrl }) => {
   const routes = new Map([
     ['/', () => home.createHandler({ apiUrl })],
     ['/about', () => about.createHandler() ],
     ['/public', () => public.createHandler({ apiUrl }) ],
     [new RegExp('^/activities/([^/\.]+)$'),
-      (activityId) => anActivity.createHandler({ apiUrl, activityId })]
+      (activityId) => anActivity.createHandler({ apiUrl, activityId, externalUrl })]
   ])
   return (req, res) => {
     const handler = route(routes, req)

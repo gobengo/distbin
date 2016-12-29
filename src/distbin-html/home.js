@@ -41,8 +41,12 @@ exports.createHandler = function ({ apiUrl }) {
         res.writeHead(302, { location: postToOutboxResponse.headers.location })
         res.end()
         return
+        break;
       // GET renders home page will all kinds of stuff
       case 'get':
+        const query = url.parse(req.url, true).query; // todo sanitize
+        const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || '');
+        const safeTitleDefault = encodeHtmlEntities(query.title || '');
         res.writeHead(200)
         res.write(distbinBodyTemplate(aboveFold(`
           <style>
@@ -69,9 +73,9 @@ exports.createHandler = function ({ apiUrl }) {
           }
           </style>
           <form class="post-form" method="post">
-            <input name="name" type="text" placeholder="Title"></input>
+            <input name="name" type="text" placeholder="Title (optional)" value="${safeTitleDefault}"></input>
             <textarea name="content" placeholder="Write anonymously, get feedback"></textarea>
-            <input name="inReplyTo" type="text" placeholder="in reply to (optional)"></input>
+            <input name="inReplyTo" type="text" placeholder="replying to another URL? (optional)" value="${safeInReplyToDefault}"></input>
             <input type="submit" value="post" />
           </form>
           <script>

@@ -1,3 +1,5 @@
+const url = require('url')
+
 exports.debuglog = require('util').debuglog('distbin')
 
 exports.readableToString = async function (readable) {
@@ -17,14 +19,15 @@ exports.requestUrl = (req) => `http://${req.headers.host}${req.url}`
 // given a map of strings/regexes to listener factories,
 // return a matching route (or undefined if no match)
 exports.route = (routes, req) => {
+  const path = url.parse(req.url).pathname
   for (let [route, createHandler] of routes.entries()) {
     if (typeof route === 'string') {
       // exact match
-      if (req.url !== route) continue
+      if (path !== route) continue
       return createHandler()
     }
     if (route instanceof RegExp) {
-      let match = req.url.match(route)
+      let match = path.match(route)
       if (!match) continue
       return createHandler(...match.slice(1))
     }
