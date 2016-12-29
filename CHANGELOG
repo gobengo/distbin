@@ -1,0 +1,11 @@
+# vNext
+
+[] - Refactored homepage with explanatory text on /about page
+
+# Opportunities
+
+[] - measureable pageviews
+
+# 12/29/2016
+
+Has explanatory homepage. Implements ActivityPub outbox/inbox for federation. Each activity has an html representation that shows inReplyTo threads. Can run with included Dockerfile. Deployed to distbin.com as well as {a,b,c}.distbin.com (see ~/domains/distbin.com/ for docker-compose).

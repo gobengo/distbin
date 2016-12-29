@@ -6,10 +6,9 @@ exports.everyPageHead = () => `
     font-family: Georgia, "Times New Roman", serif;
     margin: 0 auto;
     max-width: 42em;
+    padding: 1em;
   }
-  .distbin-body-main {
-    padding-left: 1em;    
-    padding-right: 1em;    
+  .distbin-main {  
   }
   p {
   }
@@ -22,23 +21,53 @@ exports.everyPageHead = () => `
 
 // wrap page with common body template for distbin-html (e.g. header/footer)
 exports.distbinBodyTemplate = (page) => `
+  <head>
+    ${exports.everyPageHead()}
+  </head>
   ${header()}
-  <div class="distbin-body-main">
+  <div class="distbin-main">
     ${page}
   </div>
 `
 
 function header() {
-  return '';
   // todo
   return `
     <style>
-    .distbin-header {
-      padding: 1em;
+    html { 
+      box-sizing: border-box;
     }
+    .distbin-header {
+      display: table;
+      width: 100%;
+    }
+      .distbin-header a {
+        text-decoration: none;
+      }
+
+      .distbin-header-section {
+        display: table-cell;
+        vertical-align: top;
+      }
+      .distbin-header-section.right {
+        text-align: right;
+      }
+       .distbin-header-section.right .distbin-header-item {
+        text-align: right;
+      }
+      .distbin-header-item {
+      }
+      .distbin-header .distbin-header-item.name {
+        font-weight: bold
+      }
     </style>
     <header class="distbin-header">
-      <a href="/">distbin</a>
+      <div class="distbin-header-section left">
+        <a href="/" class="distbin-header-item name">distbin</a>
+      </div>
+      <div class="distbin-header-section right">
+        <a href="/about" class="distbin-header-item about">about</a>
+      </div>
     </header>
   `
 }
