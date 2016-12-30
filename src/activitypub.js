@@ -1,5 +1,7 @@
+const { debuglog } = require('./util')
 const http = require('http')
 const https = require('https')
+const parseLinkHeader = require('parse-link-header')
 const { readableToString, sendRequest } = require('./util')
 const url = require('url')
 
@@ -81,17 +83,38 @@ const deliverActivity = async function (activity, target) {
   } catch (e) {
     throw new deliveryErrors.TargetRequestFailed(e.message)
   }
-  const targetProfileResponseBody = await readableToString(targetProfileResponse)
-  try {
-    var targetProfile = JSON.parse(targetProfileResponseBody)
-  } catch (e) {
-    throw new deliveryErrors.TargetParseFailed(e.message)
+
+  let inbox;
+
+  // look in res Link header
+  const inboxLinks = (parseLinkHeader(targetProfileResponse.headers.link) || {})['http://www.w3.org/ns/ldp#inbox']
+  let inboxLink
+  if (Array.isArray(inboxLinks)) {
+    if (inboxLinks.length > 1) {
+      console.warn("More than 1 LDN inbox found, but only using 1 for now", inboxLinks)
+      inboxLink = inboxLinks[0]
+    }
+  } else {
+    inboxLink = inboxLinks
+  }
+  
+  if (inboxLink) {
+    inbox = url.resolve(target, inboxLink.url)
+  }
+  
+  // if no link header look in json body
+  if ( ! inbox) {
+    const targetProfileResponseBody = await readableToString(targetProfileResponse)
+    try {
+      var targetProfile = JSON.parse(targetProfileResponseBody)
+    } catch (e) {
+      throw new deliveryErrors.TargetParseFailed(e.message)
+    }
+    // #TODO be more JSON-LD aware when looking for inbox
+    inbox = url.resolve(target, targetProfile.inbox)
   }
 
-  if (!targetProfile.inbox) throw new deliveryErrors.InboxDiscoveryFailed('No .inbox found for target ' + target)
-
-  // #TODO be more JSON-LD aware when looking for inbox
-  const inbox = url.resolve(target, targetProfile.inbox)
+  if ( ! inbox) throw new deliveryErrors.InboxDiscoveryFailed('No .inbox found for target ' + target)
 
   // post to inbox
   const parsedInboxUrl = url.parse(inbox)
@@ -107,6 +130,7 @@ const deliverActivity = async function (activity, target) {
   } catch (e) {
     throw new deliveryErrors.DeliveryRequestFailed(e.message)
   }
+  debuglog(`Successfully delivered activity ${activity.url} to target ${target} at inbox ${inbox}`)
   // const delivery = await readableToString(deliveryResponse);
   // #TODO handle retry/timeout?
   return target
@@ -130,6 +154,7 @@ exports.targetAndDeliver = async function (activity, targets = activityTargets(a
     })
   )
   if (failures.length) {
+    debuglog('failures delivering '+failures)
     throw new deliveryErrors.SomeDeliveriesFailed(failures)
   }
   return deliveries

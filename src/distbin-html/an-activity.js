@@ -4,6 +4,7 @@ const { everyPageHead } = require('./partials')
 const http = require('http')
 const https = require('https')
 const { readableToString } = require('../util')
+const { sanitize } = require('./sanitize')
 const { sendRequest } = require('../util')
 const url = require('url')
 
@@ -164,27 +165,29 @@ function renderActivity(activity) {
           : ''
       }
       <main>${
-        activity.content
-          ? activity.content
-          :
-        activity.object
-          ? encodeHtmlEntities(activity.object.content)
-          :
-        activity.name
-          ||
-        activity.url
-          ? `<a href="${activity.url}">${activity.url}</a>`
-          :
-        activity.id
-          ? `<a href="${activity.id}">${activity.id}</a>`
-          : ''
+        sanitize(
+          activity.content
+            ? activity.content
+            :
+          activity.object
+            ? activity.object.content
+            :
+          activity.name
+            ||
+          activity.url
+            ? `<a href="${activity.url}">${activity.url}</a>`
+            :
+          activity.id
+            ? `<a href="${activity.id}">${activity.id}</a>`
+            : ''
+        )
       }</main>
 
       ${/* TODO format published datetime, add byline */''}
       <footer>
         <div class="activity-footer-bar">
           <span>
-            <a href="${activity.url}">${
+            <a href="${encodeHtmlEntities(activity.url)}">${
               published
                 ? formatDate(new Date(Date.parse(published)))
                 : 'permalink'
@@ -192,7 +195,7 @@ function renderActivity(activity) {
           </span>
           &nbsp;
           <span>
-            <a href="/?inReplyTo=${activity.url}">reply</a>
+            <a href="/?inReplyTo=${encodeHtmlEntities(activity.url)}">reply</a>
           </span>
           &nbsp;
           <span class="action-show-raw">
