@@ -2,6 +2,7 @@ const { debuglog } = require('./util')
 const http = require('http')
 const https = require('https')
 const parseLinkHeader = require('parse-link-header')
+const { rdfaToJsonLd } = require('./util')
 const { readableToString, sendRequest } = require('./util')
 const url = require('url')
 
@@ -83,13 +84,13 @@ const deliverActivity = async function (activity, target) {
       accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#",text/html'
     }
   }))
-  debuglog("sending request to start inbox discovery for "+target)
+  debuglog("req inbox discovery "+target)
   try {
     var targetProfileResponse = await sendRequest(targetProfileRequest)
   } catch (e) {
     throw new deliveryErrors.TargetRequestFailed(e.message)
   }
-  debuglog("got response for "+target+" "+targetProfileResponse.statusCode)
+  debuglog(`res ${targetProfileResponse.statusCode} inbox discovery for ${target}`)
 
   switch (targetProfileResponse.statusCode) {
     case 200:
@@ -99,34 +100,54 @@ const deliverActivity = async function (activity, target) {
       throw new deliveryErrors.TargetRequestFailed(`Got unexpected status code ${targetProfileResponse.statusCode} when requesting ${target} to determine inbox URL`)
   }
 
-  let inbox;
+  let inbox = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse);
 
-  // look in res Link header
-  const inboxLinks = (parseLinkHeader(targetProfileResponse.headers.link) || {})['http://www.w3.org/ns/ldp#inbox']
-  let inboxLink
-  if (Array.isArray(inboxLinks)) {
-    if (inboxLinks.length > 1) {
-      console.warn("More than 1 LDN inbox found, but only using 1 for now", inboxLinks)
-      inboxLink = inboxLinks[0]
+  function inboxFromHeaders(res) {
+    let inbox;
+    // look in res Link header
+    const inboxLinks = (parseLinkHeader(res.headers.link) || {})['http://www.w3.org/ns/ldp#inbox']
+    let inboxLink
+    if (Array.isArray(inboxLinks)) {
+      if (inboxLinks.length > 1) {
+        console.warn("More than 1 LDN inbox found, but only using 1 for now", inboxLinks)
+        inboxLink = inboxLinks[0]
+      }
+    } else {
+      inboxLink = inboxLinks
     }
-  } else {
-    inboxLink = inboxLinks
+    
+    if (inboxLink) {
+      inbox = url.resolve(target, inboxLink.url)
+    }
+    return inbox;
   }
   
-  if (inboxLink) {
-    inbox = url.resolve(target, inboxLink.url)
-  }
-  
-  // if no link header look in json body
-  if ( ! inbox) {
-    const targetProfileResponseBody = await readableToString(targetProfileResponse)
-    try {
-      var targetProfile = JSON.parse(targetProfileResponseBody)
-    } catch (e) {
-      throw new deliveryErrors.TargetParseFailed(e.message)
+  async function inboxFromBody(res) {
+    const contentType = (res.headers['content-type'] || '').split(';')[0] // strip mediaType params (e.g. charset, profile)
+    const body = await readableToString(res)
+    let inbox
+    switch (contentType) {
+      case 'application/json':
+        try {
+          var targetProfile = JSON.parse(body)
+        } catch (e) {
+          throw new deliveryErrors.TargetParseFailed(e.message)
+        }   
+        // #TODO be more JSON-LD aware when looking for inbox
+        inbox = url.resolve(target, targetProfile.inbox)
+        return inbox
+      case 'text/html':
+        let ld = await rdfaToJsonLd(body)
+        let targetSubject = ld.find(x => x['@id'] === 'http://localhost/')
+        let inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox']
+        if (inboxes.length > 1) {
+          console.warn(`Using only first inbox, but there were ${inboxes.length}: ${inboxes}`)
+        }
+        inbox = inboxes[0]['@id']
+        return inbox
+      default:
+        throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
     }
-    // #TODO be more JSON-LD aware when looking for inbox
-    inbox = url.resolve(target, targetProfile.inbox)
   }
 
   if ( ! inbox) throw new deliveryErrors.InboxDiscoveryFailed('No .inbox found for target ' + target)
@@ -147,12 +168,12 @@ const deliverActivity = async function (activity, target) {
   } catch (e) {
     throw new deliveryErrors.DeliveryRequestFailed(e.message)
   }
-  debuglog(`delivery response code ${deliveryResponse.statusCode} from ${inbox}`)
-  if (400 <= deliveryResponse.statusCode <= 599) {
+  const deliveryResponseBody = await readableToString(deliveryResponse);
+  debuglog(`ldn notify res ${deliveryResponse.statusCode} ${inbox} ${deliveryResponseBody.slice(0,100)}`)
+  if (400 <= deliveryResponse.statusCode && deliveryResponse.statusCode <= 599) {
     // client or server error
     throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}`)
   }
-  // const delivery = await readableToString(deliveryResponse);
   // #TODO handle retry/timeout?
   return target
 }

@@ -1,0 +1,27 @@
+* Be able to reply to http://csarven.ca/linked-data-notifications
+  * [x] ok, can reply
+  * [] but it doesn't show up on that site... maybe because we don't send 'as:Announce's
+
+
+[20:07:29]  <rhiaro>	In that notification you sent me I think you should set the "@id" of the note part to  http://distbin.com/activities/006dec49-13a9-436b-bab5-4a5605f2e792 (what you have for url) and leave the "@id" of the Create empty ("")
+[20:07:35]  <bengo>	Yeah. I'll do whatever but I hope you get bored of Georgetown well before end of February and decide to go somewhere else :P
+[20:08:20]  <rhiaro>	Well, I have paid for accommodation up til the end.. the idea was to pin myself down for long enough to get bored, so I could properly get some work done
+[20:08:35]  <rhiaro>	I'm supposed to be writing my thesis, not adventuring
+[20:08:35]  <bengo>	It's smart self management
+[20:08:44]  <bengo>	hmmm. I think there's something in AP about requiring .ids ?
+[20:08:52]  <rhiaro>	yeah
+[20:08:52]  <bengo>	But I'll add this to my notes and make sure
+[20:08:59]  <bengo>	Why you think I should do that?
+[20:09:43]  <rhiaro>	because you have two resources in the notification. Since one of them is published already at a url, it will let my receiver verify it (in the same way as a webmention). @id (id in AS2,) is the canonical way of saying >this thing<
+[20:10:12]  <rhiaro>	anything you don't publish elsehwere, ie. the Create itself, if you leave id as "" then my server generates a URI for it
+[20:10:17]  <rhiaro>	and it comes into existence as a resource at my end
+[20:10:36]  <rhiaro>	which is better than a non-URI id I think
+[20:10:47]  <bengo>	my ids are URIs
+[20:10:59]  <rhiaro>	I'm seeing urn:uuid:006dec49-13a9-436b-bab5-4a5605f2e792
+[20:11:07]  <rhiaro>	And I'm 99.9% sure my server doesn't know how to make that
+[20:11:07]  <bengo>	that's a URI just not a URL
+[20:11:14]  <rhiaro>	sorry I meant URL then..
+[20:11:53]  <rhiaro>	I suppose it doesn't matter so much since it ends up in a graph with a URL on my end. I'm just not used to dealing with non URLs.
+[20:12:37]  <bengo>	Yeah I'm sort of averse to them for reasons I'd have to take time to articulate. eh
+
+

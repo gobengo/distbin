@@ -13,6 +13,10 @@ const { debuglog, denodeify, readableToString, sendRequest } = require('../src/u
 
 // Run tests if this file is executed
 if (require.main === module) {
+  process.on('unhandledRejection', err => {
+  	console.trace(err)
+  	throw err;
+  })
   runServer()
     .then(() => process.exit())
     .catch((err) => {

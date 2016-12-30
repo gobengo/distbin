@@ -310,13 +310,13 @@ async function fetchActivity(activityUrl) {
       throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): "+ activityUrl)
   }
 
-  debuglog("Requesting activity "+activityUrl)
+  debuglog("req activity "+activityUrl)
   const activityResponse = await sendRequest(createRequest(Object.assign(parsedUrl, {
     headers: {
       accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
     }
   })))
-  debuglog("Got response for activity "+activityUrl+" "+activityResponse.statusCode)
+  debuglog(`res activity ${activityResponse.statusCode} ${activityUrl}`)
 
   switch (activityResponse.statusCode) {
     case 200:
@@ -338,7 +338,7 @@ async function fetchActivity(activityUrl) {
   //   }
   // }
   const resContentType = activityResponse.headers['content-type']
-    ? activityResponse.headers['content-type'].toLowerCase()
+    ? activityResponse.headers['content-type'].split(';')[0].toLowerCase() // strip off params like charset, profile, etc
     : undefined
   switch (resContentType) {
     case 'application/json':
@@ -355,7 +355,7 @@ async function fetchActivity(activityUrl) {
         // TODO parse <title> for .name ?
       }
     default:
-      throw new Error("Unexpected fetched activity content-type: " + resContentType + " " + activityUrl + " " + await readableToString(activityResponse))
+      throw new Error("Unexpected fetched activity content-type: " + resContentType + " " + activityUrl + " " )
   }
 }
 
