@@ -89,7 +89,7 @@ function createAboutMessage () {
 	    <p>
 	      With a distributed social web, you could have long term ownership of the things you create online and the way you consume and socialize around them. distbin is the first tool anyone (especially non-programmers!) can use to communicate in this way.
 	    </p>
-	    <p>Sound interesting? Post your thoughts below to get started.</p>
+	    <p>Sound interesting? Post your thoughts below to try it out.</p>
 	  <details>
 	    <summary>
 	      Technical Info, Planned Features, and Progress
