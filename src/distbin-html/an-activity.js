@@ -2,6 +2,7 @@ const { distbinBodyTemplate } = require('./partials')
 const { encodeHtmlEntities } = require('../util')
 const { everyPageHead } = require('./partials')
 const http = require('http')
+const https = require('https')
 const { readableToString } = require('../util')
 const { sendRequest } = require('../util')
 const url = require('url')
@@ -60,6 +61,9 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
         .primary-activity main {
           font-size: 1.2em;
         }
+        .primary-activity.at-least-viewport-height {
+          min-height: calc(100vh - 5.5em);          
+        }
         .primary-activity {
           margin: 1rem auto;
         }
@@ -94,7 +98,27 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
         ${renderDescendantsSection(activity.replies)} 
 
         <script>
-        document.querySelector('.primary-activity').scrollIntoView()
+        (function () {
+          var primary = document.querySelector('.primary-activity');
+          if ( ! isElementInViewport(primary)) {
+            primary.classList.add('at-least-viewport-height')
+            primary.scrollIntoView()
+          }
+
+          // offset
+          // document.body.scrollTop = document.body.scrollTop - 2 * parseFloat(getComputedStyle(primary).fontSize)
+
+          // http://stackoverflow.com/questions/123999/how-to-tell-if-a-dom-element-is-visible-in-the-current-viewport/7557433#7557433
+          function isElementInViewport (el) {
+            var rect = el.getBoundingClientRect();
+            return (
+                rect.top >= 0 &&
+                rect.left >= 0 &&
+                rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) && /*or $(window).height() */
+                rect.right <= (window.innerWidth || document.documentElement.clientWidth) /*or $(window).width() */
+            );
+          }
+        }());
         </script>
       `)}
     `)
@@ -131,17 +155,29 @@ function renderActivity(activity) {
 
   return `
     <article class="activity-item">
-      ${activity.object && activity.object.name
-        ? `<h1>${activity.object.name}</h1>`
-        : ''}
+      ${
+        activity.name
+          ? `<h1>${activity.name}</h1>`
+          :
+        activity.object && activity.object.name
+          ? `<h1>${activity.object.name}</h1>`
+          : ''
+      }
       <main>${
+        activity.content
+          ? activity.content
+          :
         activity.object
           ? encodeHtmlEntities(activity.object.content)
-        : activity.name
-        || activity.url
+          :
+        activity.name
+          ||
+        activity.url
           ? `<a href="${activity.url}">${activity.url}</a>`
+          :
+        activity.id
+          ? `<a href="${activity.id}">${activity.id}</a>`
           : ''
-        || ''
       }</main>
 
       ${/* TODO format published datetime, add byline */''}
@@ -257,9 +293,21 @@ async function fetchReplyAncestors(activity) {
 }
 
 async function fetchActivity(activityUrl) {
-  const activityResponse = await sendRequest(http.request(Object.assign(url.parse(activityUrl), {
+  const parsedUrl = url.parse(activityUrl)
+  let createRequest;
+  switch (parsedUrl.protocol) {
+    case 'https:':
+      createRequest = https.request
+      break
+    case 'http:':
+      createRequest = http.request
+      break
+    default:
+      throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): "+ activityUrl)
+  }
+  const activityResponse = await sendRequest(createRequest(Object.assign(parsedUrl, {
     headers: {
-      accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
+      accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
     }
   })))
   if (activityResponse.statusCode !== 200) {
@@ -276,7 +324,12 @@ async function fetchActivity(activityUrl) {
     : undefined
   switch (resContentType) {
     case 'application/json':
-      return JSON.parse(await readableToString(activityResponse))
+    case 'application/activity+json':
+      let a = JSON.parse(await readableToString(activityResponse))
+      // ensure there is a .url value
+      return Object.assign(a, {
+        url: a.url || activityUrl
+      })
     case 'text/html':
       // Make an activity-like thing
       return {

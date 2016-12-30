@@ -94,7 +94,8 @@ const deliverActivity = async function (activity, target) {
   const inbox = url.resolve(target, targetProfile.inbox)
 
   // post to inbox
-  const deliveryRequest = http.request(Object.assign(url.parse(inbox), {
+  const parsedInboxUrl = url.parse(inbox)
+  const deliveryRequest = (parsedInboxUrl.protocol == 'https:' ? https : http).request(Object.assign(parsedInboxUrl, {
     headers: {
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#'
     },
