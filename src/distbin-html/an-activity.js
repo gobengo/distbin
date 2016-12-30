@@ -1,3 +1,4 @@
+const { debuglog } = require('../util')
 const { distbinBodyTemplate } = require('./partials')
 const { encodeHtmlEntities } = require('../util')
 const { everyPageHead } = require('./partials')
@@ -308,14 +309,28 @@ async function fetchActivity(activityUrl) {
     default:
       throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): "+ activityUrl)
   }
+
+  debuglog("Requesting activity "+activityUrl)
   const activityResponse = await sendRequest(createRequest(Object.assign(parsedUrl, {
     headers: {
       accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
     }
   })))
-  if (activityResponse.statusCode !== 200) {
-    console.warn('non 200 fetchActivity', activityResponse.statusCode, activityUrl)
+  debuglog("Got response for activity "+activityUrl+" "+activityResponse.statusCode)
+
+  switch (activityResponse.statusCode) {
+    case 200:
+      //cool
+      break
+    case 406:
+      // unacceptable. Server doesn't speak a content-type I know.
+      return {
+        url: activityUrl
+      }
+    default:
+      console.warn('unexpected fetchActivity statusCode', activityResponse.statusCode, activityUrl)
   }
+
   // if (activityResponse.statusCode === 500) {
   //   return {
   //     url: activityUrl,

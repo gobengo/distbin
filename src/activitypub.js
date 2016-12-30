@@ -36,7 +36,7 @@ exports.clientHeaders = (headers = {}) => {
   const requirements = {
     // The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
     //  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
-    accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#'
+    accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
   }
   if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
     throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
@@ -47,6 +47,7 @@ exports.clientHeaders = (headers = {}) => {
 const makeErrorClass = (name, setUp) => class extends Error {
   constructor (msg) {
     super(msg)
+    this.message = msg
     this.name = name
     if (typeof setUp === 'function') setUp.apply(this, arguments)
   }
@@ -61,6 +62,8 @@ const deliveryErrors = exports.deliveryErrors = {
   InboxDiscoveryFailed: makeErrorClass('InboxDiscoveryFailed'),
   // Found an inbox, but failed to POST delivery to it
   DeliveryRequestFailed: makeErrorClass('DeliveryRequestFailed'),
+  // Succeeded in delivering, but response was an error
+  DeliveryErrorResponse: makeErrorClass('DeliveryErrorResponse'),
   // At least one delivery did not succeed. Try again later?
   SomeDeliveriesFailed: makeErrorClass('SomeDeliveriesFailed', function (failures) {
     this.failures = failures
@@ -76,12 +79,24 @@ const request = (urlOrOptions, ...otherArgs) => {
 const deliverActivity = async function (activity, target) {
   // discover inbox
   const targetProfileRequest = request(Object.assign(url.parse(target), {
-    headers: exports.clientHeaders()
+    headers: {
+      accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#",text/html'
+    }
   }))
+  debuglog("sending request to start inbox discovery for "+target)
   try {
     var targetProfileResponse = await sendRequest(targetProfileRequest)
   } catch (e) {
     throw new deliveryErrors.TargetRequestFailed(e.message)
+  }
+  debuglog("got response for "+target+" "+targetProfileResponse.statusCode)
+
+  switch (targetProfileResponse.statusCode) {
+    case 200:
+      // cool
+      break;
+    default:
+      throw new deliveryErrors.TargetRequestFailed(`Got unexpected status code ${targetProfileResponse.statusCode} when requesting ${target} to determine inbox URL`)
   }
 
   let inbox;
@@ -125,12 +140,18 @@ const deliverActivity = async function (activity, target) {
     method: 'post'
   }))
   deliveryRequest.write(JSON.stringify(activity))
+
+  let deliveryResponse
   try {
-    await sendRequest(deliveryRequest)
+    deliveryResponse = await sendRequest(deliveryRequest)
   } catch (e) {
     throw new deliveryErrors.DeliveryRequestFailed(e.message)
   }
-  debuglog(`Successfully delivered activity ${activity.url} to target ${target} at inbox ${inbox}`)
+  debuglog(`delivery response code ${deliveryResponse.statusCode} from ${inbox}`)
+  if (400 <= deliveryResponse.statusCode <= 599) {
+    // client or server error
+    throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}`)
+  }
   // const delivery = await readableToString(deliveryResponse);
   // #TODO handle retry/timeout?
   return target

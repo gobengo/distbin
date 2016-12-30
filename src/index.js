@@ -385,10 +385,19 @@ function outboxHandler ({
           await targetAndDeliver(activityToDeliver)
         } catch (e) {
           if (e.name === 'SomeDeliveriesFailed') {
+            const failures = e.failures.map(f => {
+              return {
+                name: f.name,
+                message: f.message,
+              }
+            })
             // #TODO: Retry some day
             res.end(JSON.stringify({
               content: "Activity was created, but delivery to some others servers' inbox failed. They will not be retried.",
-              failures: e.failures
+              failures: failures
+            }))
+            activities.set(newActivity.id, Object.assign({}, newActivity, {
+              'distbin:activityPubDeliveryFailures': failures
             }))
             return
           }
