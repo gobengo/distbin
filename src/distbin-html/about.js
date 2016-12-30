@@ -1,12 +1,66 @@
 const { distbinBodyTemplate } = require('./partials')
+const { requestUrl } = require('../util')
 
-exports.createHandler = function () {
+exports.createHandler = function ({ externalUrl }) {
   return (req, res) => {
-    res.writeHead(200)
+    res.writeHead(200, {
+    	'content-type': 'text/html'
+    })
     res.end(distbinBodyTemplate(`
-		${createAboutMessage()}
+			${createAboutMessage()}
+			${createReplySection({ inReplyTo: requestUrl(req) })}
     `))
   }
+}
+
+function createReplySection({ inReplyTo }) {
+	return `
+		<style>
+		.distbin-reply-section header {
+			margin-top: 1em;
+			margin-bottom: 0.5em;
+		}
+		</style>
+		<div class="distbin-reply-section">
+			<header>
+				<strong>reply</strong>
+			</header>
+			${createReplyForm({ inReplyTo })}
+		</div>
+	`
+}
+
+function createReplyForm({ inReplyTo }) {
+	return `
+	  <style>
+	  .post-form textarea {
+	    min-height: 4em;
+	  }
+	  .post-form textarea,
+	  .post-form input {
+	    border: 0;
+	    font: inherit;
+	    padding: 0.5em;
+	    width:100%;
+	    margin-bottom: 2px; /* account for webkit :focus glow overflow */
+	  }
+	  .post-form textarea,
+	  .post-form input {
+	    width: calc(100% + 1em);
+	    margin-left: -0.5em;
+	    margin-right: -0.5em;
+	  }
+	  .post-form .post-form-label-with-input {
+	    margin: 1em 0;
+	  }
+	  </style>
+	  <form class="post-form" method="post" action="/">
+	    <input name="name" type="text" placeholder="Title (optional)"></input>
+	    <textarea name="content" placeholder="Share your reaction, get feedback"></textarea>
+	    <input name="inReplyTo" type="hidden" value="${inReplyTo}"></input>
+	    <input type="submit" value="post" />
+	  </form>
+	`
 }
 
 const htmlEntities = {

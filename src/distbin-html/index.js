@@ -7,7 +7,7 @@ const anActivity = require('./an-activity')
 exports.createHandler = ({ apiUrl, externalUrl }) => {
   const routes = new Map([
     ['/', () => home.createHandler({ apiUrl })],
-    ['/about', () => about.createHandler() ],
+    ['/about', () => about.createHandler({ externalUrl }) ],
     ['/public', () => public.createHandler({ apiUrl }) ],
     [new RegExp('^/activities/([^/\.]+)$'),
       (activityId) => anActivity.createHandler({ apiUrl, activityId, externalUrl })]

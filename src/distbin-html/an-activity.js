@@ -20,8 +20,6 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
       return
     }
 
-    console.log('externalUrl is', externalUrl)
-
     const activityWithoutDescendants = activityWithUrlsRelativeTo(JSON.parse(await readableToString(activityRes)), externalUrl)
     const repliesUrl = url.resolve(activityUrl, activityWithoutDescendants.replies)
     const descendants = await fetchDescendants(repliesUrl)
@@ -31,13 +29,6 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
     })
 
     const ancestors = await fetchReplyAncestors(activity)
-
-    function activityWithUrlsRelativeTo(activity, relativeTo) {
-      return Object.assign(activity, {
-        replies: url.resolve(relativeTo, activity.replies),
-        url: url.resolve(relativeTo, activity.url),
-      })
-    }
 
     async function fetchDescendants(repliesUrl) {
       const repliesCollectionResponse = await sendRequest(http.get(repliesUrl))
@@ -51,7 +42,6 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
       repliesCollection.items = await Promise.all(repliesCollection.items.map(async function(activity) {
         // activity with resolved .replies collection
         const withAbsoluteUrls = activityWithUrlsRelativeTo(activity, repliesUrl)
-        console.log("withAbsoluteUrls", withAbsoluteUrls)
         return Object.assign(withAbsoluteUrls, {
           replies: await fetchDescendants(withAbsoluteUrls.replies),
         })
@@ -59,7 +49,9 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
       return repliesCollection
     }
 
-    res.writeHead(200)
+    res.writeHead(200, {
+      'content-type': 'text/html'
+    })
     res.end(`
       <!doctype html>
       <head>
@@ -68,16 +60,16 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
         .primary-activity main {
           font-size: 1.2em;
         }
-        /*.primary-activity {
-          margin: 2em auto;
-        }*/
+        .primary-activity {
+          margin: 1rem auto;
+        }
         .ancestors,
         .descendants {
           border-left: 1px solid #efefef;
           padding-left: 1em;
         }
         .activity-item main {
-          margin: 1em auto; /* intended to be same as <p> to force same margins even if main content is not a p */
+          margin: 1rem auto; /* intended to be same as <p> to force same margins even if main content is not a p */
         }
         .activity-footer-bar a {
           text-decoration: none;
@@ -133,22 +125,38 @@ function renderDescendant(activity) {
       ></iframe>
 */
 function renderActivity(activity) {
+  const published =
+    (activity.object && activity.object.published)
+    || activity.published
+
   return `
     <article class="activity-item">
-      ${activity.object.name
+      ${activity.object && activity.object.name
         ? `<h1>${activity.object.name}</h1>`
         : ''}
-      <main>${encodeHtmlEntities(activity.object.content)}</main>
+      <main>${
+        activity.object
+          ? encodeHtmlEntities(activity.object.content)
+        : activity.name
+        || activity.url
+          ? `<a href="${activity.url}">${activity.url}</a>`
+          : ''
+        || ''
+      }</main>
 
       ${/* TODO format published datetime, add byline */''}
       <footer>
         <div class="activity-footer-bar">
           <span>
-            <a href="${activity.url}" target="_blank">${formatDate(new Date(Date.parse(activity.published)))}</a>
+            <a href="${activity.url}">${
+              published
+                ? formatDate(new Date(Date.parse(published)))
+                : 'permalink'
+            }</a>
           </span>
           &nbsp;
           <span>
-            <a href="/?inReplyTo=${activity.url}" target="_blank">reply</a>
+            <a href="/?inReplyTo=${activity.url}">reply</a>
           </span>
           &nbsp;
           <span class="action-show-raw">
@@ -199,7 +207,11 @@ function renderAncestor (ancestor) {
     // assume its a broken link
     return `
       <article class="activity-item">
-        <a href="${ancestor.href}">${ancestor.href}</a> (couldn't fetch more info)
+        <a href="${ancestor.href}">${ancestor.href}</a> (${
+          ancestor[failedToFetch] === true
+            ? "couldn't fetch more info"
+            : ancestor[failedToFetch]
+        })
       </article>
     `
   }
@@ -220,21 +232,22 @@ function renderAncestorsSection (ancestors=[]) {
 }
 
 async function fetchReplyAncestors(activity) {
-  const parentUrl = activity.object.inReplyTo
+  const parentUrl = activity.object && activity.object.inReplyTo
   if ( ! parentUrl) {
     return []
   }
   let parent
   try {
-    parent = await fetchActivity(parentUrl)
+    parent = activityWithUrlsRelativeTo(await fetchActivity(parentUrl), parentUrl)
   } catch (err) {
     switch (err.code) {
       case 'ECONNREFUSED':
+      case 'ENOTFOUND':
         // don't recurse since we can't fetch the parent
         return [{
           type: 'Link',
           href: parentUrl,
-          [failedToFetch]: true,
+          [failedToFetch]: err.code,
         }]
     }
     throw err
@@ -246,11 +259,49 @@ async function fetchReplyAncestors(activity) {
 async function fetchActivity(activityUrl) {
   const activityResponse = await sendRequest(http.request(Object.assign(url.parse(activityUrl), {
     headers: {
-      accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#'
+      accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
     }
   })))
+  if (activityResponse.statusCode !== 200) {
+    console.warn('non 200 fetchActivity', activityResponse.statusCode, activityUrl)
+  }
+  // if (activityResponse.statusCode === 500) {
+  //   return {
+  //     url: activityUrl,
+  //     name: "500 fetching activity: " + await readableToString(activityResponse)
+  //   }
+  // }
+  const resContentType = activityResponse.headers['content-type']
+    ? activityResponse.headers['content-type'].toLowerCase()
+    : undefined
+  switch (resContentType) {
+    case 'application/json':
+      return JSON.parse(await readableToString(activityResponse))
+    case 'text/html':
+      // Make an activity-like thing
+      return {
+        url: activityUrl,
+        // TODO parse <title> for .name ?
+      }
+    default:
+      throw new Error("Unexpected fetched activity content-type: " + resContentType + " " + activityUrl + " " + await readableToString(activityResponse))
+  }
+}
 
-  return JSON.parse(await readableToString(activityResponse))
+// given an activity with some URL values as maybe relative URLs,
+// return the activity with them made absolute URLs
+// TODO: use json-ld logic for this incl e.g. @base
+function activityWithUrlsRelativeTo(activity, relativeTo) {
+  const propsWithUrls = ['replies', 'url']
+  const withAbsoluteUrls = Object.assign(activity, propsWithUrls.reduce((a, prop) => {
+    const isRelativeUrl = u => u && ! url.parse(u).host
+    if (isRelativeUrl(activity[prop]) ) {
+      return Object.assign(a, {
+        [prop]: url.resolve(relativeTo, activity[prop])
+      })
+    }
+  }, {}))
+  return withAbsoluteUrls;
 }
 
 function formatDate(date, relativeTo = new Date) {

@@ -75,30 +75,60 @@ async function runServer() {
 	const mainServer = http.createServer((req, res) => {
 		// htmlHandler only supports '/' right now (#TODO)
 		const accept = req.headers.accept ? req.headers.accept.split(',') : [];
-		const preference = accept.find((mime) => ['text/html', 'application/json'])
-		if (preference !== 'text/html') {
-			// just hit api
-			return apiHandler(req, res);
+		const preference = accept.find((mime) => ['text/html', 'application/json']) // TODO wtf?
+		// Depending on 'Accept' header, try candidate backends in a certain order (e.g. html first)
+		let prioritizedBackends;
+		switch (preference) {
+			case 'text/html':
+				prioritizedBackends = [htmlServerUrl, apiServerUrl]
+				break;
+			default:
+				prioritizedBackends = [apiServerUrl, htmlServerUrl]
 		}
+		let candidateBackendUrl
+		(function attemptBackends(backends = [], req, res) {
+			if ( ! backends.length) {
+				res.writeHead(404)
+				res.end()
+				return
+			}
+			const [candidateBackendUrl, ...nextBackends] = backends;
+			forwardRequest(req, candidateBackendUrl)
+				.then(candidateResponse => {
+					switch (candidateResponse.statusCode) {
+						case 404:
+							return attemptBackends(nextBackends, req, res)
+						default:
+							return forwardResponse(candidateResponse, res)							
+					}
+				})
+		}(prioritizedBackends, req, res))
 		// preference is html
 		// proxy to htmlServer
-		const htmlReq = http.request(Object.assign(url.parse(htmlServerUrl),{
-			method: req.method,
-			path: req.url,
-			headers: req.headers,
-		}))
-		req.pipe(htmlReq).on('finish', function () {
-			sendRequest(htmlReq)
-			.then((htmlRes) => {
-				if (htmlRes.statusCode !== 404) {
-					res.writeHead(htmlRes.statusCode, htmlRes.headers)
-					htmlRes.pipe(res);
-					return;
-				}
-				// htmlServer can't help, delegate to apihandler
-				return apiHandler(req, res)
+		// const apiServerResponse = await forward(req, htmlServerUrl)
+		// if (apiServerResponse.statusCode === 404) {
+		// 	const htmlServerResponse = await forward(req, apiServerUrl)
+		// 	proxyResponse(htmlServerResponse, res)
+		// 	return
+		// }
+		async function forwardRequest(req, toUrl) {
+			const reqToForward = http.request(Object.assign(url.parse(toUrl),{
+				method: req.method,
+				path: req.url,
+				headers: req.headers,
+			}))
+			return new Promise((resolve, reject) => {
+				req.pipe(reqToForward).on('finish', () => {
+					sendRequest(reqToForward)
+						.then(resolve)
+						.catch(reject);
+				})
 			})
-		})
+		}
+		async function forwardResponse(res, toRes) {
+			toRes.writeHead(res.statusCode, res.headers)
+			res.pipe(toRes)
+		}
 	})
 	// listen
 	let mainServerUrl = await new Promise((resolve) => {

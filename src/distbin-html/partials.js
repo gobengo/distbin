@@ -13,9 +13,6 @@ exports.everyPageHead = () => `
   .distbin-above-fold {
     height: calc(100vh - 3em); /* magic number; height of header */
   }
-  details {
-    margin-bottom: 1em;
-  }
   pre {
     max-width: 100%;
     overflow-x: auto;

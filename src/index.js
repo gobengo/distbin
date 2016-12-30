@@ -133,7 +133,9 @@ function activityHandler ({ activities, activityUuid }) {
     // return the activity
     const extendedActivity = locallyHostedActivity(activity)
     // woo its here
-    res.writeHead(200)
+    res.writeHead(200, {
+      'content-type': 'application/json'
+    })
     res.end(JSON.stringify(extendedActivity, null, 2))
   }
 }
@@ -173,7 +175,9 @@ function activityRepliesHandler ({ activities, activityUuid }) {
         }
         return activity
       })
-    res.writeHead(200)
+    res.writeHead(200, {
+      'content-type': 'application/json'
+    })
     res.end(JSON.stringify({
       type: 'Collection',
       name: 'replies to item with UUID '+activityUuid,
@@ -186,7 +190,9 @@ function activityRepliesHandler ({ activities, activityUuid }) {
 
 // root route, do nothing for now but 200
 function index (req, res) {
-  res.writeHead(200)
+  res.writeHead(200, {
+    'content-type': 'application/json'
+  })
   res.end(JSON.stringify({
     '@context': [
       'https://www.w3.org/ns/activitystreams',
@@ -210,7 +216,8 @@ function recentHandler ({ activities }) {
   return async function (req, res) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     res.writeHead(200, {
-      'Access-Control-Allow-Origin': '*'
+      'Access-Control-Allow-Origin': '*',
+      'content-type': 'application/json',
     })
     res.end(JSON.stringify({
       '@context': 'https://www.w3.org/ns/activitystreams',
@@ -232,7 +239,9 @@ function inboxHandler ({ activities, inbox }) {
     switch (req.method.toLowerCase()) {
       case 'get':
         const maxMemberCount = requestMaxMemberCount(req) || 10
-        res.writeHead(200)
+        res.writeHead(200, {
+          'content-type': 'application/json'
+        })
         res.end(JSON.stringify({
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: 'OrderedCollection',
@@ -319,7 +328,9 @@ function outboxHandler ({
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
       case 'get':
-        res.writeHead(200)
+        res.writeHead(200, {
+          'content-type': 'application/json'
+        })
         res.end(JSON.stringify({
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: 'OrderedCollection',
@@ -417,7 +428,9 @@ function publicCollectionHandler ({ activities }) {
       // empty string is relative URL for 'self'
       'current': ''
     }
-    res.writeHead(200)
+    res.writeHead(200, {
+      'content-type': 'application/json'
+    })
     res.end(JSON.stringify(publicCollection, null, 2))
   }
 }
