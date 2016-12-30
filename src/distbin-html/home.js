@@ -48,43 +48,46 @@ exports.createHandler = function ({ apiUrl }) {
         const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || '');
         const safeTitleDefault = encodeHtmlEntities(query.title || '');
         res.writeHead(200)
-        res.write(distbinBodyTemplate(aboveFold(`
-          <style>
-          .post-form textarea {
-            height: calc(100% - 10em); /* everything except the rest of this form */
-            min-height: 4em;
-          }
-          .post-form textarea,
-          .post-form input {
-            border: 0;
-            font: inherit;
-            padding: 1em;
-            width:100%;
-            margin-bottom: 2px; /* account for webkit :focus glow overflow */
-          }
-          .post-form textarea,
-          .post-form input {
-            width: calc(100% + 2em);
-            margin-left: -1em;
-            margin-right: -1em;
-          }
-          .post-form .post-form-label-with-input {
-            margin: 1em 0;
-          }
-          </style>
-          <form class="post-form" method="post">
-            <input name="name" type="text" placeholder="Title (optional)" value="${safeTitleDefault}"></input>
-            <textarea name="content" placeholder="Write anonymously, get feedback"></textarea>
-            <input name="inReplyTo" type="text" placeholder="replying to another URL? (optional)" value="${safeInReplyToDefault}"></input>
-            <input type="submit" value="post" />
-          </form>
-          <script>
-          (function () {
-            var contentInput = document.querySelector('.post-form *[name=content]')
-            contentInput.scrollIntoViewIfNeeded();
-            contentInput.focus();
-          }())
-          </script>
+        res.write(distbinBodyTemplate(`
+          ${aboveFold(`
+            <style>
+            .post-form textarea {
+              height: calc(100% - 10em); /* everything except the rest of this form */
+              min-height: 4em;
+            }
+            .post-form textarea,
+            .post-form input {
+              border: 0;
+              font: inherit;
+              padding: 1em;
+              width:100%;
+              margin-bottom: 2px; /* account for webkit :focus glow overflow */
+            }
+            .post-form textarea,
+            .post-form input {
+              width: calc(100% + 2em);
+              margin-left: -1em;
+              margin-right: -1em;
+            }
+            .post-form .post-form-label-with-input {
+              margin: 1em 0;
+            }
+            </style>
+            <form class="post-form" method="post">
+              <input name="name" type="text" placeholder="Title (optional)" value="${safeTitleDefault}"></input>
+              <textarea name="content" placeholder="Write anonymously, get feedback"></textarea>
+              <input name="inReplyTo" type="text" placeholder="replying to another URL? (optional)" value="${safeInReplyToDefault}"></input>
+              <input type="submit" value="post" />
+            </form>
+            <script>
+            (function () {
+              var contentInput = document.querySelector('.post-form *[name=content]')
+              contentInput.scrollIntoViewIfNeeded();
+              contentInput.focus();
+            }())
+            </script>
+          `)}
+          <p>
           <details>
             <summary>or POST via API</summary>
             <pre>${encodeHtmlEntities(`
@@ -99,7 +102,7 @@ curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
 EOF`)}
             </pre>
           </details>
-        `)))
+        `))
         res.end()
         return
     }
