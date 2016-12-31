@@ -156,7 +156,7 @@ const deliverActivity = async function (activity, target) {
   const parsedInboxUrl = url.parse(inbox)
   const deliveryRequest = (parsedInboxUrl.protocol == 'https:' ? https : http).request(Object.assign(parsedInboxUrl, {
     headers: {
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#'
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     },
     method: 'post'
   }))
@@ -172,7 +172,7 @@ const deliverActivity = async function (activity, target) {
   debuglog(`ldn notify res ${deliveryResponse.statusCode} ${inbox} ${deliveryResponseBody.slice(0,100)}`)
   if (400 <= deliveryResponse.statusCode && deliveryResponse.statusCode <= 599) {
     // client or server error
-    throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}`)
+    throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}\n${deliveryResponseBody}`)
   }
   // #TODO handle retry/timeout?
   return target
