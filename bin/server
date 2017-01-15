@@ -14,13 +14,15 @@ const { debuglog, denodeify, readableToString, sendRequest } = require('../src/u
 // Run tests if this file is executed
 if (require.main === module) {
   process.on('unhandledRejection', err => {
+  	console.error("Unhandled Promise rejection")
   	console.trace(err)
   	throw err;
   })
   runServer()
     .then(() => process.exit())
     .catch((err) => {
-    	console.error("Uncaught Error", err)
+    	console.error("Uncaught Error in runServer")
+    	console.trace(err)
     	process.exit(1)
     })
 }
