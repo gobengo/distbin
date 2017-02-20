@@ -22,7 +22,8 @@
   },
   "scripts": {
     "lint": "eslint test src",
-    "test": "node --harmony test"
+    "test": "node --harmony test",
+    "start": "PORT=8000 node --harmony bin/server"
   },
   "author": "",
   "license": "ISC"
