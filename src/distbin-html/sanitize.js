@@ -10,3 +10,7 @@ const window = jsdom.jsdom('', {
 const DOMPurify = createDOMPurify(window);
 
 exports.sanitize = DOMPurify.sanitize.bind(DOMPurify);
+
+exports.toText = function (html) {
+	return DOMPurify.sanitize(html, { ALLOWED_TAGS: ['#text'] })
+}

@@ -158,6 +158,23 @@ tests['When GET an activity, it has information about any replies it may have'] 
   assert.equal(repliesCollection.items[0].id, replyId, '.items contains the reply')
 }
 
+tests['Activities can have a .generator'] = async function () {
+  const distbinA = distbin()
+  const activityToPost = {
+    type: 'Note',
+    content: 'this has a generator',
+    generator: {
+      type: 'Application',
+      name: 'distbin-html',
+      url: 'http://distbin.com'
+    }
+  }
+  const activityUrl = await postActivity(distbinA, activityToPost)
+  const activity = JSON.parse(await readableToString(await sendRequest(http.get(activityUrl))))
+  // note: it was converted to a 'Create' activity
+  assert(activity.object.generator, 'has a generator')
+}
+
 tests['GET an activity has a .url that resolves'] = async function () {
   const activityUrl = await postActivity(distbin(), {
     type: 'Note',

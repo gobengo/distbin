@@ -8,7 +8,7 @@ const { distbinBodyTemplate } = require('./partials')
 const { aboveFold } = require('./partials')
 const { requestUrl } = require('../util')
 
-exports.createHandler = function ({ apiUrl }) {
+exports.createHandler = function ({ apiUrl, externalUrl }) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
       // POST is form submission to create a new post
@@ -21,7 +21,13 @@ exports.createHandler = function ({ apiUrl }) {
             '@context': 'https://www.w3.org/ns/activitystreams',
             'type': 'Note',
             'content': content,
-            'cc': [publicCollectionId, inReplyTo].filter(Boolean)
+            'cc': [publicCollectionId, inReplyTo].filter(Boolean),
+            generator: {
+              type: 'Application',
+              name: 'distbin-html',
+              url: externalUrl,
+              // @todo add .url of externalUrl
+            }
           },
           inReplyTo ? { inReplyTo } : {}
         )
@@ -47,7 +53,9 @@ exports.createHandler = function ({ apiUrl }) {
         const query = url.parse(req.url, true).query; // todo sanitize
         const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || '');
         const safeTitleDefault = encodeHtmlEntities(query.title || '');
-        res.writeHead(200)
+        res.writeHead(200, {
+          'content-type': 'text/html',
+        })
         res.write(distbinBodyTemplate(`
           ${aboveFold(`
             <style>

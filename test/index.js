@@ -4,6 +4,7 @@ if (require.main === module) {
     require('./activitypub'),
     require('./distbin'),
     require('./filemap'),
+    require('./distbin-html'),
   ].map(run))
     .then(() => process.exit())
     .catch(() => process.exit(1))

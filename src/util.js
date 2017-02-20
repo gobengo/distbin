@@ -91,3 +91,9 @@ exports.rdfaToJsonLd = async function rdfaToJsonLd (html) {
   // jsonld.fromRDF(html, {format: 'text/html'}, function(err, data) {
 
 }
+
+exports.isProbablyAbsoluteUrl = isProbablyAbsoluteUrl
+function isProbablyAbsoluteUrl(url) {
+  const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i');
+  return absoluteUrlPattern.test(url)
+}

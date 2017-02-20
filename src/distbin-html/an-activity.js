@@ -5,6 +5,7 @@ const { everyPageHead } = require('./partials')
 const http = require('http')
 const https = require('https')
 const { readableToString } = require('../util')
+const { isProbablyAbsoluteUrl } = require('../util')
 const { sanitize } = require('./sanitize')
 const { sendRequest } = require('../util')
 const url = require('url')
@@ -154,7 +155,7 @@ function renderActivity(activity) {
   const published =
     (activity.object && activity.object.published)
     || activity.published
-
+  const generator = formatGenerator(activity)
   return `
     <article class="activity-item">
       ${
@@ -184,7 +185,7 @@ function renderActivity(activity) {
         )
       }</main>
 
-      ${/* TODO format published datetime, add byline */''}
+      ${/* TODO add byline */''}
       <footer>
         <div class="activity-footer-bar">
           <span>
@@ -205,11 +206,35 @@ function renderActivity(activity) {
               <pre><code>${encodeHtmlEntities(JSON.stringify(activity, null, 2))}</code></pre>
             </details>
           </span>
+          ${
+            generator
+              ? `&nbsp;via ${generator}`
+              : ''
+          }
         </div>
       </footer>
     </article>
 
   `
+}
+
+function formatGenerator(activity) {
+  const object = activity.object || activity;
+  const generator = object.generator;
+  if ( ! generator) return '';
+  let generatorText
+  if (generator.name) generatorText = generator.name;
+  else if (generator.id) generatorText = generator.id;
+  let generatorUrl
+  if (generator.url) generatorUrl = generator.url
+  else if (generator.id) generatorUrl = generator.id
+  if (generatorUrl) {
+    return `<a target="_blank" href="${generatorUrl}">${generatorText}</a>`
+  }
+  if (generatorText) {
+    return generatorText
+  }
+  return ''
 }
 
 function renderActivityTree(a) {
