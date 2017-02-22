@@ -169,7 +169,7 @@ function renderActivity(activity) {
       }</main>
 
       <div class="activity-attachments">
-        ${(activity.object.attachment || []).map(attachment => {
+        ${((activity.object && activity.object.attachment) || []).map(attachment => {
           if ( ! attachment) return ''
           switch (attachment.type) {
             case 'Link':
@@ -262,6 +262,9 @@ function createActivityCss() {
 
     .activity-item .activity-footer-bar {
       opacity: 0.3;
+    }
+    .activity-item .activity-attachments img {
+      max-width: 100%;
     }
   `
 }
