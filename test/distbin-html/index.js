@@ -76,6 +76,7 @@ tests['POST / can create activities with geolocation'] = async function () {
   const dhUrl = await listen(http.createServer(dh))
   const formFields = {
     content: 'lorem ipsum',
+    'location.name': 'Penang, Malaysia',
     'location.latitude': 5.365458,
     'location.longitude': 100.45900909999999,
     'location.altitude': 56.1,
@@ -84,6 +85,7 @@ tests['POST / can create activities with geolocation'] = async function () {
   };
   const activity = await postDistbinHtmlActivityForm(dbUrl, dhUrl, formFields)
   assert.equal(typeof activity.location, 'object')
+  assert.equal(activity.location.name, formFields['location.name'])
   assert.equal(activity.location.latitude, formFields['location.latitude'])
   assert.equal(activity.location.longitude, formFields['location.longitude'])
   assert.equal(activity.location.altitude, formFields['location.altitude'])

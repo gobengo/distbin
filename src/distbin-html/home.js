@@ -79,7 +79,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           'content-type': 'text/html',
         })
         res.write(distbinBodyTemplate(`
-          ${/*aboveFold*/(`
+          ${(`
             <style>
             .post-form textarea {
               height: calc(100% - 14em - 8px); /* everything except the rest of this form */
@@ -107,7 +107,80 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
             .post-form summary {
               cursor: pointer;
             }
+            .cursor-pointer:hover {
+              cursor: pointer;
+            }
             </style>
+            <script>
+            window.addGeolocation = function (addLocationEl) {
+              var locationInputGroup = addLocationEl.closest('.post-form-geolocation-input-group')
+              if ( ! locationInputGroup) {
+                throw new Error("addGeolocation must be called with an element inside a .post-form-geolocation-input-group")
+              }
+              // show loading indicator
+              var gettingLocationEl = document.createElement('span');
+              gettingLocationEl.innerHTML = 'Getting Location...'
+              addLocationEl.parentNode.replaceChild(gettingLocationEl, addLocationEl)
+              // ok now to request location
+              navigator.geolocation.getCurrentPosition(success, failure);
+              function success(position) {
+                var coords= position.coords || {};
+                var coordPropsToFormFields = {
+                  'altitude': 'location.altitude',
+                  'latitude': 'location.latitude',
+                  'longitude': 'location.longitude',
+                  'accuracy': 'location.radius',
+                }
+                var hiddenInputsToCreate = Object.keys(coordPropsToFormFields).map(function (coordProp) {
+                  var coordValue = coords[coordProp]
+                  if ( ! coordValue) return;
+                  var formFieldName = coordPropsToFormFields[coordProp]
+                  return {
+                    name: formFieldName,
+                    value: coordValue,
+                  }
+                }).filter(Boolean);
+                
+                // update the form with hidden fields for this info
+                hiddenInputsToCreate.forEach(insertOrReplaceInput);
+                
+                // replace loading indicator with 'undo'
+                var undoElement = createUndoElement('Clicking post will save your coordinates. Click here to undo.')
+                gettingLocationEl.parentNode.replaceChild(undoElement, gettingLocationEl);
+
+                function createUndoElement(text) {
+                  var undoElement = document.createElement('a');
+                  undoElement.innerHTML = text;
+                  undoElement.style.cursor = 'pointer';
+                  undoElement.onclick = function (event) {
+                    // replace with the original addLocationEl that triggered everything
+                    undoElement.parentNode.replaceChild(addLocationEl, undoElement);
+                  }
+                  return undoElement
+                }
+
+                function insertOrReplaceInput(inputInfo) {
+                  var name = inputInfo.name;
+                  var value = inputInfo.value;
+                  var input = document.createElement('input')
+                  input.type = 'hidden';
+                  input.value = value;
+                  input.name = name;
+                  var oldInput = locationInputGroup.querySelector('input[name="'+name+'"]')
+                  if (oldInput) {
+                    oldInput.parentNode.replaceChild(input, oldInput);
+                  } else {
+                    // insert
+                    locationInputGroup.appendChild(input)
+                  }
+                }
+
+              }
+              function failure(error) {
+                console.error("Error getting current position", error)
+              }
+            }
+            </script>
             <form class="post-form" method="post">
               <input name="name" type="text" placeholder="Title (optional)" value="${safeTitleDefault}" class="post-form-stretch"></input>
               <textarea name="content" placeholder="Write anonymously, get feedback" class="post-form-stretch"></textarea>
@@ -115,6 +188,12 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
               <details class="post-form-show-more">
                 <summary class="post-form-stretch">More</summary>
                 <input name="attachment" type="text" placeholder="Attachment URL (optional)" class="post-form-stretch" value="${safeAttachmentUrl}"></input>
+                <div class="post-form-geolocation-input-group">
+                  <input name="location.name" type="text" placeholder="Where are you?" class="post-form-stretch" />
+                  <p>
+                    <a onclick="addGeolocation(this)" class="cursor-pointer">Add Your Geolocation</a>
+                  </p>
+                </div>
               </details>
               <input type="submit" value="post" class="post-form-stretch" />
             </form>
@@ -149,14 +228,17 @@ EOF`)}
 
 function parseLocationFormFields(formFields) {
   let location = { type: 'Place' }
-  const fieldNames = [
+  const floatFieldNames = [
     'location.latitude',
     'location.longitude',
     'location.altitude',
     'location.accuracy',
     'location.radius',
   ]
-  fieldNames.forEach(k => {
+  if (formFields['location.name']) {
+    location.name = formFields['location.name']
+  }
+  floatFieldNames.forEach(k => {
     let fieldVal = formFields[k]
     if ( ! fieldVal) return;
     let propName = k.split('.')[1];

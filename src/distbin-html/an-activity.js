@@ -139,6 +139,7 @@ function renderActivity(activity) {
     (activity.object && activity.object.published)
     || activity.published
   const generator = formatGenerator(activity)
+  const location = formatLocation(activity)
   return `
     <article class="activity-item">
       ${
@@ -214,10 +215,25 @@ function renderActivity(activity) {
               ? `&nbsp;via ${generator}`
               : ''
           }
+          ${
+            location
+              ? `&nbsp;<span>${location}</span>`
+              : ''
+          }
         </div>
       </footer>
     </article>
 
+  `
+}
+
+function formatLocation(activity) {
+  const location = activity && activity.location;
+  if ( ! location) return;
+  return `
+    <a class="glyph" ${location.name ? `title="${encodeHtmlEntities(location.name)}"` : ''}>
+      &#127757;
+    </a>
   `
 }
 
@@ -251,6 +267,12 @@ function createActivityCss() {
     .activity-item main,
     .activity-item .activity-attachments {
       margin: 1rem auto; /* intended to be same as <p> to force same margins even if main content is not a p */
+    }
+    .activity-footer-bar {
+      line-height: 1em;
+    }
+    .activity-footer-bar .glyph {
+      vertical-align: text-bottom;
     }
     .activity-footer-bar a {
       text-decoration: none;
