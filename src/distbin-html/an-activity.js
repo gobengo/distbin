@@ -168,6 +168,26 @@ function renderActivity(activity) {
         )
       }</main>
 
+      <div class="activity-attachments">
+        ${(activity.object.attachment || []).map(attachment => {
+          if ( ! attachment) return ''
+          switch (attachment.type) {
+            case 'Link':
+              const prefetch = attachment['https://distbin.com/ns/linkPrefetch']
+              if ( ! (prefetch && prefetch.supportedMediaTypes)) return '';
+              if (prefetch.supportedMediaTypes.find(m => m.startsWith('image/'))) {
+                return `
+                  <img src="${ attachment.href }" />
+                `
+              }
+              break;
+            default:
+              break;
+          }
+          return ''
+        }).filter(Boolean).join('\n')}
+      </div>
+
       ${/* TODO add byline */''}
       <footer>
         <div class="activity-footer-bar">
@@ -228,7 +248,8 @@ function createActivityCss() {
       border-left: 1px solid #efefef;
       padding-left: 1em;
     }
-    .activity-item main {
+    .activity-item main,
+    .activity-item .activity-attachments {
       margin: 1rem auto; /* intended to be same as <p> to force same margins even if main content is not a p */
     }
     .activity-footer-bar a {

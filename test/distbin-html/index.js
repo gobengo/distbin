@@ -43,6 +43,7 @@ tests['POST / creates activities'] = async function () {
   postFormRequest.write(querystring.stringify({
     name: 'activity name',
     content: 'lorem ipsum',
+    attachment: dbUrl
   }))
   const dhResponse = await sendRequest(postFormRequest);
   assert.equal(dhResponse.statusCode, 302)
@@ -57,6 +58,13 @@ tests['POST / creates activities'] = async function () {
   })));
   const activity = JSON.parse(await readableToString(activityResponse))
   assert(activity.object.generator, 'distbin-html form submission sets distbin-html as the .generator')
+  assert.equal(Array.isArray(activity.object.attachment), true, '.attachment is an Array')
+  assert.equal(activity.object.attachment.length, 1, '.attachment[] is there and has the attachment link')
+  const attachmentLink = activity.object.attachment[0]
+  assert.equal(attachmentLink.href, dbUrl)
+  const linkPrefetch = attachmentLink['https://distbin.com/ns/linkPrefetch']
+  assert.equal(typeof linkPrefetch.published, 'string', 'linkPrefetch.published is a string')
+  assert.equal(linkPrefetch.supportedMediaTypes[0], 'application/json', 'linkPrefetch.supportedMediaTypes[0] is the right media type')
 }
 
 tests['/activities/:id renders the .generator.name'] = async function () {
