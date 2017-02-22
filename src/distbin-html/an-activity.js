@@ -217,7 +217,7 @@ function renderActivity(activity) {
           }
           ${
             location
-              ? `&nbsp;<span>${location}</span>`
+              ? `&nbsp;<span class="action-location">${location}</span>`
               : ''
           }
         </div>
@@ -230,10 +230,35 @@ function renderActivity(activity) {
 function formatLocation(activity) {
   const location = activity && activity.location;
   if ( ! location) return;
-  return `
+  let imgUrl;
+  let linkTo;
+  if (location.latitude && location.longitude) {
+    imgUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${location.latitude},${location.longitude}&zoom=11&size=480x300&sensor=false`
+    linkTo = `https://www.openstreetmap.org/search?query=${location.latitude},${location.longitude}`
+  } else if (location.name) {
+    // use name as center, don't specify zoom
+    imgUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${location.name}&size=480x300&sensor=false`
+    linkTo = `https://www.openstreetmap.org/search?query=${location.name}`
+  }
+  const glyph = `
     <a class="glyph" ${location.name ? `title="${encodeHtmlEntities(location.name)}"` : ''}>
       &#127757;
     </a>
+  `
+  if ( ! imgUrl) {
+    return glyph;
+  }
+  return `
+    <details>
+      <summary>
+        ${glyph}
+      </summary>
+      <div class="activity-location-map">
+        <a href="${linkTo}" target="_blank">
+          <img src="${imgUrl}" />
+        </a>
+      </div>
+    </details>
   `
 }
 
@@ -277,16 +302,28 @@ function createActivityCss() {
     .activity-footer-bar a {
       text-decoration: none;
     }
-    .activity-footer-bar > .action-show-raw > details,
-    .activity-footer-bar > .action-show-raw > details > summary {
+    .activity-footer-bar details,
+    .activity-footer-bar details > summary {
       display: inline
     }
-
-    .activity-item .activity-footer-bar {
-      opacity: 0.3;
+    .activity-footer-bar details > summary {
+      cursor: pointer;
+    }
+    .activity-footer-bar details[open] {
+      display: block;
+    }
+    .activity-item .activity-footer-bar,
+    .activity-item .activity-footer-bar a {
+      color: rgba(0, 0, 0, 0.3)
     }
     .activity-item .activity-attachments img {
       max-width: 100%;
+    }
+    .activity-location-map img {
+      width: 100%;
+    }
+    .action-show-raw pre {
+      color: initial
     }
   `
 }

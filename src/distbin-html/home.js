@@ -36,7 +36,6 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           {
             'type': 'Note',
             'content': content,
-            'cc': [publicCollectionId, inReplyTo].filter(Boolean),
             generator: {
               type: 'Application',
               name: 'distbin-html',
@@ -52,6 +51,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           type: 'Create',
           object: note,
           location,
+          cc: [publicCollectionId, inReplyTo].filter(Boolean),
         }
         // submit to outbox
         // #TODO discover outbox URL
@@ -113,6 +113,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
             </style>
             <script>
             window.addGeolocation = function (addLocationEl) {
+              var currentlyInsertedEl = addLocationEl;
               var locationInputGroup = addLocationEl.closest('.post-form-geolocation-input-group')
               if ( ! locationInputGroup) {
                 throw new Error("addGeolocation must be called with an element inside a .post-form-geolocation-input-group")
@@ -121,6 +122,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
               var gettingLocationEl = document.createElement('span');
               gettingLocationEl.innerHTML = 'Getting Location...'
               addLocationEl.parentNode.replaceChild(gettingLocationEl, addLocationEl)
+              currentlyInsertedEl = gettingLocationEl
               // ok now to request location
               navigator.geolocation.getCurrentPosition(success, failure);
               function success(position) {
@@ -145,8 +147,13 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
                 hiddenInputsToCreate.forEach(insertOrReplaceInput);
                 
                 // replace loading indicator with 'undo'
-                var undoElement = createUndoElement('Clicking post will save your coordinates. Click here to undo.')
-                gettingLocationEl.parentNode.replaceChild(undoElement, gettingLocationEl);
+                var undoElement = createUndoElement([
+                  'Clicking post will save your coordinates',
+                  (coords.latitude && coords.longitude) ? (' ('+coords.latitude+', '+coords.longitude+')') : '',
+                  '. Click here to undo.'
+                ].join(''))
+                gettingLocationEl.parentNode.replaceChild(undoElement, currentlyInsertedEl);
+                currentlyInsertedEl = undoElement
 
                 function createUndoElement(text) {
                   var undoElement = document.createElement('a');
@@ -155,6 +162,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
                   undoElement.onclick = function (event) {
                     // replace with the original addLocationEl that triggered everything
                     undoElement.parentNode.replaceChild(addLocationEl, undoElement);
+                    currentlyInsertedEl = addLocationEl
                   }
                   return undoElement
                 }
@@ -178,6 +186,15 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
               }
               function failure(error) {
                 console.error("Error getting current position", error)
+                var failureElement = document.createElement('a');
+                failureElement.style.cursor = 'pointer';
+                failureElement.innerHTML = ['Error getting geolocation', error.message].filter(Boolean).join(': ')
+                failureElement.onclick = function (e) {
+                  currentlyInsertedEl.parentNode.replaceChild(addLocationEl, currentlyInsertedEl);
+                  currentlyInsertedEl = addLocationEl                  
+                }
+                currentlyInsertedEl.parentNode.replaceChild(failureElement, currentlyInsertedEl);
+                currentlyInsertedEl = failureElement
               }
             }
             </script>
