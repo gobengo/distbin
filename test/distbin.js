@@ -89,6 +89,7 @@ tests['can page through /public collection.current'] = async function () {
   assert.equal(url.parse(collection.items[0].url).pathname, url.parse(created[created.length - 1]).pathname)
   assert( ! collection.next, 'collection does not have a next property')
   assert(collection.current, 'collection has a .current property')
+  assert(collection.first, 'collection has a .first property')
   assert.equal(typeof collection.current, 'string', 'collection.current is a string')
 
   const page1Url = url.resolve(collectionUrl, collection.current);

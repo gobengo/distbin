@@ -36,7 +36,7 @@ module.exports = function distbin({
       ['/recent', () => recentHandler({ activities })],
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox })],
       ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl })],
-      ['/activitypub/public/current', () => publicCollectionPageHandler({ activities })],
+      ['/activitypub/public/page', () => publicCollectionPageHandler({ activities })],
       ['/activitypub/public', () => publicCollectionHandler({ activities })],
       // /activities/{activityUuid}.{format}
       [/^\/activities\/([^\/]+?)(\.(.+))$/,
@@ -446,7 +446,7 @@ function publicCollectionHandler ({ activities }) {
       return activity
     })
     const totalItems = publicActivities.length;
-    const currentUrl = [req.url, req.url.endsWith('/') ? '' : '/', 'current'].join('')
+    const currentUrl = [req.url, req.url.endsWith('/') ? '' : '/', 'page'].join('')
     const publicCollection = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       'id': 'https://www.w3.org/ns/activitypub/Public',
@@ -455,7 +455,8 @@ function publicCollectionHandler ({ activities }) {
       'items': currentItems,
       'totalItems': totalItems,
       // empty string is relative URL for 'self'
-      'current': currentUrl
+      'current': currentUrl,
+      'first': currentUrl,
     }
     res.writeHead(200, {
       'content-type': 'application/json'

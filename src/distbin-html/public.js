@@ -56,9 +56,15 @@ async function createPublicBody (req, { apiUrl }) {
     .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')
     }</pre>
     ${
-      nextUrl
-      ? `<a href="${nextUrl}">Next Page</a>`
-      : ''
+      [
+        page.startIndex
+          ? `${page.startIndex} previous items`
+          : ''
+        ,
+        nextUrl
+          ? `<a href="${nextUrl}">Next Page</a>`
+          : ''
+      ].filter(Boolean).join(' - ')
     }
   `
   return msg;

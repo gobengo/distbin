@@ -8,7 +8,7 @@ exports.createHandler = ({ apiUrl, externalUrl }={}) => {
   const routes = new Map([
     ['/', () => home.createHandler({ apiUrl, externalUrl })],
     ['/about', () => about.createHandler({ externalUrl }) ],
-    [new RegExp('^/public(/current)?$'), () => public.createHandler({ apiUrl }) ],
+    [new RegExp('^/public$'), () => public.createHandler({ apiUrl }) ],
     [new RegExp('^/activities/([^/\.]+)$'),
       (activityId) => anActivity.createHandler({ apiUrl, activityId, externalUrl })]
   ])
