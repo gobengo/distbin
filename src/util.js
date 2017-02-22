@@ -97,3 +97,12 @@ function isProbablyAbsoluteUrl(url) {
   const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i');
   return absoluteUrlPattern.test(url)
 }
+
+exports.requestMaxMemberCount = requestMaxMemberCount
+// Check request parameters (http Prefer, then querystring) for a max-member-count
+function requestMaxMemberCount (req) {
+  const headerMatch = req.headers.prefer ? req.headers.prefer.match(/max-member-count="(\d+)"/) : null
+  if (headerMatch) return parseInt(headerMatch[1], 10)
+  // check querystring
+  return parseInt(url.parse(req.url, true).query['max-member-count'], 10)
+}

@@ -55,6 +55,126 @@ tests['can fetch /recent to see what\'s been going on'] = async function () {
   assert(Array.isArray(recentCollection.items), '.items is an Array')
 }
 
+tests['can page through /public collection.current'] = async function () {
+  const d = distbin()
+  const toCreate = [
+    { name: 'first!' },
+    { name: 'second' },
+    { name: 'third' },
+    { name: 'forth' },
+  ].map(a => Object.assign(a, {
+    cc: ['https://www.w3.org/ns/activitystreams#Public']
+  }))
+  let created = []
+  for (let i=0; i < toCreate.length; i++) {
+    created.push(await postActivity(d, toCreate[i]))
+  }
+  // const createdFull = await Promise.all(created.map(async function (url) {
+  //   return JSON.parse(await readableToString(await sendRequest(http.request(url))))
+  // }))
+  // console.log('createdFull', createdFull)
+  assert.equal(created.length, 4)
+  const collectionUrl = '/activitypub/public'
+  const collectionRes = await sendRequest(await requestForListener(d, {
+    path: collectionUrl,
+    headers: {
+      'accept': 'application/ld+json',
+      'Prefer': 'return=representation; max-member-count="1"'
+    }
+  }))
+  const collection = JSON.parse(await readableToString(collectionRes))
+  assert.equal(collection.type, 'Collection')
+  assert.equal(collection.items.length, 1)
+  // we get the most recently created one
+  assert.equal(url.parse(collection.items[0].url).pathname, url.parse(created[created.length - 1]).pathname)
+  assert( ! collection.next, 'collection does not have a next property')
+  assert(collection.current, 'collection has a .current property')
+  assert.equal(typeof collection.current, 'string', 'collection.current is a string')
+
+  const page1Url = url.resolve(collectionUrl, collection.current);
+  // page 1
+  const page1Res = await sendRequest(await requestForListener(d, {
+    path: page1Url,
+    headers: {
+      'accept': 'application/ld+json',
+      // NOTE! getting 2 this time
+      'Prefer': 'return=representation; max-member-count="1"'
+    }
+  }))
+  assert.equal(page1Res.statusCode, 200)
+  const page1 = JSON.parse(await readableToString(page1Res))
+  assert.equal(page1.type, 'OrderedCollectionPage')
+  assert.equal(page1.startIndex, 0)
+  assert.equal(page1.orderedItems.length, 1)
+  assert(page1.next, 'has a next property')
+
+  // page 2 (get 2 items, not 1)
+  const page2Url = url.resolve(page1Url, page1.next)
+  const page2Res = await sendRequest(await requestForListener(d, {
+    path: page2Url,
+    headers: {
+      'accept': 'application/ld+json',
+      // NOTE! getting 2 this time
+      'Prefer': 'return=representation; max-member-count="2"'
+    }
+  }))
+  assert.equal(page2Res.statusCode, 200)
+  const page2 = JSON.parse(await readableToString(page2Res))
+  assert.equal(page2.type, 'OrderedCollectionPage')
+  assert.equal(page2.startIndex, 1)
+  assert.equal(page2.orderedItems.length, 2)
+  assert(page2.next, 'has a next property')
+  // should have second most recently created
+  assert.equal(url.parse(page2.orderedItems[0].url).pathname, url.parse(created[created.length - 2]).pathname)
+  assert.equal(url.parse(page2.orderedItems[1].url).pathname, url.parse(created[created.length - 3]).pathname)
+  // ok so if we post one more new thing, the startIndex on page2 should go up by one.
+  const fifth = {
+    cc: ['https://www.w3.org/ns/activitystreams#Public'],
+    name: 'fifth',
+  }
+  created.push(await postActivity(d, fifth))
+  const page2AfterFifthRes = await sendRequest(await requestForListener(d, {
+    path: page2Url,
+    headers: {
+      'accept': 'application/ld+json',
+      'Prefer': 'return=representation; max-member-count="2"'
+    }
+  }))
+  const page2AfterFifth = JSON.parse(await readableToString(page2AfterFifthRes))
+  assert.equal(page2AfterFifth.startIndex, 2)
+  // page 3
+  const page3Url = url.resolve(page2Url, page2.next)
+  const page3Res = await sendRequest(await requestForListener(d, {
+    path: page3Url,
+    headers: {
+      'accept': 'application/ld+json',
+      'Prefer': 'return=representation; max-member-count="2"'
+    }
+  }))
+  assert.equal(page3Res.statusCode, 200)  
+  const page3 = JSON.parse(await readableToString(page3Res))
+  assert.equal(page3.type, 'OrderedCollectionPage')
+  assert.equal(page3.startIndex, 4)
+  assert.equal(page3.orderedItems.length, 1)
+  assert.equal(url.parse(page3.orderedItems[0].url).pathname, url.parse(created[created.length - 5]).pathname)
+  // page3 can specify a next, but when fetched it shouldn't have any items
+  // or continue pointing to next
+  if (page3.next) {
+    const page4Url = url.resolve(page3Url, page3.next)
+    const page4Res = await sendRequest(await requestForListener(d, {
+      path: page4Url,
+      headers: {
+        'accept': 'application/ld+json',
+        'Prefer': 'return=representation; max-member-count="2"'
+      }
+    }))
+    assert.equal(page4Res.statusCode, 200)  
+    const page4 = JSON.parse(await readableToString(page4Res))
+    assert.equal(page4.orderedItems.length, 0)
+    assert( ! page4.next)
+  }
+}
+
 // Example 8,9: Submitting an Activity to the Outbox
 tests['posted activities have an .inbox (e.g. to receive replies in)'] = async function () {
   // Create an Activity by POSTing to outbox

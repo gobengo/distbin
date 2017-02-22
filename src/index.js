@@ -7,10 +7,13 @@ const {
   debuglog,
   readableToString,
   route,
+  requestMaxMemberCount,
 } = require('./util')
 const path = require('path')
 const url = require('url')
 const uuid = require('node-uuid')
+const querystring = require('querystring')
+const assert = require('assert')
 
 // given a non-uri activity id, return an activity URI
 const activityUri = (uuid) => `urn:uuid:${uuid}`
@@ -33,6 +36,7 @@ module.exports = function distbin({
       ['/recent', () => recentHandler({ activities })],
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox })],
       ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl })],
+      ['/activitypub/public/current', () => publicCollectionPageHandler({ activities })],
       ['/activitypub/public', () => publicCollectionHandler({ activities })],
       // /activities/{activityUuid}.{format}
       [/^\/activities\/([^\/]+?)(\.(.+))$/,
@@ -50,7 +54,9 @@ module.exports = function distbin({
       handler = error(404)
     }
     try {
-      return handler(req, res)
+      return Promise.resolve(handler(req, res)).catch(err => {
+        return error(500, err)(req, res)
+      })
     } catch (err) {
       return error(500, err)(req, res)
     }
@@ -417,30 +423,161 @@ function outboxHandler ({
 function publicCollectionHandler ({ activities }) {
   return async function (req, res) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
+    const parsedUrl = url.parse(req.url, true)
     const publicActivities = []
-    for (let activity of [...await Promise.resolve(activities.values())].reverse()) {
-      if (activityHasTarget(activity, publicCollectionId)) publicActivities.push(activity)
-      if (publicActivities.length >= maxMemberCount) break;
+    const itemsForThisPage = []
+    const allActivities = [...await Promise.resolve(activities.values())].sort((a,b) => {
+      if (a.published < b.published) return -1;
+      else if (a.published > b.published) return 1;
+      else {
+        // assume ids aren't equal. If so we have a bigger problem
+        return (a.id < b.id) ? -1 : 1;
+      }
+    }).reverse()
+    for (let activity of allActivities) {
+      if ( ! activityHasTarget(activity, publicCollectionId)) continue;
+      publicActivities.push(activity)
+      if (itemsForThisPage.length < maxMemberCount) itemsForThisPage.push(activity);
     }
+    const currentItems = itemsForThisPage.map(activity => {
+      if (isHostedLocally(activity)) {
+        return locallyHostedActivity(activity);
+      }
+      return activity
+    })
+    const totalItems = publicActivities.length;
+    const currentUrl = [req.url, req.url.endsWith('/') ? '' : '/', 'current'].join('')
     const publicCollection = {
       '@context': 'https://www.w3.org/ns/activitystreams',
       'id': 'https://www.w3.org/ns/activitypub/Public',
       'type': 'Collection',
       // Get recent 10 items
-      'items': publicActivities.map(activity => {
-        if (isHostedLocally(activity)) {
-          return locallyHostedActivity(activity);
-        }
-        return activity
-      }),
-      'totalItems': await activities.size,
+      'items': currentItems,
+      'totalItems': totalItems,
       // empty string is relative URL for 'self'
-      'current': ''
+      'current': currentUrl
     }
     res.writeHead(200, {
       'content-type': 'application/json'
     })
     res.end(JSON.stringify(publicCollection, null, 2))
+  }
+}
+
+function publicCollectionPageHandler({ activities }) {
+  return async function (req, res) {
+    const maxMemberCount = requestMaxMemberCount(req) || 10
+    const parsedUrl = url.parse(req.url, true)
+    let cursor
+    let matchesCursor = a => true
+    if (parsedUrl.query.cursor) {
+      try {
+        cursor = JSON.parse(parsedUrl.query.cursor)
+      } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ message: 'Invalid cursor in querystring' }))
+        return;
+      }
+      const createMatchesCursor = cursor => activity => {
+        const ops = ['and', 'or', 'equals'];
+        assert.equal(Object.keys(cursor).length, 1)
+        let bool = Object.keys(cursor).find(k => ops.includes(k))
+
+        const clauses = cursor[bool];
+        for (let i=0; i < clauses.length; i++) {
+          let filterN = clauses[i];
+          assert.equal(Object.keys(filterN).length, 1)
+          let prop = Object.keys(filterN)[0];
+          let matchesRequirement
+          if (ops.includes(prop)) {
+            // this is another expression, recurse
+            matchesRequirement = createMatchesCursor(filterN)(activity)
+          } else {
+            let requirement = filterN[prop]
+            assert.equal(Object.keys(requirement).length, 1)
+            let op = Object.keys(requirement)[0]
+            let propValue = activity[prop];
+            switch (op) {
+              case 'lt':
+                matchesRequirement = propValue < requirement[op]
+                break;
+              case 'equals':
+                matchesRequirement = propValue === requirement[op]
+                break;
+              default:
+                throw new Error("Unexpected op in createMatchesCursor: "+op)
+            }
+          }
+          if (matchesRequirement && (bool === 'or')) {
+            return true;
+          }
+          if (( ! matchesRequirement) && (bool === 'and')) {
+            return false
+          }
+        }
+        if (bool === 'or') return false;
+        if (bool === 'and') return true;
+      }
+      matchesCursor = createMatchesCursor(cursor)
+    }
+    const publicActivities = []
+    const itemsForThisPage = []
+    // @todo ensure sorted by both published and id
+    const allActivities = [...await Promise.resolve(activities.values())].sort((a,b) => {
+      if (a.published < b.published) return -1;
+      else if (a.published > b.published) return 1;
+      else {
+        // assume ids aren't equal. If so we have a bigger problem
+        return (a.id < b.id) ? -1 : 1;
+      }
+    }).reverse()
+    let itemsBeforeCursor = 0;
+    for (let activity of allActivities) {
+      if ( ! activityHasTarget(activity, publicCollectionId)) continue;
+      publicActivities.push(activity)
+      if ( ! matchesCursor(activity)) {
+        itemsBeforeCursor++
+        continue;
+      }
+      if (itemsForThisPage.length < maxMemberCount) itemsForThisPage.push(activity);
+    }
+    const currentItems = itemsForThisPage.map(activity => {
+      if (isHostedLocally(activity)) {
+        return locallyHostedActivity(activity);
+      }
+      return activity
+    })
+    const totalItems = publicActivities.length;
+    let next;
+    if (totalItems > currentItems.length) {
+      let lastItem = currentItems[currentItems.length - 1]
+      if (lastItem) {
+        let cursor = JSON.stringify({
+          or: [
+            { published: { lt: lastItem.published } },
+            {
+              and: [
+                { published: { equals: lastItem.published } },
+                { id: { lt: lastItem.id } },
+              ]
+            }
+          ],
+        })
+        next = '?' + querystring.stringify({ cursor })
+      }
+    }
+    const collectionPage = {
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      type: 'OrderedCollectionPage',
+      orderedItems: currentItems,
+      startIndex: itemsBeforeCursor,
+      next,
+      partOf: '/activitypub/public'      
+    }
+    res.writeHead(200, {
+      'content-type': 'application/json'
+    })
+    res.end(JSON.stringify(collectionPage, null, 2))
   }
 }
 
@@ -453,14 +590,4 @@ function error (statusCode, error) {
     const responseText = error ? error.toString() : statusCode.toString()
     res.end(responseText)
   }
-}
-
-// utilities
-
-// Check request parameters (http Prefer, then querystring) for a max-member-count
-function requestMaxMemberCount (req) {
-  const headerMatch = req.headers.prefer ? req.headers.prefer.match(/max-member-count="(\d+)"/) : null
-  if (headerMatch) return parseInt(headerMatch[1], 10)
-  // check querystring
-  return parseInt(url.parse(req.url, true).query['max-member-count'], 10)
 }
