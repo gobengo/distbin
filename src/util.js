@@ -2,6 +2,8 @@ const jsonldRdfaParser = require('jsonld-rdfa-parser')
 const jsonld = require('jsonld')
 jsonld.registerRDFParser('text/html', jsonldRdfaParser);
 const url = require('url')
+const http = require('http')
+const https = require('https')
 
 exports.debuglog = require('util').debuglog('distbin')
 
@@ -105,4 +107,24 @@ function requestMaxMemberCount (req) {
   if (headerMatch) return parseInt(headerMatch[1], 10)
   // check querystring
   return parseInt(url.parse(req.url, true).query['max-member-count'], 10)
+}
+
+exports.createHttpOrHttpsRequest = createHttpOrHttpsRequest;
+function createHttpOrHttpsRequest (urlOrObj) {
+  let parsedUrl = urlOrObj
+  if (typeof urlOrObj === 'string') {
+    parsedUrl = url.parse(urlOrObj)    
+  }
+  let createRequest;
+  switch (parsedUrl.protocol) {
+    case 'https:':
+      createRequest = https.request.bind(https)
+      break
+    case 'http:':
+      createRequest = http.request.bind(http)
+      break
+    default:
+      throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): "+ activityUrl)
+  }
+  return createRequest(urlOrObj)
 }

@@ -4,6 +4,7 @@ const { encodeHtmlEntities } = require('../util')
 const { readableToString } = require('../util')
 const { requestMaxMemberCount } = require('../util')
 const http = require('http')
+const { createHttpOrHttpsRequest } = require('../util')
 const url = require('url')
 const querystring = require('querystring')
 
@@ -26,7 +27,7 @@ async function createPublicBody (req, { apiUrl }) {
   let pageUrl = url.parse(req.url, true).query.page;
   if ( ! pageUrl) {
     const publicCollectionUrl = apiUrl + '/activitypub/public'
-    const publicCollectionRequest = http.request(Object.assign(url.parse(publicCollectionUrl), {
+    const publicCollectionRequest = createHttpOrHttpsRequest(Object.assign(url.parse(publicCollectionUrl), {
       headers: {
         'Prefer': `return=representation; max-member-count="${limit}"`
       }
@@ -34,12 +35,13 @@ async function createPublicBody (req, { apiUrl }) {
     const publicCollection = JSON.parse(await readableToString(await sendRequest(publicCollectionRequest)))
     pageUrl = url.resolve(publicCollectionUrl, publicCollection.current)    
   }
-  const pageRequest = http.request(Object.assign(url.parse(pageUrl), {
+  const pageRequest = createHttpOrHttpsRequest(Object.assign(url.parse(pageUrl), {
     headers: {
       'Prefer': `return=representation; max-member-count="${limit}"`
     }
   }))
-  const page = JSON.parse(await readableToString(await sendRequest(pageRequest)))
+  const pageResponse = await sendRequest(pageRequest)
+  const page = JSON.parse(await readableToString(pageResponse))
   const nextQuery = page.next && Object.assign({}, url.parse(req.url, true).query, {
     'page': page.next && url.resolve(pageUrl, page.next)
   })
