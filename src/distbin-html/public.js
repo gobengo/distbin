@@ -7,6 +7,8 @@ const http = require('http')
 const { createHttpOrHttpsRequest } = require('../util')
 const url = require('url')
 const querystring = require('querystring')
+const { linkToHref } = require('../util')
+
 
 exports.createHandler = function ({ apiUrl }) {
   return async function(req, res) {
@@ -33,7 +35,7 @@ async function createPublicBody (req, { apiUrl }) {
       }
     }))
     const publicCollection = JSON.parse(await readableToString(await sendRequest(publicCollectionRequest)))
-    pageUrl = url.resolve(publicCollectionUrl, publicCollection.current)    
+    pageUrl = url.resolve(publicCollectionUrl, linkToHref(publicCollection.current))
   }
   const pageRequest = createHttpOrHttpsRequest(Object.assign(url.parse(pageUrl), {
     headers: {
@@ -43,7 +45,7 @@ async function createPublicBody (req, { apiUrl }) {
   const pageResponse = await sendRequest(pageRequest)
   const page = JSON.parse(await readableToString(pageResponse))
   const nextQuery = page.next && Object.assign({}, url.parse(req.url, true).query, {
-    'page': page.next && url.resolve(pageUrl, page.next)
+    'page': page.next && url.resolve(pageUrl, linkToHref(page.next))
   })
   const nextUrl = nextQuery && `?${querystring.stringify(nextQuery)}`
   const msg = `

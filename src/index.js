@@ -455,7 +455,10 @@ function publicCollectionHandler ({ activities }) {
       'items': currentItems,
       'totalItems': totalItems,
       // empty string is relative URL for 'self'
-      'current': currentUrl,
+      'current': {
+        type: 'Link',
+        href: currentUrl,
+      },
       'first': currentUrl,
     }
     res.writeHead(200, {

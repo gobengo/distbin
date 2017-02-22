@@ -128,3 +128,10 @@ function createHttpOrHttpsRequest (urlOrObj) {
   }
   return createRequest(urlOrObj)
 }
+
+exports.linkToHref = linkToHref;
+function linkToHref(hrefOrLinkObj) {
+  if (typeof hrefOrLinkObj === 'string') return hrefOrLinkObj;
+  if (typeof hrefOrLinkObj === 'object') return hrefOrLinkObj.href;
+  throw new Error("Unexpected link type: " + typeof hrefOrLinkObj)
+}

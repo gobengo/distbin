@@ -8,6 +8,7 @@ const { isProbablyAbsoluteUrl } = require('./util')
 const { listen } = require('./util')
 const { readableToString } = require('../src/util')
 const { requestForListener } = require('./util')
+const { linkToHref } = require('../src/util')
 const { sendRequest } = require('../src/util')
 const url = require('url')
 
@@ -90,9 +91,7 @@ tests['can page through /public collection.current'] = async function () {
   assert( ! collection.next, 'collection does not have a next property')
   assert(collection.current, 'collection has a .current property')
   assert(collection.first, 'collection has a .first property')
-  assert.equal(typeof collection.current, 'string', 'collection.current is a string')
-
-  const page1Url = url.resolve(collectionUrl, collection.current);
+  const page1Url = url.resolve(collectionUrl, linkToHref(collection.current));
   // page 1
   const page1Res = await sendRequest(await requestForListener(d, {
     path: page1Url,
