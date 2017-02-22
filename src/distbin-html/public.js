@@ -26,7 +26,9 @@ async function createPublicBody (req, { apiUrl }) {
   if (typeof limit !== 'number') {
     throw new Error('max-member-count must be a number')
   }
-  let pageUrl = url.parse(req.url, true).query.page;
+  let query = url.parse(req.url, true).query
+  let pageUrl = query.page;
+  let pageMediaType = query.pageMediaType || 'application/json'
   if ( ! pageUrl) {
     const publicCollectionUrl = apiUrl + '/activitypub/public'
     const publicCollectionRequest = createHttpOrHttpsRequest(Object.assign(url.parse(publicCollectionUrl), {
@@ -36,10 +38,14 @@ async function createPublicBody (req, { apiUrl }) {
     }))
     const publicCollection = JSON.parse(await readableToString(await sendRequest(publicCollectionRequest)))
     pageUrl = url.resolve(publicCollectionUrl, linkToHref(publicCollection.current))
+    if (typeof publicCollection.current === 'object') {
+      pageMediaType = publicCollection.current.mediaType || pageMediaType
+    }
   }
   const pageRequest = createHttpOrHttpsRequest(Object.assign(url.parse(pageUrl), {
     headers: {
-      'Prefer': `return=representation; max-member-count="${limit}"`
+      'Prefer': `return=representation; max-member-count="${limit}"`,
+      'Accept': pageMediaType,
     }
   }))
   const pageResponse = await sendRequest(pageRequest)

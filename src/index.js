@@ -457,7 +457,10 @@ function publicCollectionHandler ({ activities }) {
       // empty string is relative URL for 'self'
       'current': {
         type: 'Link',
+        rel: 'current',
         href: currentUrl,
+        mediaType: 'application/json',
+        name: 'Recently updated public activities',
       },
       'first': currentUrl,
     }
