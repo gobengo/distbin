@@ -70,25 +70,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
         .primary-activity {
           margin: 1rem auto;
         }
-        .ancestors,
-        .descendants {
-          border-left: 1px solid #efefef;
-          padding-left: 1em;
-        }
-        .activity-item main {
-          margin: 1rem auto; /* intended to be same as <p> to force same margins even if main content is not a p */
-        }
-        .activity-footer-bar a {
-          text-decoration: none;
-        }
-        .activity-footer-bar > .action-show-raw > details,
-        .activity-footer-bar > .action-show-raw > details > summary {
-          display: inline
-        }
-
-        .activity-item .activity-footer-bar {
-          opacity: 0.3;
-        }
+        ${createActivityCss()}
         </style>
       </head>
 
@@ -151,6 +133,7 @@ function renderDescendant(activity) {
         scrolling="no"
       ></iframe>
 */
+exports.renderActivity = renderActivity
 function renderActivity(activity) {
   const published =
     (activity.object && activity.object.published)
@@ -235,6 +218,31 @@ function formatGenerator(activity) {
     return generatorText
   }
   return ''
+}
+
+exports.createActivityCss = createActivityCss;
+function createActivityCss() {
+  return `
+    .ancestors,
+    .descendants {
+      border-left: 1px solid #efefef;
+      padding-left: 1em;
+    }
+    .activity-item main {
+      margin: 1rem auto; /* intended to be same as <p> to force same margins even if main content is not a p */
+    }
+    .activity-footer-bar a {
+      text-decoration: none;
+    }
+    .activity-footer-bar > .action-show-raw > details,
+    .activity-footer-bar > .action-show-raw > details > summary {
+      display: inline
+    }
+
+    .activity-item .activity-footer-bar {
+      opacity: 0.3;
+    }
+  `
 }
 
 function renderActivityTree(a) {

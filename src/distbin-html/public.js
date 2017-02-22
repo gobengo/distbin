@@ -8,7 +8,8 @@ const { createHttpOrHttpsRequest } = require('../util')
 const url = require('url')
 const querystring = require('querystring')
 const { linkToHref } = require('../util')
-
+const { renderActivity } = require('./an-activity')
+const { createActivityCss } = require('./an-activity')
 
 exports.createHandler = function ({ apiUrl }) {
   return async function(req, res) {
@@ -55,16 +56,26 @@ async function createPublicBody (req, { apiUrl }) {
   })
   const nextUrl = nextQuery && `?${querystring.stringify(nextQuery)}`
   const msg = `
+    <style>
+      ${createActivityCss()}
+    </style>
     <h2>Public Activity</h2>
-    <p>Fetched from <a href="/activitypub/public">/activitypub/public</a></p>
-    <pre>${
-    encodeHtmlEntities(
-      // #TODO: discover /public url via HATEOAS
-      JSON.stringify(page, null, 2)
-    )
-    // linkify values of 'url' property (quotes encode to &#34;)
-    .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')
-    }</pre>
+    <p>Fetched from <a href="${pageUrl}">${pageUrl}</a></p>
+    <details>
+      <summary>{&hellip;}</summary>
+      <pre><code>${
+          encodeHtmlEntities(
+            // #TODO: discover /public url via HATEOAS
+            JSON.stringify(page, null, 2)
+          )
+          // linkify values of 'url' property (quotes encode to &#34;)
+          .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')  
+      }</code></pre>
+    </details>
+    <div>
+      ${(page.orderedItems || page.items || []).map(renderActivity).join('\n')}
+    </div>
+    <p>
     ${
       [
         page.startIndex
@@ -76,6 +87,7 @@ async function createPublicBody (req, { apiUrl }) {
           : ''
       ].filter(Boolean).join(' - ')
     }
+    </p>
   `
   return msg;
 }
