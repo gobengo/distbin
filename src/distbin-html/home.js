@@ -17,52 +17,23 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
       case 'post':
         const submission = await readableToString(req)
         // assuming application/x-www-form-urlencoded
-        const { content, inReplyTo, attachment } = querystring.parse(submission)
+        const formFields = querystring.parse(submission)
+        const { content, inReplyTo, attachment } = formFields;
         if (attachment && ! isProbablyAbsoluteUrl(attachment)) {
           throw new Error("attachment must be a URL, but got "+attachment)
         }
-        let attachmentLink = attachment && {
-          type: 'Link',
-          href: attachment,
-        };
-        if (attachment && attachmentLink) {
-          // try to request the URL to figure out what kind of media type it responds with
-          // then we can store a hint to future clients that render it
-          let connectionError;
-          let attachmentResponse;
-          try {
-            attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))            
-          } catch (error) {
-            connectionError = error;
-            console.warn("Error prefetching attachment URL "+attachment)
-            console.error(error)
-          }
-          if (connectionError) {
-            attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
-              error: {
-                message: connectionError.message
-              }
-            }
-          } else if (attachmentResponse.statusCode === 200) {
-            const contentType = attachmentResponse.headers['content-type']
-            if (contentType) {
-              attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
-                published: new Date().toISOString(),
-                supportedMediaTypes: [contentType],
-              }
-            }
-          } else {
-            // no connection error, not 200, must be another
-            attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
-              error: {
-                status: attachmentResponse.statusCode
-              }
-            }
-          }
+        const attachmentLink = await getAttachmentLinkForUrl(attachment)
+
+        let location;
+        try {
+          location = parseLocationFormFields(formFields)
+        } catch (error) {
+          console.error(error)
+          throw new Error("Error parsing location form fields")
         }
+
         let note = Object.assign(
           {
-            '@context': 'https://www.w3.org/ns/activitystreams',
             'type': 'Note',
             'content': content,
             'cc': [publicCollectionId, inReplyTo].filter(Boolean),
@@ -72,12 +43,17 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
               url: externalUrl,
               // @todo add .url of externalUrl
             },
-            attachment: attachmentLink ? [attachmentLink] : undefined
+            attachment: attachmentLink ? [attachmentLink] : undefined,
           },
           inReplyTo ? { inReplyTo } : {}
         )
+        const activity = {
+          '@context': 'https://www.w3.org/ns/activitystreams',
+          type: 'Create',
+          object: note,
+          location,
+        }
         // submit to outbox
-        // #TODO is it more 'precise' to convert this to an activity here?
         // #TODO discover outbox URL
         const postToOutboxRequest = http.request(Object.assign(url.parse(apiUrl + '/activitypub/outbox'), {
           headers: {
@@ -86,7 +62,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           method: 'post',
           path: '/activitypub/outbox'
         }))
-        postToOutboxRequest.write(JSON.stringify(note))
+        postToOutboxRequest.write(JSON.stringify(activity))
         postToOutboxResponse = await sendRequest(postToOutboxRequest)
         // handle form submission by posting to outbox
         res.writeHead(302, { location: postToOutboxResponse.headers.location })
@@ -169,6 +145,71 @@ EOF`)}
         return
     }
   }
+}
+
+function parseLocationFormFields(formFields) {
+  let location = { type: 'Place' }
+  const fieldNames = [
+    'location.latitude',
+    'location.longitude',
+    'location.altitude',
+    'location.accuracy',
+    'location.radius',
+  ]
+  fieldNames.forEach(k => {
+    let fieldVal = formFields[k]
+    if ( ! fieldVal) return;
+    let propName = k.split('.')[1];
+    location[propName] = parseFloat(fieldVal, 10);
+  })
+  if (Object.keys(location).length === 1) {
+    // there were no location formFields
+    return;
+  }
+  return location
+}
+
+async function getAttachmentLinkForUrl(attachment) {
+  let attachmentLink = attachment && {
+    type: 'Link',
+    href: attachment,
+  };
+  if (attachment && attachmentLink) {
+    // try to request the URL to figure out what kind of media type it responds with
+    // then we can store a hint to future clients that render it
+    let connectionError;
+    let attachmentResponse;
+    try {
+      attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))            
+    } catch (error) {
+      connectionError = error;
+      console.warn("Error prefetching attachment URL "+attachment)
+      console.error(error)
+    }
+    if (connectionError) {
+      attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+        error: {
+          message: connectionError.message
+        }
+      }
+    } else if (attachmentResponse.statusCode === 200) {
+      const contentType = attachmentResponse.headers['content-type']
+      if (contentType) {
+        attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+          published: new Date().toISOString(),
+          supportedMediaTypes: [contentType],
+        }
+      }
+    } else {
+      // no connection error, not 200, must be another
+      attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+        error: {
+          status: attachmentResponse.statusCode
+        }
+      }
+    }
+  }
+  return attachmentLink
 }
 
 // function createMoreInfo(req, apiUrl) {
