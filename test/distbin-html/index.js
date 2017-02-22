@@ -82,6 +82,7 @@ tests['POST / can create activities with geolocation'] = async function () {
     'location.altitude': 56.1,
     'location.accuracy': 95.0,
     'location.radius': 18408,
+    'location.units': 'm',
   };
   const activity = await postDistbinHtmlActivityForm(dbUrl, dhUrl, formFields)
   assert.equal(typeof activity.location, 'object')
@@ -91,6 +92,7 @@ tests['POST / can create activities with geolocation'] = async function () {
   assert.equal(activity.location.altitude, formFields['location.altitude'])
   assert.equal(activity.location.accuracy, formFields['location.accuracy'])
   assert.equal(activity.location.radius, formFields['location.radius'])
+  assert.equal(activity.location.units, formFields['location.units'])
 }
 
 async function postDistbinHtmlActivityForm(distbinUrl, distbinHtmlUrl, activityFormFields) {

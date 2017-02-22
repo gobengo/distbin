@@ -127,6 +127,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
               navigator.geolocation.getCurrentPosition(success, failure);
               function success(position) {
                 var coords= position.coords || {};
+                console.log('Your position', position)
                 var coordPropsToFormFields = {
                   'altitude': 'location.altitude',
                   'latitude': 'location.latitude',
@@ -142,7 +143,10 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
                     value: coordValue,
                   }
                 }).filter(Boolean);
-                
+                if (coords.altitude || coords.accuracy) {
+                  hiddenInputsToCreate.push({ name: 'location.units', value: 'm' })
+                }
+
                 // update the form with hidden fields for this info
                 hiddenInputsToCreate.forEach(insertOrReplaceInput);
                 
@@ -254,6 +258,9 @@ function parseLocationFormFields(formFields) {
   ]
   if (formFields['location.name']) {
     location.name = formFields['location.name']
+  }
+  if (formFields['location.units']) {
+    location.units = formFields['location.units']
   }
   floatFieldNames.forEach(k => {
     let fieldVal = formFields[k]
