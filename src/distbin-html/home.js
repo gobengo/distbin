@@ -28,12 +28,35 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
         if (attachment && attachmentLink) {
           // try to request the URL to figure out what kind of media type it responds with
           // then we can store a hint to future clients that render it
-          const attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))
-          const contentType = attachmentResponse.headers['content-type']
-          if (contentType) {
+          let connectionError;
+          let attachmentResponse;
+          try {
+            attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))            
+          } catch (error) {
+            connectionError = error;
+            console.warn("Error prefetching attachment URL "+attachment)
+            console.error(error)
+          }
+          if (connectionError) {
             attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
-              published: new Date().toISOString(),
-              supportedMediaTypes: [contentType],
+              error: {
+                message: connectionError.message
+              }
+            }
+          } else if (attachmentResponse.statusCode === 200) {
+            const contentType = attachmentResponse.headers['content-type']
+            if (contentType) {
+              attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+                published: new Date().toISOString(),
+                supportedMediaTypes: [contentType],
+              }
+            }
+          } else {
+            // no connection error, not 200, must be another
+            attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+              error: {
+                status: attachmentResponse.statusCode
+              }
             }
           }
         }
