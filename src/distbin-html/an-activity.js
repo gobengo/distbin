@@ -254,6 +254,13 @@ function formatLocation(activity) {
       <summary>
         ${glyph}
       </summary>
+      <ul>
+        ${location.latitude ? `<li>latitude: ${location.latitude}</li>` : ''}
+        ${location.longitude ? `<li>longitude: ${location.longitude}</li>` : ''}
+        ${location.altitude ? `<li>altitude: ${location.altitude}${location.units || 'm'}</li>` : ''}
+        ${location.radius ? `<li>radius: ${location.radius}${location.units || 'm'}</li>` : ''}
+        ${location.accuracy ? `<li>accuracy: ${location.accuracy}%</li>` : ''}
+      </ul>
       <div class="activity-location-map">
         <a href="${linkTo}" target="_blank">
           <img src="${imgUrl}" />

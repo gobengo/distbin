@@ -146,6 +146,9 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
                 if (coords.altitude || coords.accuracy) {
                   hiddenInputsToCreate.push({ name: 'location.units', value: 'm' })
                 }
+                if (coords.altitude || coords.latitude || coords.longitude) {
+                  hiddenInputsToCreate.push({ name: 'location.accuracy', value: 95.0 })
+                }
 
                 // update the form with hidden fields for this info
                 hiddenInputsToCreate.forEach(insertOrReplaceInput);
