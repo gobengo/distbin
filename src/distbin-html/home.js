@@ -47,6 +47,15 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           attributedTo = undefined;
         }
 
+        let tag;
+        if (formFields['tag_csv']) {
+          tag = formFields['tag_csv'].split(',').map((n) => {
+            return {
+              name: n.trim()
+            };
+          })
+        }
+
         let note = Object.assign(
           {
             'type': 'Note',
@@ -58,6 +67,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
               // @todo add .url of externalUrl
             },
             attachment: attachmentLink ? [attachmentLink] : undefined,
+            tag,
           },
           inReplyTo ? { inReplyTo } : {}
         )
@@ -230,6 +240,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
                 <input name="attributedTo.name" type="text" placeholder="What's your name? (optional)" class="post-form-stretch"></input>
                 <input name="attributedTo.url" type="text" placeholder="What's your URL? (optional)" class="post-form-stretch"></input>
                 <input name="attachment" type="text" placeholder="Attachment URL (optional)" class="post-form-stretch" value="${safeAttachmentUrl}"></input>
+                <input name="tag_csv" type="text" placeholder="Tags (comma-separated, optional)" class="post-form-stretch"></input>
                 <div class="post-form-geolocation-input-group">
                   <input name="location.name" type="text" placeholder="Where are you?" class="post-form-stretch" />
                   <p>

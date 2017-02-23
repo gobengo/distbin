@@ -142,6 +142,7 @@ function renderActivity(activity) {
   const generator = formatGenerator(activity)
   const location = formatLocation(activity)
   const attributedTo = formatAttributedTo(activity)
+  const tags = formatTags(activity)
   return `
     <article class="activity-item">
       <header>
@@ -173,6 +174,16 @@ function renderActivity(activity) {
             : ''
         )
       }</main>
+
+      ${
+        tags
+        ? `
+          <div class="activity-tags">
+            ${tags}
+          </div>
+        `
+        : ''
+      }
 
       <div class="activity-attachments">
         ${((activity.object && activity.object.attachment) || []).map(attachment => {
@@ -230,6 +241,25 @@ function renderActivity(activity) {
     </article>
 
   `
+}
+
+function formatTags(activity) {
+  const tags = activity && activity.object && activity.object.tag;
+  if ( ! Array.isArray(tags)) return;
+  return tags.map(renderTag).filter(Boolean).join('&nbsp;');
+  function renderTag(tag) {
+    const text = tag.name || tag.id || tag.url;
+    if ( ! text) return;
+    const safeText = encodeHtmlEntities(text);
+    const url = tag.url || tag.id || (isProbablyAbsoluteUrl(text) ? text : '');
+    let rendered;
+    if (url) {
+      rendered = `<a href="${encodeHtmlEntities(url)}" class="activity-tag">${safeText}</a>`
+    } else {
+      rendered = `<span class="activity-tag">${safeText}</span>`
+    }
+    return rendered;
+  }
 }
 
 function formatAttributedTo(activity) {
@@ -329,6 +359,12 @@ function createActivityCss() {
 
     .activity-item .activity-attributedTo {
       font-style: normal;
+    }
+
+    .activity-item .activity-tag {
+      display: inline-block;
+      padding: 0.5em;
+      border: 1px solid #eee;
     }
 
     .activity-footer-bar {
