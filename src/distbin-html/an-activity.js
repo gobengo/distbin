@@ -414,27 +414,40 @@ async function fetchReplyAncestors(activity) {
 }
 
 async function fetchActivity(activityUrl) {
-  const parsedUrl = url.parse(activityUrl)
 
   debuglog("req activity "+activityUrl)
-  const activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(parsedUrl, {
+  let activityUrlOrRedirect = activityUrl
+  let activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
     headers: {
       accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
     }
   })))
   debuglog(`res activity ${activityResponse.statusCode} ${activityUrl}`)
 
-  switch (activityResponse.statusCode) {
-    case 200:
-      //cool
-      break
-    case 406:
-      // unacceptable. Server doesn't speak a content-type I know.
-      return {
-        url: activityUrl
-      }
-    default:
-      console.warn('unexpected fetchActivity statusCode', activityResponse.statusCode, activityUrl)
+  let redirectsLeft = 3;
+  while ((activityResponse.statusCode !== 200) && redirectsLeft > 0) {
+    switch (activityResponse.statusCode) {
+      case 200:
+        //cool
+        break
+      case 301:
+      case 302:
+        let activityUrlOrRedirect = url.resolve(activityUrl, activityResponse.headers.location);
+        activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
+          headers: {
+            accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
+          }
+        })))
+        redirectsLeft--;
+        break;
+      case 406:
+        // unacceptable. Server doesn't speak a content-type I know.
+        return {
+          url: activityUrl
+        }
+      default:
+        console.warn('unexpected fetchActivity statusCode', activityResponse.statusCode, activityUrl)
+    }
   }
 
   // if (activityResponse.statusCode === 500) {
