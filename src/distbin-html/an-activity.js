@@ -141,8 +141,12 @@ function renderActivity(activity) {
     || activity.published
   const generator = formatGenerator(activity)
   const location = formatLocation(activity)
+  const attributedTo = formatAttributedTo(activity)
   return `
     <article class="activity-item">
+      <header>
+        ${attributedTo ? attributedTo : ''}
+      </header>
       ${
         activity.name
           ? `<h1>${activity.name}</h1>`
@@ -228,6 +232,26 @@ function renderActivity(activity) {
   `
 }
 
+function formatAttributedTo(activity) {
+  const attributedTo = activity.attributedTo || (activity.object && activity.object.attributedTo);
+  if ( ! attributedTo) return;
+  let formatted = '';
+  let url;
+  if (typeof attributedTo === 'string') {
+    formatted = encodeHtmlEntities(attributedTo)
+  } else if (typeof attributedTo === 'object') {
+    formatted = encodeHtmlEntities(attributedTo.name || attributedTo.url);
+    url = attributedTo.url
+  }
+  if (url) {
+    formatted = `<a rel="author" href="${encodeHtmlEntities(url)}">${formatted}</a>`
+  }
+  if (! formatted) return;
+  return `
+    <address class="activity-attributedTo">${formatted}</address>
+  `
+}
+
 function formatLocation(activity) {
   const location = activity && activity.location;
   if ( ! location) return;
@@ -298,9 +322,15 @@ function createActivityCss() {
       padding-left: 1em;
     }
     .activity-item main,
-    .activity-item .activity-attachments {
+    .activity-item .activity-attachments,
+    .activity-item .activity-attributedTo {
       margin: 1rem auto; /* intended to be same as <p> to force same margins even if main content is not a p */
     }
+
+    .activity-item .activity-attributedTo {
+      font-style: normal;
+    }
+
     .activity-footer-bar {
       line-height: 1em;
     }

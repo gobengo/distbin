@@ -32,6 +32,21 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           throw new Error("Error parsing location form fields")
         }
 
+        let attributedTo = {};
+        if (formFields['attributedTo.name']) {
+          attributedTo.name = formFields['attributedTo.name']
+        }
+        const attributedToUrl = formFields['attributedTo.url']
+        if (attributedToUrl) {
+          if ( ! isProbablyAbsoluteUrl(attributedToUrl)) {
+            throw new Error("Invalid non-URL value for attributedTo.url: "+attributedToUrl)
+          }
+          attributedTo.url = attributedToUrl;
+        }
+        if (Object.keys(attributedTo).length === 0) {
+          attributedTo = undefined;
+        }
+
         let note = Object.assign(
           {
             'type': 'Note',
@@ -52,6 +67,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           object: note,
           location,
           cc: [publicCollectionId, inReplyTo].filter(Boolean),
+          attributedTo,
         }
         // submit to outbox
         // #TODO discover outbox URL
@@ -211,6 +227,8 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
               <input name="inReplyTo" type="text" placeholder="replying to another URL? (optional)" value="${safeInReplyToDefault}" class="post-form-stretch"></input>
               <details class="post-form-show-more">
                 <summary class="post-form-stretch">More</summary>
+                <input name="attributedTo.name" type="text" placeholder="What's your name? (optional)" class="post-form-stretch"></input>
+                <input name="attributedTo.url" type="text" placeholder="What's your URL? (optional)" class="post-form-stretch"></input>
                 <input name="attachment" type="text" placeholder="Attachment URL (optional)" class="post-form-stretch" value="${safeAttachmentUrl}"></input>
                 <div class="post-form-geolocation-input-group">
                   <input name="location.name" type="text" placeholder="Where are you?" class="post-form-stretch" />
