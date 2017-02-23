@@ -9,6 +9,7 @@ const { isProbablyAbsoluteUrl } = require('../util')
 const { sanitize } = require('./sanitize')
 const { sendRequest } = require('../util')
 const url = require('url')
+const { createHttpOrHttpsRequest } = require('../util')
 
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 
@@ -16,7 +17,7 @@ const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
   return async function (req, res) {
     const activityUrl = apiUrl + req.url;
-    const activityRes = await sendRequest(http.request(activityUrl))
+    const activityRes = await sendRequest(createHttpOrHttpsRequest(activityUrl))
     if (activityRes.statusCode !== 200) {
       // proxy
       res.writeHead(activityRes.statusCode, activityRes.headers)
@@ -35,7 +36,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
     const ancestors = await fetchReplyAncestors(activity)
 
     async function fetchDescendants(repliesUrl) {
-      const repliesCollectionResponse = await sendRequest(http.get(repliesUrl))
+      const repliesCollectionResponse = await sendRequest(createHttpOrHttpsRequest(repliesUrl))
       if (repliesCollectionResponse.statusCode !== 200) {
         return {
           name: `Failed to fetch replies at ${repliesUrl} (code ${repliesCollectionResponse.statusCode})`
@@ -414,20 +415,9 @@ async function fetchReplyAncestors(activity) {
 
 async function fetchActivity(activityUrl) {
   const parsedUrl = url.parse(activityUrl)
-  let createRequest;
-  switch (parsedUrl.protocol) {
-    case 'https:':
-      createRequest = https.request
-      break
-    case 'http:':
-      createRequest = http.request
-      break
-    default:
-      throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): "+ activityUrl)
-  }
 
   debuglog("req activity "+activityUrl)
-  const activityResponse = await sendRequest(createRequest(Object.assign(parsedUrl, {
+  const activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(parsedUrl, {
     headers: {
       accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
     }
