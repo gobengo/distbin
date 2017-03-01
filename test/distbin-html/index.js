@@ -95,6 +95,42 @@ tests['POST / can create activities with geolocation'] = async function () {
   assert.equal(activity.location.units, formFields['location.units'])
 }
 
+tests['POST / can create activities with .attributedTo'] = async function () {
+  const dbUrl = await listen(http.createServer(distbin()))
+  const dh = distbinHtml.createHandler({
+    apiUrl: dbUrl,
+    externalUrl: 'badurl'
+  })
+  const dhUrl = await listen(http.createServer(dh))
+  const formFields = {
+    content: 'lorem ipsum',
+    'attributedTo.name': 'Ben',
+    'attributedTo.url': 'http://bengo.is',
+  };
+  const activity = await postDistbinHtmlActivityForm(dbUrl, dhUrl, formFields)
+  assert.equal(typeof activity.attributedTo, 'object')
+  assert.equal(activity.attributedTo.name, formFields['attributedTo.name'])
+  assert.equal(activity.attributedTo.url, formFields['attributedTo.url'])
+}
+
+tests['POST / can create activities with .tag'] = async function () {
+  const dbUrl = await listen(http.createServer(distbin()))
+  const dh = distbinHtml.createHandler({
+    apiUrl: dbUrl,
+    externalUrl: 'badurl'
+  })
+  const dhUrl = await listen(http.createServer(dh))
+  const formFields = {
+    content: 'lorem ipsum',
+    'tag_csv': 'tag1,tag2',
+  };
+  const activity = await postDistbinHtmlActivityForm(dbUrl, dhUrl, formFields)
+  assert.equal(Array.isArray(activity.object.tag), true)
+  const tagNames = activity.object.tag.map(t => t.name)
+  assert.equal(tagNames.includes('tag1'), true, 'tag includes tag1')
+  assert.equal(tagNames.includes('tag2'), true, 'tag includes tag2')
+}
+
 async function postDistbinHtmlActivityForm(distbinUrl, distbinHtmlUrl, activityFormFields) {
   const postFormRequest = http.request(Object.assign(url.parse(distbinHtmlUrl), {
     method: 'POST',
