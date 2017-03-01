@@ -7,10 +7,12 @@
     "test": "test"
   },
   "dependencies": {
+    "accepts": "^1.3.3",
     "dompurify": "^0.8.4",
     "jsdom": "^9.9.1",
     "jsonld": "^0.4.11",
     "jsonld-rdfa-parser": "^1.5.1",
+    "node-fetch": "^1.6.3",
     "node-uuid": "^1.4.7",
     "parse-link-header": "^0.4.1"
   },

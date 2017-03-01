@@ -1,6 +1,7 @@
 // Run tests if this file is executed
 if (require.main === module) {
   Promise.all([
+    require('./ldn'),
     require('./activitypub'),
     require('./distbin'),
     require('./filemap'),

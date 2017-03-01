@@ -14,13 +14,16 @@ const url = require('url')
 const uuid = require('node-uuid')
 const querystring = require('querystring')
 const assert = require('assert')
+const accepts = require('accepts')
 
 // given a non-uri activity id, return an activity URI
 const activityUri = (uuid) => `urn:uuid:${uuid}`
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
-module.exports = function distbin({
+exports = module.exports = distbin
+exports.distbin = distbin
+function distbin({
   // Juse use Map as default, but users should provide more bette data structures
   // #TODO: This should be size-bound e.g. LRU
   // #TODO: This should be persistent :P
@@ -243,19 +246,39 @@ function recentHandler ({ activities }) {
 function inboxHandler ({ activities, inbox }) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
+      case 'options':
+        res.writeHead(200, {
+          'Accept-Post': [
+            'application/activity+json', 'application/json', 'application/ld+json',
+            'application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
+          ].join(', ')
+        })
+        res.end()
+        return;
       case 'get':
         const maxMemberCount = requestMaxMemberCount(req) || 10
-        res.writeHead(200, {
-          'content-type': 'application/json'
-        })
-        res.end(JSON.stringify({
+        const items = [...(await Promise.resolve(inbox.values()))].reverse().slice(-1 * maxMemberCount)
+        const inboxCollection = {
           '@context': 'https://www.w3.org/ns/activitystreams',
-          type: 'OrderedCollection',
-          items: [...(await Promise.resolve(inbox.values()))].reverse().slice(-1 * maxMemberCount),
+          type: ['OrderedCollection', 'ldp:Container'],
+          items,
           totalItems: await inbox.size,
           // empty string is relative URL for 'self'
-          current: ''
-        }, null, 2))
+          current: '',
+          'ldp:contains': items.map(i => i.id).filter(Boolean)
+        };
+        const accept = accepts(req)
+        const serverPreferences = [
+          'application/ld+json; profile="https://www.w3.org/ns/activitystreams"',
+          'json',
+          'application/ld+json',
+          'application/activity+json',
+        ]
+        const contentType = accept.type(serverPreferences) || serverPreferences[0]
+        res.writeHead(200, {
+          'content-type': contentType
+        })
+        res.end(JSON.stringify(inboxCollection, null, 2))
         break
       case 'post':
         debuglog('receiving inbox POST')

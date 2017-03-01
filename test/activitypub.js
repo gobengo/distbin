@@ -59,12 +59,6 @@ tests['The outbox must be an OrderedCollection'] = async function () {
   }))
   assert.equal(res.statusCode, 200)
   const resBody = await readableToString(res)
-  const isOrderedCollection = (something) => {
-    const obj = typeof something === 'string' ? JSON.parse(something) : something
-    // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
-    assert.equal(obj.type, 'OrderedCollection')
-    return true
-  }
   assert(isOrderedCollection(resBody))
 }
 
@@ -136,15 +130,18 @@ tests['The inbox must be an OrderedCollection'] = async function () {
   }))
   assert.equal(res.statusCode, 200)
   const resBody = await readableToString(res)
-  const isOrderedCollection = (something) => {
-    const obj = typeof something === 'string' ? JSON.parse(something) : something
-    // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
-    assert.equal(obj.type, 'OrderedCollection')
-    return true
-  }
   assert(isOrderedCollection(resBody))
 }
 
+
+function isOrderedCollection (something) {
+  const obj = typeof something === 'string' ? JSON.parse(something) : something
+  // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
+  let type = obj.type;
+  if ( ! Array.isArray(type)) type = [type]
+  assert(type.includes('OrderedCollection'))
+  return true
+}
 /*
 
 The inbox stream contains all objects received by the user.
