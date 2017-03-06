@@ -5,10 +5,8 @@ const { distbin } = require('../src')
 const http = require('http')
 const fs = require('fs')
 const uuid = require('uuid')
-const jsonld = require('jsonld')
+const { jsonld } = require('../src/util')
 const url = require('url')
-
-jsonld.documentLoader = createCustomDocumentLoader()
 
 let tests = module.exports
 
@@ -25,10 +23,11 @@ tests['can OPTIONS inbox'] = async () => {
 
 tests['can GET inbox'] = async () => {
   const distbinUrl = await listen(http.createServer(distbin()))
+  const notification = createNotification()
   // post first
   await fetch(`${distbinUrl}/activitypub/inbox`, {
     method: 'POST',
-    body: JSON.stringify(createNotification(), null, 2)
+    body: JSON.stringify(notification, null, 2)
   })
   // get
   const res = await fetch(`${distbinUrl}/activitypub/inbox`, {
@@ -50,11 +49,12 @@ tests['can GET inbox'] = async () => {
       }
     ]
   }
-  const compacted = await jsonld.promises.compact(inbox, compaction)
+  const compacted = await jsonld.compact(inbox, compaction)
   const contains = compacted['ldp:contains']
   assert(Array.isArray(contains))
   const containsIds = contains.map(a => a.id).filter(Boolean)
   assert.equal(containsIds.length, 1)
+  assert.equal(containsIds[0], notification.id)
   const type = compacted.type
   assert((Array.isArray(type) ? type : [type]).includes('ldp:Container'))
 }
@@ -89,7 +89,6 @@ tests['can POST notifications to inbox'] = async () => {
 tests['fails gracefully on unexpected data in POST notifications to inbox'] = async () => {
   const distbinUrl = await listen(http.createServer(distbin()))
   const notification = {
-    "@context": "http://schema.org/",
     "@id": "http://example.net/note#foo",
     "citation": { "@id": "http://example.org/article#results" }
   }
@@ -101,6 +100,55 @@ tests['fails gracefully on unexpected data in POST notifications to inbox'] = as
   let body = await res.text()
   assert([201, 202].includes(res.status), 'status is either 200 or 201')
 }
+
+tests['Inbox handles notifications with ambiguous @id URIs by ignoring the id'] = async () => {
+  const distbinUrl = await listen(http.createServer(distbin()))
+  const notification = {
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "@id": "./foo",
+  }
+  // post
+  const inboxUrl = `${distbinUrl}/activitypub/inbox`
+  const res = await fetch(inboxUrl, {
+    method: 'POST',
+    body: JSON.stringify(notification, null, 2),
+    headers: {
+      'content-type': 'application/ld+json'
+    }
+  })
+  const location = url.resolve(inboxUrl, res.headers.get('location'))
+  const notificationRes = await fetch(location, { headers: { accept: 'application/ld+json' }})
+  const fetchedNotification = await notificationRes.json()
+  assert(fetchedNotification.id.startsWith('urn:uuid'), 'notification got a urn:uuid id')
+  assert( ! ('@id' in fetchedNotification), 'fetchedNotification does not have a @id')
+  // TODO: but it should work if @base is specified
+}
+
+// tests['Inbox handles notifications relative @id and @base'] = async () => {
+//   const distbinUrl = await listen(http.createServer(distbin()))
+//   const notification = {
+//     "@context": [{
+//       "@base": "http://bengo.is/",
+//     }, "https://www.w3.org/ns/activitystreams"],
+//     "@id": "i",
+//   }
+//   // post
+//   const inboxUrl = `${distbinUrl}/activitypub/inbox`
+//   const res = await fetch(inboxUrl, {
+//     method: 'POST',
+//     body: JSON.stringify(notification, null, 2),
+//     headers: {
+//       'content-type': 'application/ld+json'
+//     }
+//   })
+//   const location = url.resolve(inboxUrl, res.headers.get('location'))
+//   const notificationRes = await fetch(location, { headers: { accept: 'application/ld+json' }})
+//   const fetchedNotification = await notificationRes.json()
+//   assert.equal(fetchedNotification.id, 'http://bengo.is/i')
+//   assert( ! ('@id' in fetchedNotification), 'fetchedNotification does not have a @id')
+// }
+
+
 
 function createNotification() {
   return {
@@ -124,36 +172,3 @@ if (require.main === module) {
     .catch(() => process.exit(1))
 }
 
-function createCustomDocumentLoader() {
-  // define a mapping of context URL => context doc
-  var CONTEXTS = {
-    "https://www.w3.org/ns/activitystreams": fs.readFileSync(__dirname + '/as2context.json', 'utf8')
-  }
-
-  // grab the built-in node.js doc loader
-  var nodeDocumentLoader = jsonld.documentLoaders.node();
-  // or grab the XHR one: jsonld.documentLoaders.xhr()
-  // or grab the jquery one: jsonld.documentLoaders.jquery()
-
-  // change the default document loader using the callback API
-  // (you can also do this using the promise-based API, return a promise instead
-  // of using a callback)
-  var customLoader = function(url, callback) {
-    if(url in CONTEXTS) {
-      return callback(
-        null, {
-          contextUrl: null, // this is for a context via a link header
-          document: CONTEXTS[url], // this is the actual document that was loaded
-          documentUrl: url // this is the actual context URL after redirects
-        });
-    }
-    // call the underlining documentLoader using the callback API.
-    nodeDocumentLoader(url, callback);
-    /* Note: By default, the node.js document loader uses a callback, but
-    browser-based document loaders (xhr or jquery) return promises if they
-    are supported (or polyfilled) in the browser. This behavior can be
-    controlled with the 'usePromise' option when constructing the document
-    loader. For example: jsonld.documentLoaders.xhr({usePromise: false}); */
-  };
-  return customLoader
-}

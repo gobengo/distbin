@@ -5,9 +5,11 @@ const {
  } = require('./activitypub')
 const {
   debuglog,
+  isProbablyAbsoluteUrl,
   readableToString,
   route,
   requestMaxMemberCount,
+  jsonld
 } = require('./util')
 const path = require('path')
 const url = require('url')
@@ -259,6 +261,7 @@ function inboxHandler ({ activities, inbox }) {
         const idQuery = url.parse(req.url, true).query.id;
         let responseBody
         if (idQuery) {
+          // trying to just get one notification
           const itemWithId = await inbox.get(idQuery)
           if ( ! itemWithId) {
             res.writeHead(404)
@@ -267,6 +270,7 @@ function inboxHandler ({ activities, inbox }) {
           }
           responseBody = itemWithId
         } else {
+          // getting a bunch of notifications
           const maxMemberCount = requestMaxMemberCount(req) || 10
           const items = [...(await Promise.resolve(inbox.values()))].reverse().slice(-1 * maxMemberCount)
           const inboxCollection = {
@@ -313,7 +317,9 @@ function inboxHandler ({ activities, inbox }) {
           return
         }
 
-        if (!parsed.id) {
+        const compacted = await jsonld.compact(parsed, {})
+        if ( ! compacted['@id']) {
+          delete parsed['@id'] // just in case
           parsed.id = activityUri(uuid())
         }
 

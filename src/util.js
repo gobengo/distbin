@@ -4,6 +4,7 @@ jsonld.registerRDFParser('text/html', jsonldRdfaParser);
 const url = require('url')
 const http = require('http')
 const https = require('https')
+const fs = require('fs')
 
 exports.debuglog = require('util').debuglog('distbin')
 
@@ -134,4 +135,43 @@ function linkToHref(hrefOrLinkObj) {
   if (typeof hrefOrLinkObj === 'string') return hrefOrLinkObj;
   if (typeof hrefOrLinkObj === 'object') return hrefOrLinkObj.href;
   throw new Error("Unexpected link type: " + typeof hrefOrLinkObj)
+}
+
+jsonld.documentLoader = createCustomDocumentLoader()
+
+exports.jsonld = jsonld.promises
+
+
+function createCustomDocumentLoader() {
+  // define a mapping of context URL => context doc
+  var CONTEXTS = {
+    "https://www.w3.org/ns/activitystreams": fs.readFileSync(__dirname + '/as2context.json', 'utf8')
+  }
+
+  // grab the built-in node.js doc loader
+  var nodeDocumentLoader = jsonld.documentLoaders.node();
+  // or grab the XHR one: jsonld.documentLoaders.xhr()
+  // or grab the jquery one: jsonld.documentLoaders.jquery()
+
+  // change the default document loader using the callback API
+  // (you can also do this using the promise-based API, return a promise instead
+  // of using a callback)
+  var customLoader = function(url, callback) {
+    if(url in CONTEXTS) {
+      return callback(
+        null, {
+          contextUrl: null, // this is for a context via a link header
+          document: CONTEXTS[url], // this is the actual document that was loaded
+          documentUrl: url // this is the actual context URL after redirects
+        });
+    }
+    // call the underlining documentLoader using the callback API.
+    nodeDocumentLoader(url, callback);
+    /* Note: By default, the node.js document loader uses a callback, but
+    browser-based document loaders (xhr or jquery) return promises if they
+    are supported (or polyfilled) in the browser. This behavior can be
+    controlled with the 'usePromise' option when constructing the document
+    loader. For example: jsonld.documentLoaders.xhr({usePromise: false}); */
+  };
+  return customLoader
 }
