@@ -256,17 +256,30 @@ function inboxHandler ({ activities, inbox }) {
         res.end()
         return;
       case 'get':
-        const maxMemberCount = requestMaxMemberCount(req) || 10
-        const items = [...(await Promise.resolve(inbox.values()))].reverse().slice(-1 * maxMemberCount)
-        const inboxCollection = {
-          '@context': 'https://www.w3.org/ns/activitystreams',
-          type: ['OrderedCollection', 'ldp:Container'],
-          items,
-          totalItems: await inbox.size,
-          // empty string is relative URL for 'self'
-          current: '',
-          'ldp:contains': items.map(i => ({ id: i.id })).filter(Boolean)
-        };
+        const idQuery = url.parse(req.url, true).query.id;
+        let responseBody
+        if (idQuery) {
+          const itemWithId = await inbox.get(idQuery)
+          if ( ! itemWithId) {
+            res.writeHead(404)
+            res.end()
+            return
+          }
+          responseBody = itemWithId
+        } else {
+          const maxMemberCount = requestMaxMemberCount(req) || 10
+          const items = [...(await Promise.resolve(inbox.values()))].reverse().slice(-1 * maxMemberCount)
+          const inboxCollection = {
+            '@context': 'https://www.w3.org/ns/activitystreams',
+            type: ['OrderedCollection', 'ldp:Container'],
+            items,
+            totalItems: await inbox.size,
+            // empty string is relative URL for 'self'
+            current: '',
+            'ldp:contains': items.map(i => ({ id: i.id })).filter(Boolean)
+          };
+          responseBody = inboxCollection
+        }
         const accept = accepts(req)
         const serverPreferences = [
           'application/ld+json; profile="https://www.w3.org/ns/activitystreams"',
@@ -278,7 +291,7 @@ function inboxHandler ({ activities, inbox }) {
         res.writeHead(200, {
           'content-type': contentType
         })
-        res.end(JSON.stringify(inboxCollection, null, 2))
+        res.end(JSON.stringify(responseBody, null, 2))
         break
       case 'post':
         debuglog('receiving inbox POST')
@@ -318,7 +331,9 @@ function inboxHandler ({ activities, inbox }) {
           existsAlreadyInActivities ? null : activities.set(parsed.id, parsed),
         ])
 
-        res.writeHead(202)
+        res.writeHead(201, {
+          location: `?id=${parsed.id}`
+        })
         res.end()
         break
       default:

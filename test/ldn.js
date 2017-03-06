@@ -6,6 +6,7 @@ const http = require('http')
 const fs = require('fs')
 const uuid = require('uuid')
 const jsonld = require('jsonld')
+const url = require('url')
 
 jsonld.documentLoader = createCustomDocumentLoader()
 
@@ -60,24 +61,29 @@ tests['can GET inbox'] = async () => {
 
 tests['can POST notifications to inbox'] = async () => {
   const distbinUrl = await listen(http.createServer(distbin()))
-  const notification = {
-    "@context": "https://www.w3.org/ns/activitystreams",
-    "actor": {
-      "name": "Ben"
-    },
-    "type": "Create",
-    "object": {
-      "type": "Note",
-      "content": "<p>Hello, world!</p>"
-    }
-  }
+  const notification = createNotification()
   // post
-  const res = await fetch(`${distbinUrl}/activitypub/inbox`, {
+  const inboxUrl = `${distbinUrl}/activitypub/inbox`;
+  const res = await fetch(inboxUrl, {
     method: 'POST',
     body: JSON.stringify(notification, null, 2)
   })
   let body = await res.text()
   assert([201, 202].includes(res.status), 'status is either 200 or 201')
+  // response has a Location header
+  const location = res.headers.get('location')
+  assert(location, 'POST notification responds with a Location header')
+  const resolvedLocation = url.resolve(inboxUrl, location)
+  // can GET that location
+  const notificationRes = await fetch(resolvedLocation, {
+    headers: {
+      accept: 'application/ld+json'
+    }
+  })
+  assert.equal(notificationRes.status, 200, 'can GET inbox notification URI')
+  assert.equal(notificationRes.headers.get('content-type').split(';')[0], 'application/ld+json', 'notification GET responds with ld+json content-type')
+  const gotNotification = await notificationRes.json()
+  assert.equal(gotNotification.id, notification.id)
 }
 
 tests['fails gracefully on unexpected data in POST notifications to inbox'] = async () => {
