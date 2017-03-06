@@ -497,12 +497,9 @@ async function fetchActivity(activityUrl) {
   })))
   debuglog(`res activity ${activityResponse.statusCode} ${activityUrl}`)
 
-  let redirectsLeft = 3;
-  while ((activityResponse.statusCode !== 200) && redirectsLeft > 0) {
+  let redirectsLeft = 3
+  followRedirects: while (redirectsLeft > 0) {
     switch (activityResponse.statusCode) {
-      case 200:
-        //cool
-        break
       case 301:
       case 302:
         let activityUrlOrRedirect = url.resolve(activityUrl, activityResponse.headers.location);
@@ -512,14 +509,18 @@ async function fetchActivity(activityUrl) {
           }
         })))
         redirectsLeft--;
-        break;
+        continue followRedirects;
       case 406:
         // unacceptable. Server doesn't speak a content-type I know.
         return {
           url: activityUrl
         }
+      case 200:
+        //cool
+        break followRedirects;
       default:
         console.warn('unexpected fetchActivity statusCode', activityResponse.statusCode, activityUrl)
+        break followRedirects;
     }
   }
 
