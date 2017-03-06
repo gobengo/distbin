@@ -265,7 +265,7 @@ function inboxHandler ({ activities, inbox }) {
           totalItems: await inbox.size,
           // empty string is relative URL for 'self'
           current: '',
-          'ldp:contains': items.map(i => i.id).filter(Boolean)
+          'ldp:contains': items.map(i => ({ id: i.id })).filter(Boolean)
         };
         const accept = accepts(req)
         const serverPreferences = [

@@ -4,7 +4,9 @@ const { listen } = require('./util')
 const { distbin } = require('../src')
 const http = require('http')
 const fs = require('fs')
+const uuid = require('uuid')
 const jsonld = require('jsonld')
+
 jsonld.documentLoader = createCustomDocumentLoader()
 
 let tests = module.exports
@@ -49,7 +51,9 @@ tests['can GET inbox'] = async () => {
   }
   const compacted = await jsonld.promises.compact(inbox, compaction)
   const contains = compacted['ldp:contains']
-  assert.equal(contains.length, 1)
+  assert(Array.isArray(contains))
+  const containsIds = contains.map(a => a.id).filter(Boolean)
+  assert.equal(containsIds.length, 1)
   const type = compacted.type
   assert((Array.isArray(type) ? type : [type]).includes('ldp:Container'))
 }
@@ -95,6 +99,7 @@ tests['fails gracefully on unexpected data in POST notifications to inbox'] = as
 function createNotification() {
   return {
     "@context": "https://www.w3.org/ns/activitystreams",
+    "id": `urn:uuid:${uuid()}`,
     "actor": {
       "name": "Ben"
     },
