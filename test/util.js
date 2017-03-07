@@ -39,11 +39,7 @@ async function listen (server, port = 0, ...args) {
   })
 }
 
-exports.isProbablyAbsoluteUrl = isProbablyAbsoluteUrl
-function isProbablyAbsoluteUrl(url) {
-  const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i');
-  return absoluteUrlPattern.test(url)
-}
+exports.isProbablyAbsoluteUrl = require('../src/util').isProbablyAbsoluteUrl
 
 exports.postActivity = postActivity
 // post an activity to a distbin, and return its absolute url

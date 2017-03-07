@@ -6,6 +6,7 @@ const http = require('http')
 const fs = require('fs')
 const uuid = require('uuid')
 const { jsonld } = require('../src/util')
+const { isProbablyAbsoluteUrl } = require('../src/util')
 const url = require('url')
 
 let tests = module.exports
@@ -52,16 +53,15 @@ tests['can GET inbox'] = async () => {
   const compacted = await jsonld.compact(inbox, compaction)
   const contains = compacted['ldp:contains']
   assert(Array.isArray(contains))
-  const containsIds = contains.map(a => a.id).filter(Boolean)
-  assert.equal(containsIds.length, 1)
-  assert.equal(containsIds[0], notification.id)
+  assert.equal(contains.length, 1)
   const type = compacted.type
   assert((Array.isArray(type) ? type : [type]).includes('ldp:Container'))
 }
 
 tests['can POST notifications to inbox'] = async () => {
   const distbinUrl = await listen(http.createServer(distbin()))
-  const notification = createNotification()
+  const notificationId = String(Math.random()).slice(2)
+  const notification = createNotification({ id: notificationId })
   // post
   const inboxUrl = `${distbinUrl}/activitypub/inbox`;
   const res = await fetch(inboxUrl, {
@@ -83,13 +83,21 @@ tests['can POST notifications to inbox'] = async () => {
   assert.equal(notificationRes.status, 200, 'can GET inbox notification URI')
   assert.equal(notificationRes.headers.get('content-type').split(';')[0], 'application/ld+json', 'notification GET responds with ld+json content-type')
   const gotNotification = await notificationRes.json()
-  assert.equal(gotNotification.id, notification.id)
+  // new id is provisioned
+  assert.notEqual(gotNotification.id, notification.id)
+  // notifications once fetched are derivedFrom the thing that was sent
+  const compaction = { "@context": [
+    { "prov": "http://www.w3.org/ns/prov#wasDerivedFrom" },
+    "http://www.w3.org/ns/activitystreams"
+  ]}
+  const compactedForDerivedFrom = await jsonld.compact(gotNotification, compaction)
+  const wasDerivedFrom = compactedForDerivedFrom['http://www.w3.org/ns/prov#wasDerivedFrom'];
+  assert.equal(wasDerivedFrom.id, notificationId)
 }
 
 tests['fails gracefully on unexpected data in POST notifications to inbox'] = async () => {
   const distbinUrl = await listen(http.createServer(distbin()))
   const notification = {
-    "@id": "http://example.net/note#foo",
     "citation": { "@id": "http://example.org/article#results" }
   }
   // post
@@ -119,7 +127,7 @@ tests['Inbox handles notifications with ambiguous @id URIs by ignoring the id'] 
   const location = url.resolve(inboxUrl, res.headers.get('location'))
   const notificationRes = await fetch(location, { headers: { accept: 'application/ld+json' }})
   const fetchedNotification = await notificationRes.json()
-  assert(fetchedNotification.id.startsWith('urn:uuid'), 'notification got a urn:uuid id')
+  assert.notEqual(fetchedNotification.id, notification['@id'], 'notification got an unambiguous id provisioned')
   assert( ! ('@id' in fetchedNotification), 'fetchedNotification does not have a @id')
   // TODO: but it should work if @base is specified
 }
@@ -150,8 +158,8 @@ tests['Inbox handles notifications with ambiguous @id URIs by ignoring the id'] 
 
 
 
-function createNotification() {
-  return {
+function createNotification(props={}) {
+  return Object.assign({
     "@context": "https://www.w3.org/ns/activitystreams",
     "id": `urn:uuid:${uuid()}`,
     "actor": {
@@ -162,7 +170,7 @@ function createNotification() {
       "type": "Note",
       "content": "<p>Hello, world!</p>"
     }
-  }
+  }, props)
 }
 
 

@@ -19,7 +19,7 @@ const assert = require('assert')
 const accepts = require('accepts')
 
 // given a non-uri activity id, return an activity URI
-const activityUri = (uuid) => `urn:uuid:${uuid}`
+const uuidUri = (uuid) => `urn:uuid:${uuid}`
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
@@ -39,7 +39,7 @@ function distbin({
     const routes = new Map([
       ['/', () => index],
       ['/recent', () => recentHandler({ activities })],
-      ['/activitypub/inbox', () => inboxHandler({ activities, inbox })],
+      ['/activitypub/inbox', () => inboxHandler({ activities, inbox, externalUrl })],
       ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl })],
       ['/activitypub/public/page', () => publicCollectionPageHandler({ activities })],
       ['/activitypub/public', () => publicCollectionHandler({ activities })],
@@ -118,7 +118,7 @@ const locallyHostedActivity = function (activity, { externalUrl='' } = {}) {
 // get specific activity by id
 function activityHandler ({ activities, activityUuid }) {
   return async function (req, res) {
-    const uri = activityUri(activityUuid)
+    const uri = uuidUri(activityUuid)
     const activity = await Promise.resolve(activities.get(uri))
     // #TODO: If the activity isn't addressed to the public, we should enforce access controls here.
     if (!activity) {
@@ -164,7 +164,7 @@ function activityWithExtensionHandler({ activities, activityUuid, format }) {
 
 function activityRepliesHandler ({ activities, activityUuid }) {
   return async function (req, res) {
-    const uri = activityUri(activityUuid)
+    const uri = uuidUri(activityUuid)
     const activity = await Promise.resolve(activities.get(uri))
     // #TODO: If the activity isn't addressed to the public, we should enforce access controls here.
     if (!activity) {
@@ -245,7 +245,7 @@ function recentHandler ({ activities }) {
 
 // route for ActivityPub Inbox
 // https://w3c.github.io/activitypub/#inbox
-function inboxHandler ({ activities, inbox }) {
+function inboxHandler ({ activities, externalUrl, inbox }) {
   return async function (req, res) {
     switch (req.method.toLowerCase()) {
       case 'options':
@@ -317,28 +317,45 @@ function inboxHandler ({ activities, inbox }) {
           return
         }
 
-        const compacted = await jsonld.compact(parsed, {})
-        if ( ! compacted['@id']) {
-          delete parsed['@id'] // just in case
-          parsed.id = activityUri(uuid())
+        let notificationToSave = Object.assign({}, parsed)
+        const compacted = await jsonld.compact(notificationToSave, {})
+        let originalId = compacted['@id']
+        // Move incomding @id to wasDerivedFrom, then provision a new @id
+        if (originalId) {
+          notificationToSave['http://www.w3.org/ns/prov#wasDerivedFrom'] = { id: originalId }
+        } else {
+          // can't understand parsed's id
+          delete parsed['@id']
+          delete parsed['id']
+          parsed.id = originalId = uuidUri(uuid())
         }
+        delete notificationToSave['@id']
+        const notificationUrnUuid = uuidUri(uuid())
+        const notificationUrl = `/activitypub/inbox?id=${encodeURIComponent(notificationUrnUuid)}`
+
+        notificationToSave.id = notificationUrl
+
+        const owlSameAs = 'http://www.w3.org/2002/07/owl#sameAs'
+        notificationToSave[owlSameAs] = { id: notificationUrnUuid }
 
         // If receiving a notification about an activity we've seen before (e.g. it is canonically hosted here),
         // this will be true
-        const existsAlreadyInActivities = parsed.id ? await Promise.resolve(activities.get(parsed.id)) : false
-        if (existsAlreadyInActivities) {
+        const originalAlreadySaved = originalId ? await Promise.resolve(activities.get(originalId)) : false
+        if (originalAlreadySaved) {
           // #TODO merge or something? Consider storing local ones and remote ones in different places
           debuglog('Inbox received activity already stored in activities store. Not overwriting internal one. But #TODO')
         }
 
+        assert(originalId)
+
         await Promise.all([
-          inbox.set(parsed.id, parsed),
+          inbox.set(notificationUrnUuid, notificationToSave),
           // todo: Probably setting on inbox should automagically add to global set of activities
-          existsAlreadyInActivities ? null : activities.set(parsed.id, parsed),
+          originalAlreadySaved ? null : activities.set(originalId, parsed),
         ])
 
         res.writeHead(201, {
-          location: `?id=${parsed.id}`
+          location: notificationUrl
         })
         res.end()
         break
@@ -417,7 +434,7 @@ function outboxHandler ({
 
         const newActivity = Object.assign(submittedActivity, {
           // #TODO: validate that newActivity wasn't submitted with an .id, even though spec says to rewrite it
-          id: activityUri(newuuid),
+          id: uuidUri(newuuid),
           // #TODO: what if it already had published?
           published: (new Date()).toISOString()
         })
