@@ -272,7 +272,7 @@ function inboxHandler ({ activities, externalUrl, inbox }) {
         } else {
           // getting a bunch of notifications
           const maxMemberCount = requestMaxMemberCount(req) || 10
-          const items = [...(await Promise.resolve(inbox.values()))].reverse().slice(-1 * maxMemberCount)
+          const items = [...(await Promise.resolve(inbox.values()))].slice(-1 * maxMemberCount).reverse()
           const inboxCollection = {
             '@context': 'https://www.w3.org/ns/activitystreams',
             type: ['OrderedCollection', 'ldp:Container'],
