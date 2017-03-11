@@ -51,6 +51,8 @@ tests['can GET inbox'] = async () => {
     ]
   }
   const compacted = await jsonld.compact(inbox, compaction)
+  // inbox needs @id to pass https://linkedresearch.org/ldn/tests/receiver
+  assert(compacted.id, 'inbox has an @id')
   const contains = compacted['ldp:contains']
   assert(Array.isArray(contains))
   assert.equal(contains.length, 1)

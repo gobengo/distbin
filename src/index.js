@@ -275,6 +275,7 @@ function inboxHandler ({ activities, externalUrl, inbox }) {
           const items = [...(await Promise.resolve(inbox.values()))].slice(-1 * maxMemberCount).reverse()
           const inboxCollection = {
             '@context': 'https://www.w3.org/ns/activitystreams',
+            '@id': '/activitypub/inbox',
             type: ['OrderedCollection', 'ldp:Container'],
             items,
             totalItems: await inbox.size,
