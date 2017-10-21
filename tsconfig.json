@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "types": ["node"],
+    "allowJs": true,
+    "outDir": "dist.ts",
+    "module": "es6",
+    "target": "es6",
+    "pretty": true
+  },
+  "include": [
+    "src/**/*",
+    "bin/**/*",
+    "test/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist.ts"
+  ]
+}

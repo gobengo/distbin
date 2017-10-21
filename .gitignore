@@ -1,3 +1,4 @@
 bengo-notes
 /node_modules
 TODO
+/dist.ts

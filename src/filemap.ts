@@ -1,5 +1,5 @@
-const fs = require('fs')
-const path = require('path')
+import * as fs from 'fs'
+import * as path from 'path'
 const { denodeify } = require('./util')
 
 // A Map that reads/writes keys from files in a directory
@@ -39,10 +39,11 @@ exports.JSONFileMap = class JSONFileMap extends Map {
     return JSON.parse(fileContents)
   }
   ['delete'] (key) {
-    throw new Error('TODO implement JSONFileMap#delete')
+    fs.unlinkSync(path.join(this[FileMapPrivates.dir], key))
+    return true
   }
   [Symbol.iterator] () {
-    return this.keys()[Symbol.iterator]()
+    return this.entries()[Symbol.iterator]()
   }
   keys () {
     const dir = this[FileMapPrivates.dir]
@@ -64,22 +65,72 @@ exports.JSONFileMap = class JSONFileMap extends Map {
         return timeDelta
       })
       .map(({ name }) => name)
-    return sortedAscByCreation
+    return sortedAscByCreation[Symbol.iterator]()
   }
   values () {
-    return Array.from(this.keys()).map(file => this.get(file))
+    return Array.from(this.keys()).map(file => this.get(file))[Symbol.iterator]()
   }
-  entries () {
-    return Array.from(this.keys()).map(file => [file, this.get(file)])
+  entries (): IterableIterator<[any, any]> {
+    return Array.from(this.keys()).map(file => [file, this.get(file)] as [string, any])[Symbol.iterator]()
   }
   get size () {
     return Array.from(this.keys()).length
   }
 }
 
+interface IAsyncMap<K, V> {
+    clear(): Promise<void>;
+    delete(key: K): Promise<boolean>;
+    forEach(callbackfn: (value: V, index: K, map: Map<K, V>) => void, thisArg?: any): void;
+    get(key: K): Promise<V>;
+    has(key: K): Promise<boolean>;
+    set(key: K, value?: V): Promise<Map<K, V>>;
+    // @TODO (ben) these should really be like Iterator<Promise>
+    entries(): Promise<Iterator<[K, V]>>;
+    keys(): Promise<Iterator<K>>;
+    values(): Promise<Iterator<V>>;
+    size: Promise<number>;
+}
+
+// Like a Map, but all methods return a Promise
+class AsyncMap implements IAsyncMap<any,any> {
+  async clear() {
+    return Map.prototype.clear.call(this)
+  }
+  async delete(key) {
+    return Map.prototype.delete.call(this, key)
+  }
+  forEach(...args) {
+    return Map.prototype.forEach.call(this, ...args)
+  }
+  async get(key) {
+    return Map.prototype.get.call(this, key)
+  }
+  async has(key) {
+    return Map.prototype.has.call(this, key)
+  }
+  async set(key, value) {
+    return Map.prototype.set.call(this, key, value)
+  }
+  async entries() {
+    return Map.prototype.entries.call(this)
+  }
+  async keys() {
+    return Map.prototype.keys.call(this)
+  }
+  async values() {
+    return Map.prototype.values.call(this)
+  }
+  get size() {
+    return (async () => {
+      return Promise.resolve(Array.from(await this.keys()).length)
+    })()
+  }
+}
+
 // Like JSONFileMap, but all methods return Promises of their values
 // and i/o is done async
-exports.JSONFileMapAsync = class JSONFileMapAsync extends Map {
+exports.JSONFileMapAsync = class JSONFileMapAsync extends AsyncMap implements IAsyncMap<string, any> {
   constructor (dir) {
     super()
     this[FileMapPrivates.dir] = dir
@@ -103,14 +154,15 @@ exports.JSONFileMapAsync = class JSONFileMapAsync extends Map {
       }
     }
   }
-  ['delete'] (key) {
-    throw new Error('TODO implement JSONFileMap#delete')
+  async ['delete'] (key) {
+    fs.unlinkSync(path.join(this[FileMapPrivates.dir], key))
+    return true
   }
   [Symbol.iterator] () {
     return this.keys()[Symbol.iterator]()
   }
   // todo make async
-  keys () {
+  async keys () {
     const dir = this[FileMapPrivates.dir]
     const files = fs.readdirSync(dir)
     const sortedAscByCreation = files
@@ -130,20 +182,22 @@ exports.JSONFileMapAsync = class JSONFileMapAsync extends Map {
         return timeDelta
       })
       .map(({ name }) => name)
-    return sortedAscByCreation
+    return sortedAscByCreation[Symbol.iterator]()
   }
   async values () {
     const files = await this.keys()
-    const values = await Promise.all(files.map(file => this.get(file)))
-    return values
+    const values = await Promise.all(Array.from(files).map(file => this.get(file)))
+    return values[Symbol.iterator]()
   }
   async entries () {
     const files = await this.keys()
-    return Promise.all(files.map(async function (file) {
-      return [file, await this.get(file)]
-    }.bind(this)))
+    const entries = await Promise.all(Array.from(files).map(async (key) => {
+      return [key, await this.get(key)] as [string, any]
+    }))
+    const entriesIterator = entries[Symbol.iterator]()
+    return entriesIterator
   }
   get size () {
-    return Promise.resolve(this.keys()).then(files => files.length)
+    return Promise.resolve(this.keys()).then(files => Array.from(files).length)
   }
 }
