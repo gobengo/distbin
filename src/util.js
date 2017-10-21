@@ -125,6 +125,7 @@ function createHttpOrHttpsRequest (urlOrObj) {
       createRequest = http.request.bind(http)
       break
     default:
+      const activityUrl = url.format(parsedUrl)
       throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): "+ activityUrl)
   }
   return createRequest(urlOrObj)
