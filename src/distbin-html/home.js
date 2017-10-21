@@ -3,9 +3,7 @@ const { publicCollectionId } = require('../activitypub')
 const querystring = require('querystring')
 const url = require('url')
 const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
-const { everyPageHead } = require('./partials')
 const { distbinBodyTemplate } = require('./partials')
-const { aboveFold } = require('./partials')
 const { requestUrl } = require('../util')
 const { isProbablyAbsoluteUrl } = require('../util')
 const { createHttpOrHttpsRequest } = require('../util')
@@ -18,41 +16,41 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
         const submission = await readableToString(req)
         // assuming application/x-www-form-urlencoded
         const formFields = querystring.parse(submission)
-        const { content, inReplyTo, attachment } = formFields;
-        if (attachment && ! isProbablyAbsoluteUrl(attachment)) {
-          throw new Error("attachment must be a URL, but got "+attachment)
+        const { content, inReplyTo, attachment } = formFields
+        if (attachment && !isProbablyAbsoluteUrl(attachment)) {
+          throw new Error('attachment must be a URL, but got ' + attachment)
         }
         const attachmentLink = await getAttachmentLinkForUrl(attachment)
 
-        let location;
+        let location
         try {
           location = parseLocationFormFields(formFields)
         } catch (error) {
           console.error(error)
-          throw new Error("Error parsing location form fields")
+          throw new Error('Error parsing location form fields')
         }
 
-        let attributedTo = {};
+        let attributedTo = {}
         if (formFields['attributedTo.name']) {
           attributedTo.name = formFields['attributedTo.name']
         }
         const attributedToUrl = formFields['attributedTo.url']
         if (attributedToUrl) {
-          if ( ! isProbablyAbsoluteUrl(attributedToUrl)) {
-            throw new Error("Invalid non-URL value for attributedTo.url: "+attributedToUrl)
+          if (!isProbablyAbsoluteUrl(attributedToUrl)) {
+            throw new Error('Invalid non-URL value for attributedTo.url: ' + attributedToUrl)
           }
-          attributedTo.url = attributedToUrl;
+          attributedTo.url = attributedToUrl
         }
         if (Object.keys(attributedTo).length === 0) {
-          attributedTo = undefined;
+          attributedTo = undefined
         }
 
-        let tag;
+        let tag
         if (formFields['tag_csv']) {
           tag = formFields['tag_csv'].split(',').map((n) => {
             return {
               name: n.trim()
-            };
+            }
           })
         }
 
@@ -63,11 +61,11 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
             generator: {
               type: 'Application',
               name: 'distbin-html',
-              url: externalUrl,
+              url: externalUrl
               // @todo add .url of externalUrl
             },
             attachment: attachmentLink ? [attachmentLink] : undefined,
-            tag,
+            tag
           },
           inReplyTo ? { inReplyTo } : {}
         )
@@ -77,7 +75,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           object: note,
           location,
           cc: [publicCollectionId, inReplyTo].filter(Boolean),
-          attributedTo,
+          attributedTo
         }
         // submit to outbox
         // #TODO discover outbox URL
@@ -89,31 +87,30 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           path: '/activitypub/outbox'
         }))
         postToOutboxRequest.write(JSON.stringify(activity))
-        postToOutboxResponse = await sendRequest(postToOutboxRequest)
+        const postToOutboxResponse = await sendRequest(postToOutboxRequest)
         switch (postToOutboxResponse.statusCode) {
           case 201:
             const postedLocation = postToOutboxResponse.headers.location
             // handle form submission by posting to outbox
             res.writeHead(302, { location: postedLocation })
             res.end()
-            return
             break
           case 500:
             res.writeHead(500)
             postToOutboxResponse.pipe(res)
-            break;
+            break
           default:
             throw new Error('unexpected upstream response')
         }
-        break;
+        break
       // GET renders home page will all kinds of stuff
       case 'get':
-        const query = url.parse(req.url, true).query; // todo sanitize
-        const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || '');
-        const safeTitleDefault = encodeHtmlEntities(query.title || '');
-        const safeAttachmentUrl = encodeHtmlEntities(query.attachment || '');
+        const query = url.parse(req.url, true).query // todo sanitize
+        const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || '')
+        const safeTitleDefault = encodeHtmlEntities(query.title || '')
+        const safeAttachmentUrl = encodeHtmlEntities(query.attachment || '')
         res.writeHead(200, {
-          'content-type': 'text/html',
+          'content-type': 'text/html'
         })
         res.write(distbinBodyTemplate(`
           ${(`
@@ -285,19 +282,18 @@ EOF`)}
           </details>
         `))
         res.end()
-        return
     }
   }
 }
 
-function parseLocationFormFields(formFields) {
+function parseLocationFormFields (formFields) {
   let location = { type: 'Place' }
   const floatFieldNames = [
     'location.latitude',
     'location.longitude',
     'location.altitude',
     'location.accuracy',
-    'location.radius',
+    'location.radius'
   ]
   if (formFields['location.name']) {
     location.name = formFields['location.name']
@@ -307,32 +303,32 @@ function parseLocationFormFields(formFields) {
   }
   floatFieldNames.forEach(k => {
     let fieldVal = formFields[k]
-    if ( ! fieldVal) return;
-    let propName = k.split('.')[1];
-    location[propName] = parseFloat(fieldVal, 10);
+    if (!fieldVal) return
+    let propName = k.split('.')[1]
+    location[propName] = parseFloat(fieldVal, 10)
   })
   if (Object.keys(location).length === 1) {
     // there were no location formFields
-    return;
+    return
   }
   return location
 }
 
-async function getAttachmentLinkForUrl(attachment) {
+async function getAttachmentLinkForUrl (attachment) {
   let attachmentLink = attachment && {
     type: 'Link',
-    href: attachment,
-  };
+    href: attachment
+  }
   if (attachment && attachmentLink) {
     // try to request the URL to figure out what kind of media type it responds with
     // then we can store a hint to future clients that render it
-    let connectionError;
-    let attachmentResponse;
+    let connectionError
+    let attachmentResponse
     try {
-      attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))            
+      attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))
     } catch (error) {
-      connectionError = error;
-      console.warn("Error prefetching attachment URL "+attachment)
+      connectionError = error
+      console.warn('Error prefetching attachment URL ' + attachment)
       console.error(error)
     }
     if (connectionError) {
@@ -346,7 +342,7 @@ async function getAttachmentLinkForUrl(attachment) {
       if (contentType) {
         attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
           published: new Date().toISOString(),
-          supportedMediaTypes: [contentType],
+          supportedMediaTypes: [contentType]
         }
       }
     } else {

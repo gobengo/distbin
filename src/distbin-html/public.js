@@ -3,7 +3,6 @@ const { sendRequest } = require('../util')
 const { encodeHtmlEntities } = require('../util')
 const { readableToString } = require('../util')
 const { requestMaxMemberCount } = require('../util')
-const http = require('http')
 const { createHttpOrHttpsRequest } = require('../util')
 const url = require('url')
 const querystring = require('querystring')
@@ -12,7 +11,7 @@ const { renderActivity } = require('./an-activity')
 const { createActivityCss } = require('./an-activity')
 
 exports.createHandler = function ({ apiUrl }) {
-  return async function(req, res) {
+  return async function (req, res) {
     res.writeHead(200)
     res.end(distbinBodyTemplate(`
       ${await createPublicBody(req, {
@@ -28,9 +27,9 @@ async function createPublicBody (req, { apiUrl }) {
     throw new Error('max-member-count must be a number')
   }
   let query = url.parse(req.url, true).query
-  let pageUrl = query.page;
+  let pageUrl = query.page
   let pageMediaType = query.pageMediaType || 'application/json'
-  if ( ! pageUrl) {
+  if (!pageUrl) {
     const publicCollectionUrl = apiUrl + '/activitypub/public'
     const publicCollectionRequest = createHttpOrHttpsRequest(Object.assign(url.parse(publicCollectionUrl), {
       headers: {
@@ -46,7 +45,7 @@ async function createPublicBody (req, { apiUrl }) {
   const pageRequest = createHttpOrHttpsRequest(Object.assign(url.parse(pageUrl), {
     headers: {
       'Prefer': `return=representation; max-member-count="${limit}"`,
-      'Accept': pageMediaType,
+      'Accept': pageMediaType
     }
   }))
   const pageResponse = await sendRequest(pageRequest)
@@ -64,30 +63,29 @@ async function createPublicBody (req, { apiUrl }) {
     <details>
       <summary>{&hellip;}</summary>
       <pre><code>${
-          encodeHtmlEntities(
-            // #TODO: discover /public url via HATEOAS
-            JSON.stringify(page, null, 2)
-          )
-          // linkify values of 'url' property (quotes encode to &#34;)
-          .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')  
-      }</code></pre>
+  encodeHtmlEntities(
+    // #TODO: discover /public url via HATEOAS
+    JSON.stringify(page, null, 2)
+  )
+  // linkify values of 'url' property (quotes encode to &#34;)
+    .replace(/&#34;url&#34;: &#34;(.+?)(?=&#34;)&#34;/g, '&#34;url&#34;: &#34;<a href="$1">$1</a>&#34;')
+}</code></pre>
     </details>
     <div>
       ${(page.orderedItems || page.items || []).map(renderActivity).join('\n')}
     </div>
     <p>
     ${
-      [
-        page.startIndex
-          ? `${page.startIndex} previous items`
-          : ''
-        ,
-        nextUrl
-          ? `<a href="${nextUrl}">Next Page</a>`
-          : ''
-      ].filter(Boolean).join(' - ')
-    }
+  [
+    page.startIndex
+      ? `${page.startIndex} previous items`
+      : '',
+    nextUrl
+      ? `<a href="${nextUrl}">Next Page</a>`
+      : ''
+  ].filter(Boolean).join(' - ')
+}
     </p>
   `
-  return msg;
+  return msg
 }

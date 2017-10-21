@@ -46,12 +46,12 @@ activitypub.objectHasRequiredProperties = (obj) => {
 
 // 5.4 Outbox - https://w3c.github.io/activitypub/#outbox
 
-  // The outbox is discovered through the outbox property of an actor's profile.
-  // #critique - Can only 'actors' have outboxes? Can a single distbin have one outbox?
+// The outbox is discovered through the outbox property of an actor's profile.
+// #critique - Can only 'actors' have outboxes? Can a single distbin have one outbox?
 
-  // The outbox must be an OrderedCollection.
-  // #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be an OrderedCollection' (see isOrderedCollection function)
-  // #assumption - interpretation is that outbox MUST accept GET requests, so I'll test
+// The outbox must be an OrderedCollection.
+// #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be an OrderedCollection' (see isOrderedCollection function)
+// #assumption - interpretation is that outbox MUST accept GET requests, so I'll test
 tests['The outbox must be an OrderedCollection'] = async function () {
   const res = await sendRequest(await requestForListener(distbin(), {
     path: '/activitypub/outbox',
@@ -62,7 +62,7 @@ tests['The outbox must be an OrderedCollection'] = async function () {
   assert(isOrderedCollection(resBody))
 }
 
-  /*
+/*
   #TODO
   The outbox stream contains objects the user has published, subject to the ability of the requestor to retrieve the object (that is, the contents of the outbox are filtered by the permissions of the person reading it).
     #TODO assert that outbox collection object has '.items'
@@ -70,8 +70,8 @@ tests['The outbox must be an OrderedCollection'] = async function () {
     #critique - "All of the public posts"? Or all of the public posts that have been sent through this outbox?
   */
 
-  // The outbox accepts HTTP POST requests, with behaviour described in Client to Server Interactions.
-  // see section 7
+// The outbox accepts HTTP POST requests, with behaviour described in Client to Server Interactions.
+// see section 7
 
 /*
 5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
@@ -133,12 +133,11 @@ tests['The inbox must be an OrderedCollection'] = async function () {
   assert(isOrderedCollection(resBody))
 }
 
-
 function isOrderedCollection (something) {
   const obj = typeof something === 'string' ? JSON.parse(something) : something
   // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
-  let type = obj.type;
-  if ( ! Array.isArray(type)) type = [type]
+  let type = obj.type
+  if (!Array.isArray(type)) type = [type]
   assert(type.includes('OrderedCollection'))
   return true
 }
@@ -244,7 +243,7 @@ tests['can submit an Activity to the Outbox'] = async function () {
 
 // 7.1 Create Activity - https://w3c.github.io/activitypub/#create-activity-outbox
 
-  /*
+/*
   The Create activity is used to when posting a new object. This has the side effect that the object embedded within the Activity (in the object property) is created.
 
   When a Create activity is posted, the actor of the activity should be copied onto the object's attributedTo field.

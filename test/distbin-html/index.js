@@ -1,5 +1,4 @@
 const distbin = require('../../')
-const { postActivity } = require('../util')
 const { listen } = require('../util')
 const url = require('url')
 const querystring = require('querystring')
@@ -10,7 +9,7 @@ const assert = require('assert')
 const sanitize = require('../../src/distbin-html/sanitize')
 
 const distbinHtml = require('../../src/distbin-html')
-let tests = module.exports;
+let tests = module.exports
 
 tests['/ serves html'] = async function () {
   const dh = distbinHtml.createHandler({
@@ -22,7 +21,7 @@ tests['/ serves html'] = async function () {
     headers: {
       accept: 'text/html'
     }
-  })));
+  })))
   assert.equal(dhResponse.statusCode, 200)
   assert.equal(dhResponse.headers['content-type'], 'text/html')
 }
@@ -45,7 +44,7 @@ tests['POST / creates activities'] = async function () {
     content: 'lorem ipsum',
     attachment: dbUrl
   }))
-  const dhResponse = await sendRequest(postFormRequest);
+  const dhResponse = await sendRequest(postFormRequest)
   assert.equal(dhResponse.statusCode, 302)
   assert(dhResponse.headers.location)
   // Ensure a generator was set
@@ -55,7 +54,7 @@ tests['POST / creates activities'] = async function () {
     headers: {
       accept: 'application/json'
     }
-  })));
+  })))
   const activity = JSON.parse(await readableToString(activityResponse))
   assert(activity.object.generator, 'distbin-html form submission sets distbin-html as the .generator')
   assert.equal(Array.isArray(activity.object.attachment), true, '.attachment is an Array')
@@ -82,8 +81,8 @@ tests['POST / can create activities with geolocation'] = async function () {
     'location.altitude': 56.1,
     'location.accuracy': 95.0,
     'location.radius': 18408,
-    'location.units': 'm',
-  };
+    'location.units': 'm'
+  }
   const activity = await postDistbinHtmlActivityForm(dbUrl, dhUrl, formFields)
   assert.equal(typeof activity.location, 'object')
   assert.equal(activity.location.name, formFields['location.name'])
@@ -105,8 +104,8 @@ tests['POST / can create activities with .attributedTo'] = async function () {
   const formFields = {
     content: 'lorem ipsum',
     'attributedTo.name': 'Ben',
-    'attributedTo.url': 'http://bengo.is',
-  };
+    'attributedTo.url': 'http://bengo.is'
+  }
   const activity = await postDistbinHtmlActivityForm(dbUrl, dhUrl, formFields)
   assert.equal(typeof activity.attributedTo, 'object')
   assert.equal(activity.attributedTo.name, formFields['attributedTo.name'])
@@ -122,8 +121,8 @@ tests['POST / can create activities with .tag'] = async function () {
   const dhUrl = await listen(http.createServer(dh))
   const formFields = {
     content: 'lorem ipsum',
-    'tag_csv': 'tag1,tag2',
-  };
+    'tag_csv': 'tag1,tag2'
+  }
   const activity = await postDistbinHtmlActivityForm(dbUrl, dhUrl, formFields)
   assert.equal(Array.isArray(activity.object.tag), true)
   const tagNames = activity.object.tag.map(t => t.name)
@@ -131,7 +130,7 @@ tests['POST / can create activities with .tag'] = async function () {
   assert.equal(tagNames.includes('tag2'), true, 'tag includes tag2')
 }
 
-async function postDistbinHtmlActivityForm(distbinUrl, distbinHtmlUrl, activityFormFields) {
+async function postDistbinHtmlActivityForm (distbinUrl, distbinHtmlUrl, activityFormFields) {
   const postFormRequest = http.request(Object.assign(url.parse(distbinHtmlUrl), {
     method: 'POST',
     headers: {
@@ -139,7 +138,7 @@ async function postDistbinHtmlActivityForm(distbinUrl, distbinHtmlUrl, activityF
     }
   }))
   postFormRequest.write(querystring.stringify(activityFormFields))
-  const dhResponse = await sendRequest(postFormRequest);
+  const dhResponse = await sendRequest(postFormRequest)
   assert.equal(dhResponse.statusCode, 302)
   assert(dhResponse.headers.location)
   // Ensure a generator was set
@@ -149,9 +148,9 @@ async function postDistbinHtmlActivityForm(distbinUrl, distbinHtmlUrl, activityF
     headers: {
       accept: 'application/json'
     }
-  })));
+  })))
   const activity = JSON.parse(await readableToString(activityResponse))
-  return activity;  
+  return activity
 }
 
 tests['/activities/:id renders the .generator.name'] = async function () {
@@ -169,9 +168,9 @@ tests['/activities/:id renders the .generator.name'] = async function () {
   }))
   postFormRequest.write(querystring.stringify({
     name: 'activity name',
-    content: 'This should have a generator.name of distbin-html',
+    content: 'This should have a generator.name of distbin-html'
   }))
-  const dhResponse = await sendRequest(postFormRequest);
+  const dhResponse = await sendRequest(postFormRequest)
   assert.equal(dhResponse.statusCode, 302)
   assert(dhResponse.headers.location)
   // Ensure a generator was set
@@ -180,7 +179,7 @@ tests['/activities/:id renders the .generator.name'] = async function () {
     headers: {
       accept: 'text/html'
     }
-  })));
+  })))
   const activityHtml = await readableToString(activityResponse)
   assert(sanitize.toText(activityHtml).includes('via distbin-html'), 'html response includes .generator.name')
   // todo rdfa?

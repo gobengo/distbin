@@ -25,7 +25,7 @@
     "eslint-plugin-standard": "^2.0.1"
   },
   "scripts": {
-    "lint": "eslint test src",
+    "lint": "eslint --fix src test bin",
     "test": "node --harmony test",
     "start": "PORT=8000 node --harmony bin/server"
   },

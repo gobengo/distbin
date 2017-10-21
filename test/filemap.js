@@ -17,18 +17,18 @@ tests['iterates in insertion order (helped by fs created timestamp)'] = withdir(
   const filemap = new JSONFileMap(dir)
   const insertionOrder = [1, 2, 10].map(String)
   for (let k of insertionOrder) {
-    filemap.set(k, k+' value')
+    filemap.set(k, k + ' value')
   }
-  assert.deepEqual(Array.from(filemap).map((k,v) => k), insertionOrder)
+  assert.deepEqual(Array.from(filemap).map((k, v) => k), insertionOrder)
   // new filemaps from same dir should have same insertion order
   const filemap2 = new JSONFileMap(dir)
-  assert.deepEqual(Array.from(filemap2).map((k,v) => k), insertionOrder)
+  assert.deepEqual(Array.from(filemap2).map((k, v) => k), insertionOrder)
 })
 
 // create a temporary directory and pass its path to the provided function
 // no matter what happens, remove the folder
-function withdir(doWork) {
-  return async function() {
+function withdir (doWork) {
+  return async function () {
     const dir = await denodeify(fs.mkdtemp)('/tmp/distbin-test-withdir-')
     try {
       return await Promise.resolve(doWork(dir))
@@ -39,17 +39,17 @@ function withdir(doWork) {
 }
 
 // rm -rf
-function deleteFolderRecursive(dir) {
-  if( fs.existsSync(dir) ) {
-    fs.readdirSync(dir).forEach(function(file,index){
+function deleteFolderRecursive (dir) {
+  if (fs.existsSync(dir)) {
+    fs.readdirSync(dir).forEach(function (file, index) {
       var curPath = path.join(dir, file)
-      if(fs.lstatSync(curPath).isDirectory()) { // recurse
-        deleteFolderRecursive(curPath);
+      if (fs.lstatSync(curPath).isDirectory()) { // recurse
+        deleteFolderRecursive(curPath)
       } else { // delete file
-        fs.unlinkSync(curPath);
+        fs.unlinkSync(curPath)
       }
-    });
-    fs.rmdirSync(dir);
+    })
+    fs.rmdirSync(dir)
   }
 };
 

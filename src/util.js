@@ -1,10 +1,11 @@
 const jsonldRdfaParser = require('jsonld-rdfa-parser')
 const jsonld = require('jsonld')
-jsonld.registerRDFParser('text/html', jsonldRdfaParser);
+jsonld.registerRDFParser('text/html', jsonldRdfaParser)
 const url = require('url')
 const http = require('http')
 const https = require('https')
 const fs = require('fs')
+const path = require('path')
 
 exports.debuglog = require('util').debuglog('distbin')
 
@@ -87,17 +88,15 @@ function denodeify (funcThatAcceptsErrback) {
   }.bind(this)
 }
 
-
 exports.rdfaToJsonLd = async function rdfaToJsonLd (html) {
   return denodeify(jsonld.fromRDF)(html, { format: 'text/html' })
   // // use it
   // jsonld.fromRDF(html, {format: 'text/html'}, function(err, data) {
-
 }
 
 exports.isProbablyAbsoluteUrl = isProbablyAbsoluteUrl
-function isProbablyAbsoluteUrl(url) {
-  const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i');
+function isProbablyAbsoluteUrl (url) {
+  const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i')
   return absoluteUrlPattern.test(url)
 }
 
@@ -110,13 +109,13 @@ function requestMaxMemberCount (req) {
   return parseInt(url.parse(req.url, true).query['max-member-count'], 10)
 }
 
-exports.createHttpOrHttpsRequest = createHttpOrHttpsRequest;
+exports.createHttpOrHttpsRequest = createHttpOrHttpsRequest
 function createHttpOrHttpsRequest (urlOrObj) {
   let parsedUrl = urlOrObj
   if (typeof urlOrObj === 'string') {
-    parsedUrl = url.parse(urlOrObj)    
+    parsedUrl = url.parse(urlOrObj)
   }
-  let createRequest;
+  let createRequest
   switch (parsedUrl.protocol) {
     case 'https:':
       createRequest = https.request.bind(https)
@@ -126,53 +125,52 @@ function createHttpOrHttpsRequest (urlOrObj) {
       break
     default:
       const activityUrl = url.format(parsedUrl)
-      throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): "+ activityUrl)
+      throw new Error("Can't fetch activity with unsupported protocol in URL (only http, https supported): " + activityUrl)
   }
   return createRequest(urlOrObj)
 }
 
-exports.linkToHref = linkToHref;
-function linkToHref(hrefOrLinkObj) {
-  if (typeof hrefOrLinkObj === 'string') return hrefOrLinkObj;
-  if (typeof hrefOrLinkObj === 'object') return hrefOrLinkObj.href;
-  throw new Error("Unexpected link type: " + typeof hrefOrLinkObj)
+exports.linkToHref = linkToHref
+function linkToHref (hrefOrLinkObj) {
+  if (typeof hrefOrLinkObj === 'string') return hrefOrLinkObj
+  if (typeof hrefOrLinkObj === 'object') return hrefOrLinkObj.href
+  throw new Error('Unexpected link type: ' + typeof hrefOrLinkObj)
 }
 
 jsonld.documentLoader = createCustomDocumentLoader()
 
 exports.jsonld = jsonld.promises
 
-
-function createCustomDocumentLoader() {
+function createCustomDocumentLoader () {
   // define a mapping of context URL => context doc
   var CONTEXTS = {
-    "https://www.w3.org/ns/activitystreams": fs.readFileSync(__dirname + '/as2context.json', 'utf8')
+    'https://www.w3.org/ns/activitystreams': fs.readFileSync(path.join(__dirname, '/as2context.json'), 'utf8')
   }
 
   // grab the built-in node.js doc loader
-  var nodeDocumentLoader = jsonld.documentLoaders.node();
+  var nodeDocumentLoader = jsonld.documentLoaders.node()
   // or grab the XHR one: jsonld.documentLoaders.xhr()
   // or grab the jquery one: jsonld.documentLoaders.jquery()
 
   // change the default document loader using the callback API
   // (you can also do this using the promise-based API, return a promise instead
   // of using a callback)
-  var customLoader = function(url, callback) {
-    if(url in CONTEXTS) {
+  var customLoader = function (url, callback) {
+    if (url in CONTEXTS) {
       return callback(
         null, {
           contextUrl: null, // this is for a context via a link header
           document: CONTEXTS[url], // this is the actual document that was loaded
           documentUrl: url // this is the actual context URL after redirects
-        });
+        })
     }
     // call the underlining documentLoader using the callback API.
-    nodeDocumentLoader(url, callback);
+    nodeDocumentLoader(url, callback)
     /* Note: By default, the node.js document loader uses a callback, but
     browser-based document loaders (xhr or jquery) return promises if they
     are supported (or polyfilled) in the browser. This behavior can be
     controlled with the 'usePromise' option when constructing the document
     loader. For example: jsonld.documentLoaders.xhr({usePromise: false}); */
-  };
+  }
   return customLoader
 }

@@ -2,16 +2,14 @@ const {
   as2ObjectIsActivity,
   targetAndDeliver,
   publicCollectionId
- } = require('./activitypub')
+} = require('./activitypub')
 const {
   debuglog,
-  isProbablyAbsoluteUrl,
   readableToString,
   route,
   requestMaxMemberCount,
   jsonld
 } = require('./util')
-const path = require('path')
 const url = require('url')
 const uuid = require('node-uuid')
 const querystring = require('querystring')
@@ -25,7 +23,7 @@ const uuidUri = (uuid) => `urn:uuid:${uuid}`
 // (routes requests to sub-handlers with common error handling)
 exports = module.exports = distbin
 exports.distbin = distbin
-function distbin({
+function distbin ({
   // Juse use Map as default, but users should provide more bette data structures
   // #TODO: This should be size-bound e.g. LRU
   // #TODO: This should be persistent :P
@@ -44,13 +42,13 @@ function distbin({
       ['/activitypub/public/page', () => publicCollectionPageHandler({ activities })],
       ['/activitypub/public', () => publicCollectionHandler({ activities })],
       // /activities/{activityUuid}.{format}
-      [/^\/activities\/([^\/]+?)(\.(.+))$/,
+      [/^\/activities\/([^/]+?)(\.(.+))$/,
         (activityUuid, _, format) => activityWithExtensionHandler({ activities, activityUuid, format })],
       // /activities/{activityUuid}
-      [/^\/activities\/([^\/]+)$/,
+      [/^\/activities\/([^/]+)$/,
         (activityUuid) => activityHandler({ activities, activityUuid })],
-      [/^\/activities\/([^\/]+)\/replies$/,
-        (activityUuid) => activityRepliesHandler({ activities, activityUuid })],
+      [/^\/activities\/([^/]+)\/replies$/,
+        (activityUuid) => activityRepliesHandler({ activities, activityUuid })]
     ])
 
     let handler = route(routes, req)
@@ -69,8 +67,8 @@ function distbin({
 }
 
 // Return new value for a JSON-LD object's value, appending to any existing one
-function jsonldAppend(oldVal, valToAppend) {
-  let newVal;
+function jsonldAppend (oldVal, valToAppend) {
+  let newVal
   switch (typeof oldVal) {
     case 'object':
       if (Array.isArray(oldVal)) {
@@ -89,30 +87,30 @@ function jsonldAppend(oldVal, valToAppend) {
   return newVal
 }
 
-function isHostedLocally(activityFreshFromStorage) {
-  return ! activityFreshFromStorage.hasOwnProperty('url')
+function isHostedLocally (activityFreshFromStorage) {
+  return !activityFreshFromStorage.hasOwnProperty('url')
 }
 
 // return a an extended version of provided activity with some extra metadata properties like 'inbox', 'url', 'replies'
 // if 'baseUrl' opt is provided, those extra properties will be absolute URLs, not relative
-const locallyHostedActivity = function (activity, { externalUrl='' } = {}) {
+const locallyHostedActivity = function (activity, { externalUrl = '' } = {}) {
   if (activity.url) {
-    debuglog("Unexpected .url property when processing activity assumed to be locally hosted\n"+JSON.stringify(activity))
-    throw new Error("Unexpected .url property when processing activity assumed to be locally hosted")
+    debuglog('Unexpected .url property when processing activity assumed to be locally hosted\n' + JSON.stringify(activity))
+    throw new Error('Unexpected .url property when processing activity assumed to be locally hosted')
   }
-  const uuidMatch = activity.id.match(/^urn:uuid:([^$]+)$/);
-  if ( ! uuidMatch) throw new Error("Couldn't determine UUID for activity with id", activity.id)
+  const uuidMatch = activity.id.match(/^urn:uuid:([^$]+)$/)
+  if (!uuidMatch) throw new Error("Couldn't determine UUID for activity with id", activity.id)
   const uuid = uuidMatch[1]
   // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
   let inboxUrl = url.resolve(externalUrl, '/activitypub/inbox') // TODO should this be an inbox specific to this activity?
-  const activityUrl = url.resolve(externalUrl, '/activities/'+uuid)
-  const repliesUrl = url.resolve(externalUrl, '/activities/'+uuid+'/replies')
+  const activityUrl = url.resolve(externalUrl, '/activities/' + uuid)
+  const repliesUrl = url.resolve(externalUrl, '/activities/' + uuid + '/replies')
   return Object.assign({}, activity, {
     inbox: jsonldAppend(activity.inbox, inboxUrl),
     url: jsonldAppend(activity.url, activityUrl),
     uuid: uuid,
-    replies: repliesUrl,
-  }) 
+    replies: repliesUrl
+  })
 }
 
 // get specific activity by id
@@ -127,14 +125,14 @@ function activityHandler ({ activities, activityUuid }) {
       return
     }
     // redirect to remote ones if we know a URL
-    if ( ! isHostedLocally(activity)) {
+    if (!isHostedLocally(activity)) {
       if (activity.url) {
         // see other
         res.writeHead(302, {
           location: activity.url
         })
         res.end(activity.url)
-        return  
+        return
       } else {
         res.writeHead(404)
         res.end(`Activity ${activityUuid} has been seen before, but it's not canonically hosted here, and I can't seem to find it's canonical URL. Sorry.`)
@@ -151,11 +149,11 @@ function activityHandler ({ activities, activityUuid }) {
   }
 }
 
-function activityWithExtensionHandler({ activities, activityUuid, format }) {
+function activityWithExtensionHandler ({ activities, activityUuid, format }) {
   return async function (req, res) {
     if (format !== 'json') {
       res.writeHead(404)
-      res.end('Unsupported activity extension .'+format)
+      res.end('Unsupported activity extension .' + format)
       return
     }
     return activityHandler({ activities, activityUuid })(req, res)
@@ -175,10 +173,10 @@ function activityRepliesHandler ({ activities, activityUuid }) {
     const allActivities = Array.from(await Promise.resolve(activities.values()))
     const replies = Array.from(allActivities)
       .filter(activity => {
-        const parent = activity && activity.object && activity.object.inReplyTo;
-        if ( ! parent) return;
+        const parent = activity && activity.object && activity.object.inReplyTo
+        if (!parent) return
         // TODO .inReplyTo could be a urn, http URL, something else?
-        return url.parse(parent).pathname === '/activities/'+activityUuid
+        return url.parse(parent).pathname === '/activities/' + activityUuid
       })
       .map(activity => {
         if (isHostedLocally(activity)) {
@@ -191,10 +189,10 @@ function activityRepliesHandler ({ activities, activityUuid }) {
     })
     res.end(JSON.stringify({
       type: 'Collection',
-      name: 'replies to item with UUID '+activityUuid,
+      name: 'replies to item with UUID ' + activityUuid,
       totalItems: replies.length,
       // TODO: sort/paginate/limit this
-      items: replies,
+      items: replies
     }, null, 2))
   }
 }
@@ -228,7 +226,7 @@ function recentHandler ({ activities }) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     res.writeHead(200, {
       'Access-Control-Allow-Origin': '*',
-      'content-type': 'application/json',
+      'content-type': 'application/json'
     })
     res.end(JSON.stringify({
       '@context': 'https://www.w3.org/ns/activitystreams',
@@ -256,14 +254,14 @@ function inboxHandler ({ activities, externalUrl, inbox }) {
           ].join(', ')
         })
         res.end()
-        return;
+        return
       case 'get':
-        const idQuery = url.parse(req.url, true).query.id;
+        const idQuery = url.parse(req.url, true).query.id
         let responseBody
         if (idQuery) {
           // trying to just get one notification
           const itemWithId = await inbox.get(idQuery)
-          if ( ! itemWithId) {
+          if (!itemWithId) {
             res.writeHead(404)
             res.end()
             return
@@ -282,7 +280,7 @@ function inboxHandler ({ activities, externalUrl, inbox }) {
             // empty string is relative URL for 'self'
             current: '',
             'ldp:contains': items.map(i => ({ id: i.id })).filter(Boolean)
-          };
+          }
           responseBody = inboxCollection
         }
         const accept = accepts(req)
@@ -290,7 +288,7 @@ function inboxHandler ({ activities, externalUrl, inbox }) {
           'application/ld+json; profile="https://www.w3.org/ns/activitystreams"',
           'json',
           'application/ld+json',
-          'application/activity+json',
+          'application/activity+json'
         ]
         const contentType = accept.type(serverPreferences) || serverPreferences[0]
         res.writeHead(200, {
@@ -352,7 +350,7 @@ function inboxHandler ({ activities, externalUrl, inbox }) {
         await Promise.all([
           inbox.set(notificationUrnUuid, notificationToSave),
           // todo: Probably setting on inbox should automagically add to global set of activities
-          originalAlreadySaved ? null : activities.set(originalId, parsed),
+          originalAlreadySaved ? null : activities.set(originalId, parsed)
         ])
 
         res.writeHead(201, {
@@ -456,7 +454,7 @@ function outboxHandler ({
             const failures = e.failures.map(f => {
               return {
                 name: f.name,
-                message: f.message,
+                message: f.message
               }
             })
             // #TODO: Retry some day
@@ -485,29 +483,28 @@ function outboxHandler ({
 function publicCollectionHandler ({ activities }) {
   return async function (req, res) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
-    const parsedUrl = url.parse(req.url, true)
     const publicActivities = []
     const itemsForThisPage = []
-    const allActivities = [...await Promise.resolve(activities.values())].sort((a,b) => {
-      if (a.published < b.published) return -1;
-      else if (a.published > b.published) return 1;
+    const allActivities = [...await Promise.resolve(activities.values())].sort((a, b) => {
+      if (a.published < b.published) return -1
+      else if (a.published > b.published) return 1
       else {
         // assume ids aren't equal. If so we have a bigger problem
-        return (a.id < b.id) ? -1 : 1;
+        return (a.id < b.id) ? -1 : 1
       }
     }).reverse()
     for (let activity of allActivities) {
-      if ( ! activityHasTarget(activity, publicCollectionId)) continue;
+      if (!activityHasTarget(activity, publicCollectionId)) continue
       publicActivities.push(activity)
-      if (itemsForThisPage.length < maxMemberCount) itemsForThisPage.push(activity);
+      if (itemsForThisPage.length < maxMemberCount) itemsForThisPage.push(activity)
     }
     const currentItems = itemsForThisPage.map(activity => {
       if (isHostedLocally(activity)) {
-        return locallyHostedActivity(activity);
+        return locallyHostedActivity(activity)
       }
       return activity
     })
-    const totalItems = publicActivities.length;
+    const totalItems = publicActivities.length
     const currentUrl = [req.url, req.url.endsWith('/') ? '' : '/', 'page'].join('')
     const publicCollection = {
       '@context': 'https://www.w3.org/ns/activitystreams',
@@ -522,9 +519,9 @@ function publicCollectionHandler ({ activities }) {
         rel: 'current',
         href: currentUrl,
         mediaType: 'application/json',
-        name: 'Recently updated public activities',
+        name: 'Recently updated public activities'
       },
-      'first': currentUrl,
+      'first': currentUrl
     }
     res.writeHead(200, {
       'content-type': 'application/json'
@@ -533,7 +530,7 @@ function publicCollectionHandler ({ activities }) {
   }
 }
 
-function publicCollectionPageHandler({ activities }) {
+function publicCollectionPageHandler ({ activities }) {
   return async function (req, res) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const parsedUrl = url.parse(req.url, true)
@@ -543,20 +540,20 @@ function publicCollectionPageHandler({ activities }) {
       try {
         cursor = JSON.parse(parsedUrl.query.cursor)
       } catch (error) {
-        res.writeHead(400);
+        res.writeHead(400)
         res.end(JSON.stringify({ message: 'Invalid cursor in querystring' }))
-        return;
+        return
       }
       const createMatchesCursor = cursor => activity => {
-        const ops = ['and', 'or', 'equals'];
+        const ops = ['and', 'or', 'equals']
         assert.equal(Object.keys(cursor).length, 1)
         let bool = Object.keys(cursor).find(k => ops.includes(k))
 
-        const clauses = cursor[bool];
-        for (let i=0; i < clauses.length; i++) {
-          let filterN = clauses[i];
+        const clauses = cursor[bool]
+        for (let i = 0; i < clauses.length; i++) {
+          let filterN = clauses[i]
           assert.equal(Object.keys(filterN).length, 1)
-          let prop = Object.keys(filterN)[0];
+          let prop = Object.keys(filterN)[0]
           let matchesRequirement
           if (ops.includes(prop)) {
             // this is another expression, recurse
@@ -565,59 +562,59 @@ function publicCollectionPageHandler({ activities }) {
             let requirement = filterN[prop]
             assert.equal(Object.keys(requirement).length, 1)
             let op = Object.keys(requirement)[0]
-            let propValue = activity[prop];
+            let propValue = activity[prop]
             switch (op) {
               case 'lt':
                 matchesRequirement = propValue < requirement[op]
-                break;
+                break
               case 'equals':
                 matchesRequirement = propValue === requirement[op]
-                break;
+                break
               default:
-                throw new Error("Unexpected op in createMatchesCursor: "+op)
+                throw new Error('Unexpected op in createMatchesCursor: ' + op)
             }
           }
           if (matchesRequirement && (bool === 'or')) {
-            return true;
+            return true
           }
-          if (( ! matchesRequirement) && (bool === 'and')) {
+          if ((!matchesRequirement) && (bool === 'and')) {
             return false
           }
         }
-        if (bool === 'or') return false;
-        if (bool === 'and') return true;
+        if (bool === 'or') return false
+        if (bool === 'and') return true
       }
       matchesCursor = createMatchesCursor(cursor)
     }
     const publicActivities = []
     const itemsForThisPage = []
     // @todo ensure sorted by both published and id
-    const allActivities = [...await Promise.resolve(activities.values())].sort((a,b) => {
-      if (a.published < b.published) return -1;
-      else if (a.published > b.published) return 1;
+    const allActivities = [...await Promise.resolve(activities.values())].sort((a, b) => {
+      if (a.published < b.published) return -1
+      else if (a.published > b.published) return 1
       else {
         // assume ids aren't equal. If so we have a bigger problem
-        return (a.id < b.id) ? -1 : 1;
+        return (a.id < b.id) ? -1 : 1
       }
     }).reverse()
-    let itemsBeforeCursor = 0;
+    let itemsBeforeCursor = 0
     for (let activity of allActivities) {
-      if ( ! activityHasTarget(activity, publicCollectionId)) continue;
+      if (!activityHasTarget(activity, publicCollectionId)) continue
       publicActivities.push(activity)
-      if ( ! matchesCursor(activity)) {
+      if (!matchesCursor(activity)) {
         itemsBeforeCursor++
-        continue;
+        continue
       }
-      if (itemsForThisPage.length < maxMemberCount) itemsForThisPage.push(activity);
+      if (itemsForThisPage.length < maxMemberCount) itemsForThisPage.push(activity)
     }
     const currentItems = itemsForThisPage.map(activity => {
       if (isHostedLocally(activity)) {
-        return locallyHostedActivity(activity);
+        return locallyHostedActivity(activity)
       }
       return activity
     })
-    const totalItems = publicActivities.length;
-    let next;
+    const totalItems = publicActivities.length
+    let next
     if (totalItems > currentItems.length) {
       let lastItem = currentItems[currentItems.length - 1]
       if (lastItem) {
@@ -627,10 +624,10 @@ function publicCollectionPageHandler({ activities }) {
             {
               and: [
                 { published: { equals: lastItem.published } },
-                { id: { lt: lastItem.id } },
+                { id: { lt: lastItem.id } }
               ]
             }
-          ],
+          ]
         })
         next = '?' + querystring.stringify({ cursor })
       }
@@ -641,7 +638,7 @@ function publicCollectionPageHandler({ activities }) {
       orderedItems: currentItems,
       startIndex: itemsBeforeCursor,
       next,
-      partOf: '/activitypub/public'      
+      partOf: '/activitypub/public'
     }
     res.writeHead(200, {
       'content-type': 'application/json'

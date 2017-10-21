@@ -1,11 +1,7 @@
 module.exports = {
-  "extends": "standard",
-  "installedESLint": true,
-  "env": {
-    "node": true
-  },
-  "plugins": [
-    "standard",
-    "promise"
-  ]
+    "extends": "standard",
+    "plugins": [
+        "standard",
+        "promise"
+    ]
 };

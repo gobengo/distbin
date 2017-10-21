@@ -1,16 +1,16 @@
-const createDOMPurify = require('dompurify');
-const jsdom = require('jsdom');
+const createDOMPurify = require('dompurify')
+const jsdom = require('jsdom')
 const window = jsdom.jsdom('', {
   features: {
     FetchExternalResources: false, // disables resource loading over HTTP / filesystem
     ProcessExternalResources: false // do not execute JS within script blocks
   }
-}).defaultView;
+}).defaultView
 
-const DOMPurify = createDOMPurify(window);
+const DOMPurify = createDOMPurify(window)
 
-exports.sanitize = DOMPurify.sanitize.bind(DOMPurify);
+exports.sanitize = DOMPurify.sanitize.bind(DOMPurify)
 
 exports.toText = function (html) {
-	return DOMPurify.sanitize(html, { ALLOWED_TAGS: ['#text'] })
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: ['#text'] })
 }

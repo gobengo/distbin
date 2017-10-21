@@ -1,15 +1,15 @@
 const about = require('./about')
-const public = require('./public')
+const publicSection = require('./public')
 const home = require('./home')
 const { route } = require('../util')
 const anActivity = require('./an-activity')
 
-exports.createHandler = ({ apiUrl, externalUrl }={}) => {
+exports.createHandler = ({ apiUrl, externalUrl } = {}) => {
   const routes = new Map([
     ['/', () => home.createHandler({ apiUrl, externalUrl })],
-    ['/about', () => about.createHandler({ externalUrl }) ],
-    [new RegExp('^/public$'), () => public.createHandler({ apiUrl }) ],
-    [new RegExp('^/activities/([^/\.]+)$'),
+    ['/about', () => about.createHandler({ externalUrl })],
+    [new RegExp('^/public$'), () => publicSection.createHandler({ apiUrl })],
+    [new RegExp('^/activities/([^/.]+)$'),
       (activityId) => anActivity.createHandler({ apiUrl, activityId, externalUrl })]
   ])
   return (req, res) => {

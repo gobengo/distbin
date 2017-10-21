@@ -52,19 +52,19 @@ exports.JSONFileMap = class JSONFileMap extends Map {
         const stat = fs.statSync(path.join(dir, name))
         return ({ name, stat })
       })
-      .sort(function(a, b) {
-        const timeDelta = a.stat.ctime.getTime() - b.stat.ctime.getTime();
+      .sort(function (a, b) {
+        const timeDelta = a.stat.ctime.getTime() - b.stat.ctime.getTime()
         if (timeDelta === 0) {
           // fall back to assumption of increasing inodes. I have no idea if
           // this is guaranteed, but think it is
           // If this is bad, then maybe this whole method should just use 'ls'
           // (delegate to the OS) since node isn't good enough here
-          return a.stat.ino - b.stat.ino;
+          return a.stat.ino - b.stat.ino
         }
         return timeDelta
       })
-      .map(({ name }) => name);
-    return sortedAscByCreation;
+      .map(({ name }) => name)
+    return sortedAscByCreation
   }
   values () {
     return Array.from(this.keys()).map(file => this.get(file))
@@ -118,19 +118,19 @@ exports.JSONFileMapAsync = class JSONFileMapAsync extends Map {
         const stat = fs.statSync(path.join(dir, name))
         return ({ name, stat })
       })
-      .sort(function(a, b) {
-        const timeDelta = a.stat.ctime.getTime() - b.stat.ctime.getTime();
+      .sort(function (a, b) {
+        const timeDelta = a.stat.ctime.getTime() - b.stat.ctime.getTime()
         if (timeDelta === 0) {
           // fall back to assumption of increasing inodes. I have no idea if
           // this is guaranteed, but think it is
           // If this is bad, then maybe this whole method should just use 'ls'
           // (delegate to the OS) since node isn't good enough here
-          return a.stat.ino - b.stat.ino;
+          return a.stat.ino - b.stat.ino
         }
         return timeDelta
       })
-      .map(({ name }) => name);
-    return sortedAscByCreation;
+      .map(({ name }) => name)
+    return sortedAscByCreation
   }
   async values () {
     const files = await this.keys()

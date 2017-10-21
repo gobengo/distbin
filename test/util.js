@@ -29,13 +29,13 @@ async function listen (server, port = 0, ...args) {
   let listened
   return new Promise((resolve, reject) => {
     server
-    .once('error', () => {
-      if (!listened) reject()
-    })
-    .listen(port, ...args, () => {
-      listened = true
-      resolve(`http://localhost:${server.address().port}`)
-    })
+      .once('error', (error) => {
+        if (!listened) reject(error)
+      })
+      .listen(port, ...args, () => {
+        listened = true
+        resolve(`http://localhost:${server.address().port}`)
+      })
   })
 }
 
@@ -43,14 +43,14 @@ exports.isProbablyAbsoluteUrl = require('../src/util').isProbablyAbsoluteUrl
 
 exports.postActivity = postActivity
 // post an activity to a distbin, and return its absolute url
-async function postActivity(distbinListener, activity) {
+async function postActivity (distbinListener, activity) {
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
-    path: '/activitypub/outbox'      
+    path: '/activitypub/outbox'
   }))
   req.write(JSON.stringify(activity))
   const res = await sendRequest(req)

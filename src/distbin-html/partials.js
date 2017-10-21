@@ -37,7 +37,7 @@ exports.distbinBodyTemplate = (page) => `
   </div>
 `
 
-function header() {
+function header () {
   // todo
   return `
     <style>

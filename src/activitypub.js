@@ -84,7 +84,7 @@ const deliverActivity = async function (activity, target) {
       accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#",text/html'
     }
   }))
-  debuglog("req inbox discovery "+target)
+  debuglog('req inbox discovery ' + target)
   try {
     var targetProfileResponse = await sendRequest(targetProfileRequest)
   } catch (e) {
@@ -95,34 +95,34 @@ const deliverActivity = async function (activity, target) {
   switch (targetProfileResponse.statusCode) {
     case 200:
       // cool
-      break;
+      break
     default:
       throw new deliveryErrors.TargetRequestFailed(`Got unexpected status code ${targetProfileResponse.statusCode} when requesting ${target} to determine inbox URL`)
   }
 
-  let inbox = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse);
+  let inbox = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse)
 
-  function inboxFromHeaders(res) {
-    let inbox;
+  function inboxFromHeaders (res) {
+    let inbox
     // look in res Link header
     const inboxLinks = (parseLinkHeader(res.headers.link) || {})['http://www.w3.org/ns/ldp#inbox']
     let inboxLink
     if (Array.isArray(inboxLinks)) {
       if (inboxLinks.length > 1) {
-        console.warn("More than 1 LDN inbox found, but only using 1 for now", inboxLinks)
+        console.warn('More than 1 LDN inbox found, but only using 1 for now', inboxLinks)
         inboxLink = inboxLinks[0]
       }
     } else {
       inboxLink = inboxLinks
     }
-    
+
     if (inboxLink) {
       inbox = url.resolve(target, inboxLink.url)
     }
-    return inbox;
+    return inbox
   }
-  
-  async function inboxFromBody(res) {
+
+  async function inboxFromBody (res) {
     const contentType = (res.headers['content-type'] || '').split(';')[0] // strip mediaType params (e.g. charset, profile)
     const body = await readableToString(res)
     let inbox
@@ -132,7 +132,7 @@ const deliverActivity = async function (activity, target) {
           var targetProfile = JSON.parse(body)
         } catch (e) {
           throw new deliveryErrors.TargetParseFailed(e.message)
-        }   
+        }
         // #TODO be more JSON-LD aware when looking for inbox
         inbox = url.resolve(target, targetProfile.inbox)
         return inbox
@@ -150,11 +150,11 @@ const deliverActivity = async function (activity, target) {
     }
   }
 
-  if ( ! inbox) throw new deliveryErrors.InboxDiscoveryFailed('No .inbox found for target ' + target)
+  if (!inbox) throw new deliveryErrors.InboxDiscoveryFailed('No .inbox found for target ' + target)
 
   // post to inbox
   const parsedInboxUrl = url.parse(inbox)
-  const deliveryRequest = (parsedInboxUrl.protocol == 'https:' ? https : http).request(Object.assign(parsedInboxUrl, {
+  const deliveryRequest = (parsedInboxUrl.protocol === 'https:' ? https : http).request(Object.assign(parsedInboxUrl, {
     headers: {
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     },
@@ -168,9 +168,9 @@ const deliverActivity = async function (activity, target) {
   } catch (e) {
     throw new deliveryErrors.DeliveryRequestFailed(e.message)
   }
-  const deliveryResponseBody = await readableToString(deliveryResponse);
-  debuglog(`ldn notify res ${deliveryResponse.statusCode} ${inbox} ${deliveryResponseBody.slice(0,100)}`)
-  if (400 <= deliveryResponse.statusCode && deliveryResponse.statusCode <= 599) {
+  const deliveryResponseBody = await readableToString(deliveryResponse)
+  debuglog(`ldn notify res ${deliveryResponse.statusCode} ${inbox} ${deliveryResponseBody.slice(0, 100)}`)
+  if (deliveryResponse.statusCode >= 400 && deliveryResponse.statusCode <= 599) {
     // client or server error
     throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}\n${deliveryResponseBody}`)
   }
@@ -185,20 +185,19 @@ exports.targetAndDeliver = async function (activity, targets = activityTargets(a
   let failures = []
   await Promise.all(
     targets
-    .map((target) => {
+      .map((target) => {
       // Don't actually deliver to publicCollection URI as it is 'special'
-      if (target === exports.publicCollectionId) {
-        return Promise.resolve(target)
-      }
-      return deliverActivity(activity, target)
-      .then(d => deliveries.push(d))
-      .catch(e => failures.push(e))
-    })
+        if (target === exports.publicCollectionId) {
+          return Promise.resolve(target)
+        }
+        return deliverActivity(activity, target)
+          .then(d => deliveries.push(d))
+          .catch(e => failures.push(e))
+      })
   )
   if (failures.length) {
-    debuglog('failures delivering '+failures)
+    debuglog('failures delivering ' + failures)
     throw new deliveryErrors.SomeDeliveriesFailed(failures)
   }
   return deliveries
 }
-

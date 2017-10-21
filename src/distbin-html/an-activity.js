@@ -3,8 +3,6 @@ const { debuglog } = require('../util')
 const { distbinBodyTemplate } = require('./partials')
 const { encodeHtmlEntities } = require('../util')
 const { everyPageHead } = require('./partials')
-const http = require('http')
-const https = require('https')
 const { isProbablyAbsoluteUrl } = require('../util')
 const marked = require('marked')
 const { readableToString } = require('../util')
@@ -15,9 +13,9 @@ const url = require('url')
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 
 // create handler to to render a single activity to a useful page
-exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
+exports.createHandler = ({apiUrl, activityId, externalUrl}) => {
   return async function (req, res) {
-    const activityUrl = apiUrl + req.url;
+    const activityUrl = apiUrl + req.url
     const activityRes = await sendRequest(createHttpOrHttpsRequest(activityUrl))
     if (activityRes.statusCode !== 200) {
       // proxy
@@ -36,7 +34,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
 
     const ancestors = await fetchReplyAncestors(activity)
 
-    async function fetchDescendants(repliesUrl) {
+    async function fetchDescendants (repliesUrl) {
       const repliesCollectionResponse = await sendRequest(createHttpOrHttpsRequest(repliesUrl))
       if (repliesCollectionResponse.statusCode !== 200) {
         return {
@@ -45,11 +43,11 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
       }
       const repliesCollection = JSON.parse(await readableToString(repliesCollectionResponse))
       if (repliesCollection.totalItems <= 0) return repliesCollection
-      repliesCollection.items = await Promise.all(repliesCollection.items.map(async function(activity) {
+      repliesCollection.items = await Promise.all(repliesCollection.items.map(async function (activity) {
         // activity with resolved .replies collection
         const withAbsoluteUrls = activityWithUrlsRelativeTo(activity, repliesUrl)
         return Object.assign(withAbsoluteUrls, {
-          replies: await fetchDescendants(withAbsoluteUrls.replies),
+          replies: await fetchDescendants(withAbsoluteUrls.replies)
         })
       }))
       return repliesCollection
@@ -112,14 +110,6 @@ exports.createHandler = ({apiUrl, activityId, externalUrl }) => {
   }
 }
 
-function renderDescendant(activity) {
-  return `
-    <div class="activity-descendant">
-      ${renderActivity(activity)}
-    </div>
-  `
-}
-
 // todo sandbox .content like
 /*
 <iframe
@@ -136,10 +126,10 @@ function renderDescendant(activity) {
       ></iframe>
 */
 exports.renderActivity = renderActivity
-function renderActivity(activity) {
+function renderActivity (activity) {
   const published =
-    (activity.object && activity.object.published)
-    || activity.published
+    (activity.object && activity.object.published) ||
+    activity.published
   const generator = formatGenerator(activity)
   const location = formatLocation(activity)
   const attributedTo = formatAttributedTo(activity)
@@ -147,60 +137,55 @@ function renderActivity(activity) {
   return `
     <article class="activity-item">
       <header>
-        ${attributedTo ? attributedTo : ''}
+        ${attributedTo || ''}
       </header>
       ${
-        activity.name
-          ? `<h1>${activity.name}</h1>`
-          :
-        activity.object && activity.object.name
-          ? `<h1>${activity.object.name}</h1>`
-          : ''
-      }
+  activity.name
+    ? `<h1>${activity.name}</h1>`
+    : activity.object && activity.object.name
+      ? `<h1>${activity.object.name}</h1>`
+      : ''
+}
       <main>${
-        sanitize(marked(
-          activity.content
-            ? activity.content
-            :
-          activity.object
-            ? activity.object.content
-            :
-          activity.name
-            ||
+  sanitize(marked(
+    activity.content
+      ? activity.content
+      : activity.object
+        ? activity.object.content
+        : activity.name ||
           activity.url
-            ? `<a href="${activity.url}">${activity.url}</a>`
-            :
-          activity.id
+          ? `<a href="${activity.url}">${activity.url}</a>`
+          : activity.id
             ? `<a href="${activity.id}">${activity.id}</a>`
             : ''
-        ))
-      }</main>
+  ))
+}</main>
 
       ${
-        tags
-        ? `
+  tags
+    ? `
           <div class="activity-tags">
             ${tags}
           </div>
         `
-        : ''
-      }
+    : ''
+}
 
       <div class="activity-attachments">
         ${((activity.object && activity.object.attachment) || []).map(attachment => {
-          if ( ! attachment) return ''
+          if (!attachment) return ''
           switch (attachment.type) {
             case 'Link':
               const prefetch = attachment['https://distbin.com/ns/linkPrefetch']
-              if ( ! (prefetch && prefetch.supportedMediaTypes)) return '';
+              if (!(prefetch && prefetch.supportedMediaTypes)) return ''
               if (prefetch.supportedMediaTypes.find(m => m.startsWith('image/'))) {
                 return `
-                  <img src="${ attachment.href }" />
+                  <img src="${attachment.href}" />
                 `
               }
-              break;
+              break
             default:
-              break;
+              break
           }
           return ''
         }).filter(Boolean).join('\n')}
@@ -211,10 +196,10 @@ function renderActivity(activity) {
         <div class="activity-footer-bar">
           <span>
             <a href="${encodeHtmlEntities(activity.url)}">${
-              published
-                ? formatDate(new Date(Date.parse(published)))
-                : 'permalink'
-            }</a>
+  published
+    ? formatDate(new Date(Date.parse(published)))
+    : 'permalink'
+}</a>
           </span>
           &nbsp;
           <span>
@@ -228,15 +213,15 @@ function renderActivity(activity) {
             </details>
           </span>
           ${
-            generator
-              ? `&nbsp;via ${generator}`
-              : ''
-          }
+  generator
+    ? `&nbsp;via ${generator}`
+    : ''
+}
           ${
-            location
-              ? `&nbsp;<span class="action-location">${location}</span>`
-              : ''
-          }
+  location
+    ? `&nbsp;<span class="action-location">${location}</span>`
+    : ''
+}
         </div>
       </footer>
     </article>
@@ -244,50 +229,50 @@ function renderActivity(activity) {
   `
 }
 
-function formatTags(activity) {
-  const tags = activity && activity.object && activity.object.tag;
-  if ( ! Array.isArray(tags)) return;
-  return tags.map(renderTag).filter(Boolean).join('&nbsp;');
-  function renderTag(tag) {
-    const text = tag.name || tag.id || tag.url;
-    if ( ! text) return;
-    const safeText = encodeHtmlEntities(text);
-    const url = tag.url || tag.id || (isProbablyAbsoluteUrl(text) ? text : '');
-    let rendered;
+function formatTags (activity) {
+  const tags = activity && activity.object && activity.object.tag
+  if (!Array.isArray(tags)) return
+  return tags.map(renderTag).filter(Boolean).join('&nbsp;')
+  function renderTag (tag) {
+    const text = tag.name || tag.id || tag.url
+    if (!text) return
+    const safeText = encodeHtmlEntities(text)
+    const url = tag.url || tag.id || (isProbablyAbsoluteUrl(text) ? text : '')
+    let rendered
     if (url) {
       rendered = `<a href="${encodeHtmlEntities(url)}" class="activity-tag">${safeText}</a>`
     } else {
       rendered = `<span class="activity-tag">${safeText}</span>`
     }
-    return rendered;
+    return rendered
   }
 }
 
-function formatAttributedTo(activity) {
-  const attributedTo = activity.attributedTo || (activity.object && activity.object.attributedTo);
-  if ( ! attributedTo) return;
-  let formatted = '';
-  let url;
+function formatAttributedTo (activity) {
+  const attributedTo = activity.attributedTo || (activity.object && activity.object.attributedTo)
+  if (!attributedTo) return
+  let formatted = ''
+  let url
   if (typeof attributedTo === 'string') {
     formatted = encodeHtmlEntities(attributedTo)
   } else if (typeof attributedTo === 'object') {
-    formatted = encodeHtmlEntities(attributedTo.name || attributedTo.url);
+    formatted = encodeHtmlEntities(attributedTo.name || attributedTo.url)
     url = attributedTo.url
   }
   if (url) {
     formatted = `<a rel="author" href="${encodeHtmlEntities(url)}">${formatted}</a>`
   }
-  if (! formatted) return;
+  if (!formatted) return
   return `
     <address class="activity-attributedTo">${formatted}</address>
   `
 }
 
-function formatLocation(activity) {
-  const location = activity && activity.location;
-  if ( ! location) return;
-  let imgUrl;
-  let linkTo;
+function formatLocation (activity) {
+  const location = activity && activity.location
+  if (!location) return
+  let imgUrl
+  let linkTo
   if (location.latitude && location.longitude) {
     imgUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${location.latitude},${location.longitude}&zoom=11&size=480x300&sensor=false`
     linkTo = `https://www.openstreetmap.org/search?query=${location.latitude},${location.longitude}`
@@ -301,8 +286,8 @@ function formatLocation(activity) {
       &#127757;
     </a>
   `
-  if ( ! imgUrl) {
-    return glyph;
+  if (!imgUrl) {
+    return glyph
   }
   return `
     <details>
@@ -325,13 +310,13 @@ function formatLocation(activity) {
   `
 }
 
-function formatGenerator(activity) {
-  const object = activity.object || activity;
-  const generator = object.generator;
-  if ( ! generator) return '';
+function formatGenerator (activity) {
+  const object = activity.object || activity
+  const generator = object.generator
+  if (!generator) return ''
   let generatorText
-  if (generator.name) generatorText = generator.name;
-  else if (generator.id) generatorText = generator.id;
+  if (generator.name) generatorText = generator.name
+  else if (generator.id) generatorText = generator.id
   let generatorUrl
   if (generator.url) generatorUrl = generator.url
   else if (generator.id) generatorUrl = generator.id
@@ -344,8 +329,8 @@ function formatGenerator(activity) {
   return ''
 }
 
-exports.createActivityCss = createActivityCss;
-function createActivityCss() {
+exports.createActivityCss = createActivityCss
+function createActivityCss () {
   return `
     .ancestors,
     .descendants {
@@ -403,19 +388,10 @@ function createActivityCss() {
   `
 }
 
-function renderActivityTree(a) {
-  return `
-    <div class="activity-tree">
-      ${renderActivity(a)}
-      ${renderDescendantsSection(a.replies)}    
-    </div>
-  `
-}
-
-function renderDescendantsSection(replies) {
-  let inner = '';
+function renderDescendantsSection (replies) {
+  let inner = ''
   if (replies.totalItems === 0) return ''
-  if ( ! replies.items && replies.name) {
+  if (!replies.items && replies.name) {
     inner = replies.name
   } else if (replies.items.length === 0) {
     inner = 'uh... totalItems > 0 but no items included. #TODO'
@@ -439,10 +415,10 @@ function renderAncestor (ancestor) {
     return `
       <article class="activity-item">
         <a href="${ancestor.href}">${ancestor.href}</a> (${
-          ancestor[failedToFetch] === true
-            ? "couldn't fetch more info"
-            : ancestor[failedToFetch]
-        })
+  ancestor[failedToFetch] === true
+    ? "couldn't fetch more info"
+    : ancestor[failedToFetch]
+})
       </article>
     `
   }
@@ -451,9 +427,9 @@ function renderAncestor (ancestor) {
 
 // Render an item and its ancestors for each ancestor in the array.
 // This results in a nested structure conducive to indent-styling
-function renderAncestorsSection (ancestors=[]) {
-  if ( ! ancestors.length) return '';
-  const [ancestor, ...olderAncestors] = ancestors;
+function renderAncestorsSection (ancestors = []) {
+  if (!ancestors.length) return ''
+  const [ancestor, ...olderAncestors] = ancestors
   return `
     <div class="ancestors">
       ${olderAncestors.length ? renderAncestorsSection(olderAncestors) : ''}
@@ -462,9 +438,9 @@ function renderAncestorsSection (ancestors=[]) {
   `
 }
 
-async function fetchReplyAncestors(activity) {
+async function fetchReplyAncestors (activity) {
   const parentUrl = activity.object && activity.object.inReplyTo
-  if ( ! parentUrl) {
+  if (!parentUrl) {
     return []
   }
   let parent
@@ -478,7 +454,7 @@ async function fetchReplyAncestors(activity) {
         return [{
           type: 'Link',
           href: parentUrl,
-          [failedToFetch]: err.code,
+          [failedToFetch]: err.code
         }]
     }
     throw err
@@ -487,9 +463,8 @@ async function fetchReplyAncestors(activity) {
   return [parent].concat(await fetchReplyAncestors(parent))
 }
 
-async function fetchActivity(activityUrl) {
-
-  debuglog("req activity "+activityUrl)
+async function fetchActivity (activityUrl) {
+  debuglog('req activity ' + activityUrl)
   let activityUrlOrRedirect = activityUrl
   let activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
     headers: {
@@ -499,31 +474,33 @@ async function fetchActivity(activityUrl) {
   debuglog(`res activity ${activityResponse.statusCode} ${activityUrl}`)
 
   let redirectsLeft = 3
+  /* eslint-disable no-labels */
   followRedirects: while (redirectsLeft > 0) {
     switch (activityResponse.statusCode) {
       case 301:
       case 302:
-        let activityUrlOrRedirect = url.resolve(activityUrl, activityResponse.headers.location);
+        let activityUrlOrRedirect = url.resolve(activityUrl, activityResponse.headers.location)
         activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
           headers: {
             accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
           }
         })))
-        redirectsLeft--;
-        continue followRedirects;
+        redirectsLeft--
+        continue followRedirects
       case 406:
         // unacceptable. Server doesn't speak a content-type I know.
         return {
           url: activityUrl
         }
       case 200:
-        //cool
-        break followRedirects;
+        // cool
+        break followRedirects
       default:
         console.warn('unexpected fetchActivity statusCode', activityResponse.statusCode, activityUrl)
-        break followRedirects;
+        break followRedirects
     }
   }
+  /* eslint-enable no-labels */
 
   // if (activityResponse.statusCode === 500) {
   //   return {
@@ -545,59 +522,59 @@ async function fetchActivity(activityUrl) {
     case 'text/html':
       // Make an activity-like thing
       return {
-        url: activityUrl,
+        url: activityUrl
         // TODO parse <title> for .name ?
       }
     default:
-      throw new Error("Unexpected fetched activity content-type: " + resContentType + " " + activityUrl + " " )
+      throw new Error('Unexpected fetched activity content-type: ' + resContentType + ' ' + activityUrl + ' ')
   }
 }
 
 // given an activity with some URL values as maybe relative URLs,
 // return the activity with them made absolute URLs
 // TODO: use json-ld logic for this incl e.g. @base
-function activityWithUrlsRelativeTo(activity, relativeTo) {
+function activityWithUrlsRelativeTo (activity, relativeTo) {
   const propsWithUrls = ['replies', 'url']
   const withAbsoluteUrls = Object.assign(activity, propsWithUrls.reduce((a, prop) => {
-    const isRelativeUrl = u => u && ! url.parse(u).host
-    if (isRelativeUrl(activity[prop]) ) {
+    const isRelativeUrl = u => u && !url.parse(u).host
+    if (isRelativeUrl(activity[prop])) {
       return Object.assign(a, {
         [prop]: url.resolve(relativeTo, activity[prop])
       })
     }
   }, {}))
-  return withAbsoluteUrls;
+  return withAbsoluteUrls
 }
 
-function formatDate(date, relativeTo = new Date) {
-    const MONTH_STRINGS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    var diffMs = date.getTime() - relativeTo.getTime(),
-        dateString;
-    // Future
-    if (diffMs > 0) {
-        throw new Error('formatDate cannot format dates in the future')
-    }
-    // Just now (0s)
-    if (diffMs > -1000) {
-        return '1s';
-    }
-    // Less than 60s ago -> 5s
-    if (diffMs > -60 * 1000) {
-        return Math.round( -1 * diffMs / 1000) + 's';
-    }
-    // Less than 1h ago -> 5m
-    if (diffMs > -60 * 60 * 1000) {
-        return Math.round( -1 * diffMs / (1000 * 60)) + 'm';
-    }
-    // Less than 24h ago -> 5h
-    if (diffMs > -60 * 60 * 24 * 1000) {
-        return Math.round( -1 * diffMs / (1000 * 60 * 60)) + 'hrs';
-    }
-    // >= 24h ago -> 6 Jul
-    dateString = date.getDate() + ' ' + MONTH_STRINGS[date.getMonth()];
-    // or like 6 Jul 2012 if the year if its different than the relativeTo year
-    if (date.getFullYear() !== relativeTo.getFullYear()) {
-        dateString += ' ' + date.getFullYear();
-    }
-    return dateString;
+function formatDate (date, relativeTo = new Date()) {
+  const MONTH_STRINGS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const diffMs = date.getTime() - relativeTo.getTime()
+  let dateString
+  // Future
+  if (diffMs > 0) {
+    throw new Error('formatDate cannot format dates in the future')
+  }
+  // Just now (0s)
+  if (diffMs > -1000) {
+    return '1s'
+  }
+  // Less than 60s ago -> 5s
+  if (diffMs > -60 * 1000) {
+    return Math.round(-1 * diffMs / 1000) + 's'
+  }
+  // Less than 1h ago -> 5m
+  if (diffMs > -60 * 60 * 1000) {
+    return Math.round(-1 * diffMs / (1000 * 60)) + 'm'
+  }
+  // Less than 24h ago -> 5h
+  if (diffMs > -60 * 60 * 24 * 1000) {
+    return Math.round(-1 * diffMs / (1000 * 60 * 60)) + 'hrs'
+  }
+  // >= 24h ago -> 6 Jul
+  dateString = date.getDate() + ' ' + MONTH_STRINGS[date.getMonth()]
+  // or like 6 Jul 2012 if the year if its different than the relativeTo year
+  if (date.getFullYear() !== relativeTo.getFullYear()) {
+    dateString += ' ' + date.getFullYear()
+  }
+  return dateString
 };

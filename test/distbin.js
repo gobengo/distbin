@@ -62,12 +62,12 @@ tests['can page through /public collection.current'] = async function () {
     { name: 'first!' },
     { name: 'second' },
     { name: 'third' },
-    { name: 'forth' },
+    { name: 'forth' }
   ].map(a => Object.assign(a, {
     cc: ['https://www.w3.org/ns/activitystreams#Public']
   }))
   let created = []
-  for (let i=0; i < toCreate.length; i++) {
+  for (let i = 0; i < toCreate.length; i++) {
     created.push(await postActivity(d, toCreate[i]))
   }
   // const createdFull = await Promise.all(created.map(async function (url) {
@@ -88,10 +88,10 @@ tests['can page through /public collection.current'] = async function () {
   assert.equal(collection.items.length, 1)
   // we get the most recently created one
   assert.equal(url.parse(collection.items[0].url).pathname, url.parse(created[created.length - 1]).pathname)
-  assert( ! collection.next, 'collection does not have a next property')
+  assert(!collection.next, 'collection does not have a next property')
   assert(collection.current, 'collection has a .current property')
   assert(collection.first, 'collection has a .first property')
-  const page1Url = url.resolve(collectionUrl, linkToHref(collection.current));
+  const page1Url = url.resolve(collectionUrl, linkToHref(collection.current))
   // page 1
   const page1Res = await sendRequest(await requestForListener(d, {
     path: page1Url,
@@ -130,7 +130,7 @@ tests['can page through /public collection.current'] = async function () {
   // ok so if we post one more new thing, the startIndex on page2 should go up by one.
   const fifth = {
     cc: ['https://www.w3.org/ns/activitystreams#Public'],
-    name: 'fifth',
+    name: 'fifth'
   }
   created.push(await postActivity(d, fifth))
   const page2AfterFifthRes = await sendRequest(await requestForListener(d, {
@@ -151,7 +151,7 @@ tests['can page through /public collection.current'] = async function () {
       'Prefer': 'return=representation; max-member-count="2"'
     }
   }))
-  assert.equal(page3Res.statusCode, 200)  
+  assert.equal(page3Res.statusCode, 200)
   const page3 = JSON.parse(await readableToString(page3Res))
   assert.equal(page3.type, 'OrderedCollectionPage')
   assert.equal(page3.startIndex, 4)
@@ -168,10 +168,10 @@ tests['can page through /public collection.current'] = async function () {
         'Prefer': 'return=representation; max-member-count="2"'
       }
     }))
-    assert.equal(page4Res.statusCode, 200)  
+    assert.equal(page4Res.statusCode, 200)
     const page4 = JSON.parse(await readableToString(page4Res))
     assert.equal(page4.orderedItems.length, 0)
-    assert( ! page4.next)
+    assert(!page4.next)
   }
 }
 
@@ -189,7 +189,7 @@ tests['posted activities have an .inbox (e.g. to receive replies in)'] = async f
   req.write(JSON.stringify({
     '@context': 'https://www.w3.org/ns/activitypub',
     'type': 'Article',
-    'content': 'Hello, world',
+    'content': 'Hello, world'
   }))
   const postActivityRequest = await sendRequest(req)
   assert.equal(postActivityRequest.statusCode, 201)
@@ -201,7 +201,7 @@ tests['posted activities have an .inbox (e.g. to receive replies in)'] = async f
   const getActivityResponse = await sendRequest(
     await requestForListener(distbinListener, {
       headers: activitypub.clientHeaders(),
-      path: location,
+      path: location
     })
   )
   assert.equal(getActivityResponse.statusCode, 200)
@@ -225,7 +225,7 @@ tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)
     type: 'Note',
     content: 'Dear Anonymous, I believe in FSW',
     inReplyTo: parentUrl,
-    cc: [parentUrl],
+    cc: [parentUrl]
   })
   // then verify that it is in distbinA's inbox
   const replyId = JSON.parse(await readableToString(await sendRequest(http.request(replyUrl)))).id
@@ -233,7 +233,7 @@ tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)
     await requestForListener(distbinA, '/activitypub/inbox'))))
   const replyFromDistbinAInbox = distbinAInbox.items.find(a => {
     const idMatches = a.id === replyId
-    if (idMatches) return true;
+    if (idMatches) return true
     const wasDerivedFrom = a['http://www.w3.org/ns/prov#wasDerivedFrom']
     if (wasDerivedFrom && (wasDerivedFrom.id === replyId)) return true
   })
@@ -263,15 +263,9 @@ tests['When GET an activity, it has information about any replies it may have'] 
     type: 'Note',
     content: 'Dear Anonymous, I believe in FSW',
     inReplyTo: parentUrl,
-    cc: [parentUrl],
+    cc: [parentUrl]
   })
   const replyId = JSON.parse(await readableToString(await sendRequest(http.get(replyUrl)))).id
-  // this is a reply to something else to test filtering
-  const notReplyUrl = await postActivity(distbinA, {
-    type: 'Note',
-    content: 'Not a reply',
-    inReplyTo: parentUrl+'foo',
-  })
   const parent = JSON.parse(await readableToString(await sendRequest(http.get(parentUrl))))
   assert.equal(typeof parent.replies, 'string', 'has .replies URL')
   const repliesResponse = await sendRequest(http.get(url.resolve(parentUrl, parent.replies)))
@@ -309,7 +303,7 @@ tests['GET an activity has a .url that resolves'] = async function () {
     headers: {
       accept: 'text/html'
     }
-  })));
+  })))
   assert.equal(activityResponse.statusCode, 200)
   const fetchedActivity = JSON.parse(await readableToString(activityResponse))
   assert(fetchedActivity.url, 'has .url property')
@@ -326,20 +320,21 @@ tests['GET {activity.id}.json always sends json response, even if html if prefer
     headers: {
       accept: 'text/html,*/*'
     }
-  })));
+  })))
   assert.equal(activityResponse.statusCode, 200)
   const fetchedActivity = JSON.parse(await readableToString(activityResponse))
+  assert.ok(fetchedActivity)
 }
 
 // post an activity to a distbin, and return its absolute url
-async function postActivity(distbinListener, activity) {
+async function postActivity (distbinListener, activity) {
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
     }),
     method: 'post',
-    path: '/activitypub/outbox'      
+    path: '/activitypub/outbox'
   }))
   req.write(JSON.stringify(activity))
   const res = await sendRequest(req)
