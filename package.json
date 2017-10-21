@@ -12,9 +12,11 @@
     "jsdom": "^9.9.1",
     "jsonld": "^0.4.11",
     "jsonld-rdfa-parser": "^1.5.1",
+    "marked": "^0.3.6",
     "node-fetch": "^1.6.3",
     "node-uuid": "^1.4.7",
-    "parse-link-header": "^0.4.1"
+    "parse-link-header": "^0.4.1",
+    "uuid": "^3.1.0"
   },
   "devDependencies": {
     "eslint": "^3.7.1",

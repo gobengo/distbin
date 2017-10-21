@@ -1,15 +1,16 @@
+const { createHttpOrHttpsRequest } = require('../util')
 const { debuglog } = require('../util')
 const { distbinBodyTemplate } = require('./partials')
 const { encodeHtmlEntities } = require('../util')
 const { everyPageHead } = require('./partials')
 const http = require('http')
 const https = require('https')
-const { readableToString } = require('../util')
 const { isProbablyAbsoluteUrl } = require('../util')
+const marked = require('marked')
+const { readableToString } = require('../util')
 const { sanitize } = require('./sanitize')
 const { sendRequest } = require('../util')
 const url = require('url')
-const { createHttpOrHttpsRequest } = require('../util')
 
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 
@@ -157,7 +158,7 @@ function renderActivity(activity) {
           : ''
       }
       <main>${
-        sanitize(
+        sanitize(marked(
           activity.content
             ? activity.content
             :
@@ -172,7 +173,7 @@ function renderActivity(activity) {
           activity.id
             ? `<a href="${activity.id}">${activity.id}</a>`
             : ''
-        )
+        ))
       }</main>
 
       ${
