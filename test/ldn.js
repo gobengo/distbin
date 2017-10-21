@@ -89,11 +89,12 @@ tests['can POST notifications to inbox'] = async () => {
   assert.notEqual(gotNotification.id, notification.id)
   // notifications once fetched are derivedFrom the thing that was sent
   const compaction = { "@context": [
-    { "prov": "http://www.w3.org/ns/prov#wasDerivedFrom" },
+    { "wasDerivedFrom": "http://www.w3.org/ns/prov#wasDerivedFrom" },
     "http://www.w3.org/ns/activitystreams"
   ]}
   const compactedForDerivedFrom = await jsonld.compact(gotNotification, compaction)
-  const wasDerivedFrom = compactedForDerivedFrom['http://www.w3.org/ns/prov#wasDerivedFrom'];
+  const wasDerivedFrom = compactedForDerivedFrom.wasDerivedFrom;
+  assert.ok(wasDerivedFrom)
   assert.equal(wasDerivedFrom.id, notificationId)
 }
 
