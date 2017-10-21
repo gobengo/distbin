@@ -32,7 +32,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}) => {
       replies: descendants
     })
 
-    const ancestors = await fetchReplyAncestors(activity)
+    const ancestors = await fetchReplyAncestors(externalUrl, activity)
 
     async function fetchDescendants (repliesUrl) {
       const repliesCollectionResponse = await sendRequest(createHttpOrHttpsRequest(repliesUrl))
@@ -438,8 +438,9 @@ function renderAncestorsSection (ancestors = []) {
   `
 }
 
-async function fetchReplyAncestors (activity) {
-  const parentUrl = activity.object && activity.object.inReplyTo
+async function fetchReplyAncestors (baseUrl, activity) {
+  const inReplyTo = activity.object && activity.object.inReplyTo
+  const parentUrl = inReplyTo && url.resolve(baseUrl, inReplyTo)
   if (!parentUrl) {
     return []
   }
@@ -460,7 +461,7 @@ async function fetchReplyAncestors (activity) {
     throw err
   }
   // #TODO support limiting at some reasonable amount of depth to avoid too big
-  return [parent].concat(await fetchReplyAncestors(parent))
+  return [parent].concat(await fetchReplyAncestors(baseUrl, parent))
 }
 
 async function fetchActivity (activityUrl) {
