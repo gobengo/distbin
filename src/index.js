@@ -443,7 +443,7 @@ function outboxHandler ({
         const location = '/activities/' + newuuid
 
         // Save
-        activities.set(newActivity.id, newActivity)
+        await activities.set(newActivity.id, newActivity)
 
         res.writeHead(201, { location })
 

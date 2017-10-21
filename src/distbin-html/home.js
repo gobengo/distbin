@@ -90,10 +90,21 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
         }))
         postToOutboxRequest.write(JSON.stringify(activity))
         postToOutboxResponse = await sendRequest(postToOutboxRequest)
-        // handle form submission by posting to outbox
-        res.writeHead(302, { location: postToOutboxResponse.headers.location })
-        res.end()
-        return
+        switch (postToOutboxResponse.statusCode) {
+          case 201:
+            const postedLocation = postToOutboxResponse.headers.location
+            // handle form submission by posting to outbox
+            res.writeHead(302, { location: postedLocation })
+            res.end()
+            return
+            break
+          case 500:
+            res.writeHead(500)
+            postToOutboxResponse.pipe(res)
+            break;
+          default:
+            throw new Error('unexpected upstream response')
+        }
         break;
       // GET renders home page will all kinds of stuff
       case 'get':
