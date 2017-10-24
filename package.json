@@ -30,7 +30,8 @@
   "scripts": {
     "lint": "eslint --fix src test bin",
     "test": "ts-node --harmony test",
-    "start": "PORT=8000 ts-node --harmony bin/server"
+    "start": "PORT=8000 ts-node --harmony bin/server",
+    "tsc": "tsc"
   },
   "author": "",
   "license": "ISC"
