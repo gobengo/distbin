@@ -1,6 +1,6 @@
 const { createHttpOrHttpsRequest } = require('../util')
 const { debuglog } = require('../util')
-const { distbinBodyTemplate } = require('./partials')
+import { distbinBodyTemplate } from './partials'
 const { encodeHtmlEntities } = require('../util')
 const { everyPageHead } = require('./partials')
 const { isProbablyAbsoluteUrl } = require('../util')

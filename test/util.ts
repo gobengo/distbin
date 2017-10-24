@@ -3,13 +3,12 @@
 
 const http = require('http')
 const { sendRequest } = require('../src/util')
-const url = require('url')
+import * as url from 'url'
 const activitypub = require('../src/activitypub')
 const assert = require('assert')
 
 // Return Promise of an http.Request that will be sent to an http.createServer listener
-exports.requestForListener = requestForListener
-async function requestForListener (listener, requestOptions) {
+export const requestForListener = async function requestForListener (listener, requestOptions) {
   const server = http.createServer(listener)
   await listen(server)
 
@@ -24,8 +23,7 @@ async function requestForListener (listener, requestOptions) {
 }
 
 // given an http.Server, return a promise of it listening on a port
-exports.listen = listen
-async function listen (server, port = 0, ...args) {
+export const listen = function listen (server, port = 0, ...args): Promise<string> {
   let listened
   return new Promise((resolve, reject) => {
     server
@@ -39,11 +37,10 @@ async function listen (server, port = 0, ...args) {
   })
 }
 
-exports.isProbablyAbsoluteUrl = require('../src/util').isProbablyAbsoluteUrl
+export const isProbablyAbsoluteUrl = require('../src/util').isProbablyAbsoluteUrl
 
-exports.postActivity = postActivity
 // post an activity to a distbin, and return its absolute url
-async function postActivity (distbinListener, activity) {
+export const postActivity = async function postActivity (distbinListener, activity) {
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({

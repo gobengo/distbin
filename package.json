@@ -24,12 +24,13 @@
     "eslint": "^3.7.1",
     "eslint-config-standard": "^6.2.0",
     "eslint-plugin-promise": "^3.0.0",
-    "eslint-plugin-standard": "^2.0.1"
+    "eslint-plugin-standard": "^2.0.1",
+    "ts-node": "^3.3.0"
   },
   "scripts": {
     "lint": "eslint --fix src test bin",
-    "test": "node --harmony test",
-    "start": "PORT=8000 node --harmony bin/server"
+    "test": "ts-node --harmony test",
+    "start": "PORT=8000 ts-node --harmony bin/server"
   },
   "author": "",
   "license": "ISC"

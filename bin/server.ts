@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-
+import * as http from "http";
 const distbin = require('../');
 const fs = require('fs')
-const http = require('http');
 const path = require('path')
 const querystring = require('querystring')
 const url = require('url')
@@ -31,7 +30,7 @@ async function runServer() {
 	Object.keys({
 	  'SIGINT': 2,
 	  'SIGTERM': 15
-	}).forEach(function (signal) {
+	}).forEach(function (signal: NodeJS.Signals) {
 	  process.on(signal, function () {
 	  	process.exit()
 	  });
@@ -80,8 +79,15 @@ async function runServer() {
 	//   way to do that without making the api part depend on the html part
 	const mainServer = http.createServer((req, res) => {
 		// htmlHandler only supports '/' right now (#TODO)
-		const accept = req.headers.accept ? req.headers.accept.split(',') : [];
-		const preference = accept.find((mime) => ['text/html', 'application/json']) // TODO wtf?
+		let acceptHeader: string
+		if (req.headers.accept instanceof Array) {
+			acceptHeader = req.headers.accept[0]
+		} else if (typeof req.headers.accept === 'string') {
+			acceptHeader = <string>req.headers.accept
+		}
+		const preference = (acceptHeader
+			? acceptHeader.split(',')
+			: []).find((mime) => ['text/html', 'application/json'].includes(mime)) // TODO wtf?
 		// Depending on 'Accept' header, try candidate backends in a certain order (e.g. html first)
 		let prioritizedBackends;
 		switch (preference) {
@@ -117,7 +123,7 @@ async function runServer() {
 		// 	proxyResponse(htmlServerResponse, res)
 		// 	return
 		// }
-		async function forwardRequest(req, toUrl) {
+		function forwardRequest(req, toUrl): Promise<http.IncomingMessage> {
 			const reqToForward = http.request(Object.assign(url.parse(toUrl),{
 				method: req.method,
 				path: req.url,

@@ -3,9 +3,12 @@
     "types": ["node"],
     "allowJs": true,
     "outDir": "dist.ts",
-    "module": "es6",
+    "module": "commonjs",
     "target": "es6",
-    "pretty": true
+    "pretty": true,
+    "lib": [
+      "es7"
+    ]
   },
   "include": [
     "src/**/*",

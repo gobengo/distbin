@@ -1,16 +1,17 @@
+/// <reference types="node" />
 const jsonldRdfaParser = require('jsonld-rdfa-parser')
-const jsonld = require('jsonld')
-jsonld.registerRDFParser('text/html', jsonldRdfaParser)
+const jsonldLib = require('jsonld')
+jsonldLib.registerRDFParser('text/html', jsonldRdfaParser)
 const url = require('url')
-const http = require('http')
+import * as http from "http";
 const https = require('https')
 const fs = require('fs')
 const path = require('path')
 
-exports.debuglog = require('util').debuglog('distbin')
+export const debuglog = require('util').debuglog('distbin')
 
-exports.readableToString = async function (readable) {
-  let body = ''
+export const readableToString = function (readable): Promise<string> {
+  let body: string = ''
   return new Promise((resolve, reject) => {
     readable.on('error', reject)
     readable.on('data', (chunk) => {
@@ -21,11 +22,11 @@ exports.readableToString = async function (readable) {
   })
 }
 
-exports.requestUrl = (req) => `http://${req.headers.host}${req.url}`
+export const requestUrl = (req) => `http://${req.headers.host}${req.url}`
 
 // given a map of strings/regexes to listener factories,
 // return a matching route (or undefined if no match)
-exports.route = (routes, req) => {
+export const route = (routes, req) => {
   const path = url.parse(req.url).pathname
   for (let [route, createHandler] of routes.entries()) {
     if (typeof route === 'string') {
@@ -41,7 +42,7 @@ exports.route = (routes, req) => {
   }
 }
 
-exports.sendRequest = async function (request) {
+export const sendRequest = function (request): Promise<http.IncomingMessage> {
   return new Promise((resolve, reject) => {
     request.once('response', resolve)
     request.once('error', reject)
@@ -59,7 +60,7 @@ const NON_ALPHANUMERIC_REGEXP = /([^#-~| |!])/g
  * @param value
  * @returns {string} escaped text
  */
-exports.encodeHtmlEntities = function encodeEntities (value) {
+export const encodeHtmlEntities = function encodeEntities (value) {
   return value
     .replace(/&/g, '&amp;')
     .replace(SURROGATE_PAIR_REGEXP, function (value) {
@@ -76,8 +77,7 @@ exports.encodeHtmlEntities = function encodeEntities (value) {
 
 // given a function that accepts a "node-style" errback as its last argument, return
 // a function that returns a promise instead
-exports.denodeify = denodeify
-function denodeify (funcThatAcceptsErrback) {
+export const denodeify = function denodeify (funcThatAcceptsErrback) {
   return function (...args) {
     return new Promise((resolve, reject) => {
       funcThatAcceptsErrback.apply(this, args.concat([(err, ...results) => {
@@ -88,29 +88,26 @@ function denodeify (funcThatAcceptsErrback) {
   }.bind(this)
 }
 
-exports.rdfaToJsonLd = async function rdfaToJsonLd (html) {
-  return denodeify(jsonld.fromRDF)(html, { format: 'text/html' })
+export const rdfaToJsonLd = async function rdfaToJsonLd (html) {
+  return denodeify(jsonldLib.fromRDF)(html, { format: 'text/html' })
   // // use it
-  // jsonld.fromRDF(html, {format: 'text/html'}, function(err, data) {
+  // jsonldLib.fromRDF(html, {format: 'text/html'}, function(err, data) {
 }
 
-exports.isProbablyAbsoluteUrl = isProbablyAbsoluteUrl
-function isProbablyAbsoluteUrl (url) {
+export const isProbablyAbsoluteUrl = function isProbablyAbsoluteUrl (url) {
   const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i')
   return absoluteUrlPattern.test(url)
 }
 
-exports.requestMaxMemberCount = requestMaxMemberCount
-// Check request parameters (http Prefer, then querystring) for a max-member-count
-function requestMaxMemberCount (req) {
+// given an http request, return a number that is the maximum number of results this client wants in this response
+export const requestMaxMemberCount = function requestMaxMemberCount (req) {
   const headerMatch = req.headers.prefer ? req.headers.prefer.match(/max-member-count="(\d+)"/) : null
   if (headerMatch) return parseInt(headerMatch[1], 10)
   // check querystring
   return parseInt(url.parse(req.url, true).query['max-member-count'], 10)
 }
 
-exports.createHttpOrHttpsRequest = createHttpOrHttpsRequest
-function createHttpOrHttpsRequest (urlOrObj) {
+export const createHttpOrHttpsRequest = function createHttpOrHttpsRequest (urlOrObj) {
   let parsedUrl = urlOrObj
   if (typeof urlOrObj === 'string') {
     parsedUrl = url.parse(urlOrObj)
@@ -130,16 +127,16 @@ function createHttpOrHttpsRequest (urlOrObj) {
   return createRequest(urlOrObj)
 }
 
-exports.linkToHref = linkToHref
-function linkToHref (hrefOrLinkObj) {
+// given a Link object or url string, return an href string that can be used to refer to it
+export const linkToHref = function linkToHref (hrefOrLinkObj) {
   if (typeof hrefOrLinkObj === 'string') return hrefOrLinkObj
   if (typeof hrefOrLinkObj === 'object') return hrefOrLinkObj.href
   throw new Error('Unexpected link type: ' + typeof hrefOrLinkObj)
 }
 
-jsonld.documentLoader = createCustomDocumentLoader()
+jsonldLib.documentLoader = createCustomDocumentLoader()
 
-exports.jsonld = jsonld.promises
+export const jsonld = jsonldLib.promises
 
 function createCustomDocumentLoader () {
   // define a mapping of context URL => context doc
@@ -148,9 +145,9 @@ function createCustomDocumentLoader () {
   }
 
   // grab the built-in node.js doc loader
-  var nodeDocumentLoader = jsonld.documentLoaders.node()
-  // or grab the XHR one: jsonld.documentLoaders.xhr()
-  // or grab the jquery one: jsonld.documentLoaders.jquery()
+  var nodeDocumentLoader = jsonldLib.documentLoaders.node()
+  // or grab the XHR one: jsonldLib.documentLoaders.xhr()
+  // or grab the jquery one: jsonldLib.documentLoaders.jquery()
 
   // change the default document loader using the callback API
   // (you can also do this using the promise-based API, return a promise instead
@@ -170,7 +167,7 @@ function createCustomDocumentLoader () {
     browser-based document loaders (xhr or jquery) return promises if they
     are supported (or polyfilled) in the browser. This behavior can be
     controlled with the 'usePromise' option when constructing the document
-    loader. For example: jsonld.documentLoaders.xhr({usePromise: false}); */
+    loader. For example: jsonldLib.documentLoaders.xhr({usePromise: false}); */
   }
   return customLoader
 }

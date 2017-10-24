@@ -3,13 +3,13 @@ const {
   targetAndDeliver,
   publicCollectionId
 } = require('./activitypub')
-const {
+import {
   debuglog,
   readableToString,
   route,
   requestMaxMemberCount,
   jsonld
-} = require('./util')
+} from './util'
 const url = require('url')
 const uuid = require('node-uuid')
 const querystring = require('querystring')
@@ -30,11 +30,15 @@ function distbin ({
   activities = new Map(),
   inbox = new Map(),
   // used for delivering to other inboxes so they can find this guy
-  externalUrl
-} = {}) {
+  externalUrl,
+}:{
+  activities?: Map<string, object>,
+  inbox?: Map<string, object>,
+  externalUrl?: string
+}={}) {
   return function (req, res) {
     externalUrl = externalUrl || `http://${req.headers.host}${req.url}`
-    const routes = new Map([
+    let handler = route(new Map<string|RegExp, Function>([
       ['/', () => index],
       ['/recent', () => recentHandler({ activities })],
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox, externalUrl })],
@@ -49,9 +53,7 @@ function distbin ({
         (activityUuid) => activityHandler({ activities, activityUuid })],
       [/^\/activities\/([^/]+)\/replies$/,
         (activityUuid) => activityRepliesHandler({ activities, activityUuid })]
-    ])
-
-    let handler = route(routes, req)
+    ]), req)
 
     if (!handler) {
       handler = error(404)
@@ -99,7 +101,7 @@ const locallyHostedActivity = function (activity, { externalUrl = '' } = {}) {
     throw new Error('Unexpected .url property when processing activity assumed to be locally hosted')
   }
   const uuidMatch = activity.id.match(/^urn:uuid:([^$]+)$/)
-  if (!uuidMatch) throw new Error("Couldn't determine UUID for activity with id", activity.id)
+  if (!uuidMatch) throw new Error(`Couldn't determine UUID for activity with id: ${activity.id}`)
   const uuid = uuidMatch[1]
   // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
   let inboxUrl = url.resolve(externalUrl, '/activitypub/inbox') // TODO should this be an inbox specific to this activity?
@@ -160,7 +162,18 @@ function activityWithExtensionHandler ({ activities, activityUuid, format }) {
   }
 }
 
-function activityRepliesHandler ({ activities, activityUuid }) {
+
+interface Post {
+  inReplyTo?: string | Post
+}
+
+
+interface Activity {
+  object: string | Post
+}
+
+function activityRepliesHandler ({ activities,
+                                   activityUuid }) {
   return async function (req, res) {
     const uri = uuidUri(activityUuid)
     const activity = await Promise.resolve(activities.get(uri))
@@ -170,10 +183,10 @@ function activityRepliesHandler ({ activities, activityUuid }) {
       res.end('There is no activity ' + uri)
       return
     }
-    const allActivities = Array.from(await Promise.resolve(activities.values()))
+    const allActivities: Iterable<Activity> = Array.from(await Promise.resolve(activities.values()))
     const replies = Array.from(allActivities)
       .filter(activity => {
-        const parent = activity && activity.object && activity.object.inReplyTo
+        const parent = activity && (typeof activity.object === 'object') && activity.object.inReplyTo
         if (!parent) return
         // TODO .inReplyTo could be a urn, http URL, something else?
         return url.parse(parent).pathname === '/activities/' + activityUuid
@@ -647,7 +660,7 @@ function publicCollectionPageHandler ({ activities }) {
   }
 }
 
-function error (statusCode, error) {
+function error (statusCode, error?) {
   if (error) {
     console.error(error)
   }

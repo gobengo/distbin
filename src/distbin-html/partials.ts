@@ -1,5 +1,5 @@
 // HTML fragment that should appear in every page's <head> element
-exports.everyPageHead = () => `
+export const everyPageHead = () => `
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
   body {
@@ -20,16 +20,16 @@ exports.everyPageHead = () => `
   </style>
 `
 
-exports.aboveFold = (html) => `
+export const aboveFold = (html) => `
   <div class="distbin-above-fold">
    ${html}
   </div>
 `
 
 // wrap page with common body template for distbin-html (e.g. header/footer)
-exports.distbinBodyTemplate = (page) => `
+export const distbinBodyTemplate = (page) => `
   <head>
-    ${exports.everyPageHead()}
+    ${everyPageHead()}
   </head>
   ${header()}
   <div class="distbin-main">

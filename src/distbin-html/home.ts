@@ -4,7 +4,7 @@ const querystring = require('querystring')
 const url = require('url')
 const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
 const { distbinBodyTemplate } = require('./partials')
-const { requestUrl } = require('../util')
+import { requestUrl } from '../util'
 const { isProbablyAbsoluteUrl } = require('../util')
 const { createHttpOrHttpsRequest } = require('../util')
 
@@ -30,7 +30,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
           throw new Error('Error parsing location form fields')
         }
 
-        let attributedTo = {}
+        let attributedTo = <any>{}
         if (formFields['attributedTo.name']) {
           attributedTo.name = formFields['attributedTo.name']
         }
@@ -287,7 +287,16 @@ EOF`)}
 }
 
 function parseLocationFormFields (formFields) {
-  let location = { type: 'Place' }
+  interface Location {
+    type: string
+    name: string
+    units: string
+    latitude: number
+    longitude: number
+    accuracy: number
+    radius: number
+  }
+  let location = <Location>{ type: 'Place' }
   const floatFieldNames = [
     'location.latitude',
     'location.longitude',
@@ -305,7 +314,7 @@ function parseLocationFormFields (formFields) {
     let fieldVal = formFields[k]
     if (!fieldVal) return
     let propName = k.split('.')[1]
-    location[propName] = parseFloat(fieldVal, 10)
+    location[propName] = parseFloat(fieldVal)
   })
   if (Object.keys(location).length === 1) {
     // there were no location formFields

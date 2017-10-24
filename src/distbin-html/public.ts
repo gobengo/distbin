@@ -1,4 +1,4 @@
-const { distbinBodyTemplate } = require('./partials')
+import { distbinBodyTemplate } from './partials'
 const { sendRequest } = require('../util')
 const { encodeHtmlEntities } = require('../util')
 const { readableToString } = require('../util')

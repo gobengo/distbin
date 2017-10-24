@@ -11,7 +11,8 @@ const { sendRequest } = require('../src/util')
 const url = require('url')
 
 if (require.main === module) {
-  postManyFixtures(...process.argv.slice(2))
+	const [distbinUrl] = process.argv.slice(2)
+  postManyFixtures(distbinUrl)
   .then(() => process.exit())
   .catch((err) => {
   	console.error("Uncaught Error", err)
@@ -24,11 +25,9 @@ function createActivityFixture({ inReplyTo }) {
 	const fixture = {
 		type: 'Note',
 		content: loremIpsum(),
-	  cc: ["https://www.w3.org/ns/activitystreams#Public"]
+	  cc: ["https://www.w3.org/ns/activitystreams#Public"],
+	  inReplyTo,
 	};
-	if (inReplyTo) {
-		fixture.inReplyTo = inReplyTo
-	}
 	return fixture
 }
 

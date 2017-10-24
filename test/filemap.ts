@@ -1,4 +1,4 @@
-const assert = require('assert')
+import * as assert from 'assert'
 const { denodeify } = require('../src/util')
 const fs = require('fs')
 const { JSONFileMap } = require('../src/filemap')
@@ -19,10 +19,10 @@ tests['iterates in insertion order (helped by fs created timestamp)'] = withdir(
   for (let k of insertionOrder) {
     filemap.set(k, k + ' value')
   }
-  assert.deepEqual(Array.from(filemap).map((k, v) => k), insertionOrder)
+  assert.deepEqual(Array.from(filemap).map(([k, v]) => k), insertionOrder)
   // new filemaps from same dir should have same insertion order
   const filemap2 = new JSONFileMap(dir)
-  assert.deepEqual(Array.from(filemap2).map((k, v) => k), insertionOrder)
+  assert.deepEqual(Array.from(filemap2).map(([k, v]) => k), insertionOrder)
 })
 
 // create a temporary directory and pass its path to the provided function

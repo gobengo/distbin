@@ -10,7 +10,7 @@ const { readableToString } = require('../src/util')
 const { requestForListener } = require('./util')
 const { linkToHref } = require('../src/util')
 const { sendRequest } = require('../src/util')
-const url = require('url')
+import * as url from 'url'
 
 let tests = module.exports
 

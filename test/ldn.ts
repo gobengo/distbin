@@ -5,7 +5,7 @@ const { distbin } = require('../src')
 const http = require('http')
 const uuid = require('uuid')
 const { jsonld } = require('../src/util')
-const url = require('url')
+import * as url from 'url'
 
 let tests = module.exports
 

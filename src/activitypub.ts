@@ -1,10 +1,10 @@
-const { debuglog } = require('./util')
-const http = require('http')
-const https = require('https')
-const parseLinkHeader = require('parse-link-header')
-const { rdfaToJsonLd } = require('./util')
-const { readableToString, sendRequest } = require('./util')
-const url = require('url')
+import { debuglog } from './util'
+import * as http from 'http'
+import * as https from 'http'
+import * as parseLinkHeader from 'parse-link-header'
+import { rdfaToJsonLd } from './util'
+import { readableToString, sendRequest } from './util'
+import * as url from 'url'
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
@@ -45,7 +45,7 @@ exports.clientHeaders = (headers = {}) => {
   return Object.assign(requirements, headers)
 }
 
-const makeErrorClass = (name, setUp) => class extends Error {
+const makeErrorClass = (name, setUp?:Function) => class extends Error {
   constructor (msg) {
     super(msg)
     this.message = msg
