@@ -1,7 +1,7 @@
 const activitypub = require('../src/activitypub')
 const assert = require('assert')
 const distbin = require('../')
-const http = require('http')
+import * as http from 'http'
 const { readableToString, sendRequest } = require('../src/util')
 const { listen, requestForListener } = require('./util')
 const { isProbablyAbsoluteUrl } = require('./util')
@@ -307,7 +307,9 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
     'type': 'Note',
     'content': 'This is a note',
     'published': '2015-02-10T15:04:55Z',
-    'to': [activitypub.publicCollectionId]
+    'to': [activitypub.publicCollectionId],
+    'cc': ['ben@bengo.is'],
+    'bcc': ['benbcc@bengo.is'],
   }
   req.write(JSON.stringify(example10))
   const res = await sendRequest(req)
