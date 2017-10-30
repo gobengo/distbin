@@ -72,8 +72,9 @@ const deliveryErrors = exports.deliveryErrors = {
 }
 
 const request = (urlOrOptions, ...otherArgs) => {
-  const options = typeof urlOrOptions === 'string' ? url.parse(urlOrOptions) : urlOrOptions
-  return (options.protocol === 'https:' ? https : http).request(urlOrOptions, ...otherArgs)
+  const options = typeof urlOrOptions === 'string' ? url.parse(urlOrOptions) : urlOrOptions;
+  const httpModule = options.protocol === 'https:' ? https : http
+  return httpModule.request(urlOrOptions)
 }
 
 // deliver an activity to a target

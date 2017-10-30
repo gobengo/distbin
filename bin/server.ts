@@ -4,6 +4,7 @@ const distbin = require('../');
 const fs = require('fs')
 const path = require('path')
 const querystring = require('querystring')
+const os = require('os')
 const url = require('url')
 const { JSONFileMapAsync } = require('../src/filemap');
 
@@ -37,7 +38,7 @@ async function runServer() {
 	});
 
 	const externalUrl = process.env.EXTERNAL_URL || `http://localhost:${process.env.PORT}`
-	const dbDir = process.env.DB_DIR || fs.mkdtempSync('/tmp/distbin-');
+	const dbDir = process.env.DB_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'distbin-'));
 	// ensure subdirs exist
 	await Promise.all(['activities', 'inbox'].map(dir => {
 		return denodeify(fs.mkdir)(path.join(dbDir, dir))

@@ -183,7 +183,7 @@ function activityRepliesHandler ({ activities,
       res.end('There is no activity ' + uri)
       return
     }
-    const allActivities: Iterable<Activity> = Array.from(await Promise.resolve(activities.values()))
+    const allActivities: Iterable<Activity> = await Promise.resolve(activities.values())
     const replies = Array.from(allActivities)
       .filter(activity => {
         const parent = activity && (typeof activity.object === 'object') && activity.object.inReplyTo
