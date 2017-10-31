@@ -7,16 +7,16 @@ const os = require('os')
 
 const tests = module.exports
 
-tests['saves keys as files in dir, and values as file contents'] = withdir(dir => {
+tests['saves keys as files in dir, and values as file contents'] = withdir((dir: string) => {
   const filemap = new JSONFileMap(dir)
   filemap.set('key', 'value')
   assert.deepEqual(fs.readdirSync(dir), ['key'])
   assert.equal(fs.readFileSync(path.join(dir, 'key'), 'utf8'), '"value"')
 })
 
-const timer = ms => new Promise((resolve, reject) => setTimeout(resolve, ms))
+const timer = (ms: number) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 
-tests['iterates in insertion order (helped by fs created timestamp)'] = withdir(async function (dir) {
+tests['iterates in insertion order (helped by fs created timestamp)'] = withdir(async function (dir: string) {
   const filemap = new JSONFileMap(dir)
   const insertionOrder = [1, 2, 10].map(String)
   for (let k of insertionOrder) {
@@ -32,7 +32,7 @@ tests['iterates in insertion order (helped by fs created timestamp)'] = withdir(
 
 // create a temporary directory and pass its path to the provided function
 // no matter what happens, remove the folder
-function withdir (doWork) {
+function withdir (doWork: Function) {
   return async function () {
     const dir = await denodeify(fs.mkdtemp)(path.join(os.tmpdir(), 'distbin-test-withdir-'))
     try {
@@ -44,9 +44,9 @@ function withdir (doWork) {
 }
 
 // rm -rf
-function deleteFolderRecursive (dir) {
+function deleteFolderRecursive (dir: string) {
   if (fs.existsSync(dir)) {
-    fs.readdirSync(dir).forEach(function (file, index) {
+    fs.readdirSync(dir).forEach(function (file: string) {
       var curPath = path.join(dir, file)
       if (fs.lstatSync(curPath).isDirectory()) { // recurse
         deleteFolderRecursive(curPath)

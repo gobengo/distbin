@@ -1,4 +1,5 @@
 const http = require('http')
+import {IncomingMessage, ServerResponse} from 'http'
 const { publicCollectionId } = require('../activitypub')
 const querystring = require('querystring')
 const url = require('url')
@@ -7,9 +8,10 @@ const { distbinBodyTemplate } = require('./partials')
 import { requestUrl } from '../util'
 const { isProbablyAbsoluteUrl } = require('../util')
 const { createHttpOrHttpsRequest } = require('../util')
+import { Link, LinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchSuccess, HasLinkPrefetchResult } from '../types'
 
-exports.createHandler = function ({ apiUrl, externalUrl }) {
-  return async function (req, res) {
+exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externalUrl:string}) {
+  return async function (req: IncomingMessage, res:ServerResponse) {
     switch (req.method.toLowerCase()) {
       // POST is form submission to create a new post
       case 'post':
@@ -47,7 +49,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }) {
 
         let tag
         if (formFields['tag_csv']) {
-          tag = formFields['tag_csv'].split(',').map((n) => {
+          tag = formFields['tag_csv'].split(',').map((n: string) => {
             return {
               name: n.trim()
             }
@@ -286,35 +288,37 @@ EOF`)}
   }
 }
 
-function parseLocationFormFields (formFields) {
+function parseLocationFormFields (formFields: {[key:string]:string}) {
   interface Location {
     type: string
     name: string
     units: string
+    altitude: number
     latitude: number
     longitude: number
     accuracy: number
     radius: number
   }
   let location = <Location>{ type: 'Place' }
-  const floatFieldNames = [
-    'location.latitude',
-    'location.longitude',
-    'location.altitude',
-    'location.accuracy',
-    'location.radius'
+  const formFieldPrefix = 'location.'
+  const prefixed = (name:string) => `${formFieldPrefix}${name}`
+  const floatFieldNames: (keyof Location)[] = [
+    'latitude',
+    'longitude',
+    'altitude',
+    'accuracy',
+    'radius'
   ]
-  if (formFields['location.name']) {
+  if (formFields[prefixed('name')]) {
     location.name = formFields['location.name']
   }
-  if (formFields['location.units']) {
+  if (formFields[prefixed('units')]) {
     location.units = formFields['location.units']
   }
-  floatFieldNames.forEach(k => {
-    let fieldVal = formFields[k]
+  floatFieldNames.forEach((k:keyof Location) => {
+    let fieldVal = formFields[prefixed(k)]
     if (!fieldVal) return
-    let propName = k.split('.')[1]
-    location[propName] = parseFloat(fieldVal)
+    location[k] = parseFloat(fieldVal)
   })
   if (Object.keys(location).length === 1) {
     // there were no location formFields
@@ -323,11 +327,12 @@ function parseLocationFormFields (formFields) {
   return location
 }
 
-async function getAttachmentLinkForUrl (attachment) {
-  let attachmentLink = attachment && {
+async function getAttachmentLinkForUrl (attachment: string) {
+  let attachmentLink: Link & HasLinkPrefetchResult = attachment && {
     type: 'Link',
     href: attachment
   }
+  let linkPrefetchResult: LinkPrefetchResult
   if (attachment && attachmentLink) {
     // try to request the URL to figure out what kind of media type it responds with
     // then we can store a hint to future clients that render it
@@ -341,7 +346,7 @@ async function getAttachmentLinkForUrl (attachment) {
       console.error(error)
     }
     if (connectionError) {
-      attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+      linkPrefetchResult = <LinkPrefetchFailure>{
         error: {
           message: connectionError.message
         }
@@ -349,20 +354,21 @@ async function getAttachmentLinkForUrl (attachment) {
     } else if (attachmentResponse.statusCode === 200) {
       const contentType = attachmentResponse.headers['content-type']
       if (contentType) {
-        attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+        linkPrefetchResult = <LinkPrefetchSuccess>{
           published: new Date().toISOString(),
           supportedMediaTypes: [contentType]
         }
       }
     } else {
       // no connection error, not 200, must be another
-      attachmentLink['https://distbin.com/ns/linkPrefetch'] = {
+      linkPrefetchResult = <LinkPrefetchFailure>{
         error: {
           status: attachmentResponse.statusCode
         }
       }
     }
   }
+  attachmentLink['https://distbin.com/ns/linkPrefetch'] = linkPrefetchResult
   return attachmentLink
 }
 

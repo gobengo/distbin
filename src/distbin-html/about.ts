@@ -1,8 +1,9 @@
 const { distbinBodyTemplate } = require('./partials')
 const { requestUrl } = require('../util')
+import {IncomingMessage, ServerResponse} from 'http'
 
-exports.createHandler = function ({ externalUrl }) {
-  return (req, res) => {
+exports.createHandler = function ({ externalUrl }:{externalUrl:string}) {
+  return (req: IncomingMessage, res: ServerResponse) => {
     res.writeHead(200, {
       'content-type': 'text/html'
     })
@@ -13,7 +14,7 @@ exports.createHandler = function ({ externalUrl }) {
   }
 }
 
-function createReplySection ({ inReplyTo }) {
+function createReplySection ({ inReplyTo }:{inReplyTo:string}) {
   return `
     <style>
     .distbin-reply-section header {
@@ -30,7 +31,7 @@ function createReplySection ({ inReplyTo }) {
   `
 }
 
-function createReplyForm ({ inReplyTo }) {
+function createReplyForm ({ inReplyTo }:{inReplyTo:string}) {
   return `
     <style>
     .post-form textarea {

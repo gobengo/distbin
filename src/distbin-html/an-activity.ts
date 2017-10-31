@@ -1,6 +1,7 @@
 const { createHttpOrHttpsRequest } = require('../util')
 const { debuglog } = require('../util')
 import { distbinBodyTemplate } from './partials'
+import { IncomingMessage, ServerResponse } from 'http'
 const { encodeHtmlEntities } = require('../util')
 const { everyPageHead } = require('./partials')
 const { isProbablyAbsoluteUrl } = require('../util')
@@ -8,13 +9,16 @@ const marked = require('marked')
 const { readableToString } = require('../util')
 const { sanitize } = require('./sanitize')
 const { sendRequest } = require('../util')
+const { ensureArray } = require('../util')
+const { flatten } = require('../util')
 const url = require('url')
-
+import {Activity,Collection, LDObject, ASObject, Link, Place} from '../types'
+import {LinkPrefetchResult, LinkPrefetchSuccess, LinkPrefetchFailure, HasLinkPrefetchResult} from '../types'
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 
 // create handler to to render a single activity to a useful page
-exports.createHandler = ({apiUrl, activityId, externalUrl}) => {
-  return async function (req, res) {
+exports.createHandler = ({apiUrl, activityId, externalUrl}:{apiUrl:string, activityId: string, externalUrl: string}) => {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     const activityUrl = apiUrl + req.url
     const activityRes = await sendRequest(createHttpOrHttpsRequest(activityUrl))
     if (activityRes.statusCode !== 200) {
@@ -34,7 +38,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}) => {
 
     const ancestors = await fetchReplyAncestors(externalUrl, activity)
 
-    async function fetchDescendants (repliesUrl) {
+    async function fetchDescendants (repliesUrl: string) {
       const repliesCollectionResponse = await sendRequest(createHttpOrHttpsRequest(repliesUrl))
       if (repliesCollectionResponse.statusCode !== 200) {
         return {
@@ -43,11 +47,14 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}) => {
       }
       const repliesCollection = JSON.parse(await readableToString(repliesCollectionResponse))
       if (repliesCollection.totalItems <= 0) return repliesCollection
-      repliesCollection.items = await Promise.all(repliesCollection.items.map(async function (activity) {
+      repliesCollection.items = await Promise.all(repliesCollection.items.map(async function (activity: Activity) {
         // activity with resolved .replies collection
         const withAbsoluteUrls = activityWithUrlsRelativeTo(activity, repliesUrl)
+        
         return Object.assign(withAbsoluteUrls, {
-          replies: await fetchDescendants(withAbsoluteUrls.replies)
+          replies: (typeof withAbsoluteUrls.replies === 'string')
+            ? await fetchDescendants(withAbsoluteUrls.replies)
+            : withAbsoluteUrls.replies
         })
       }))
       return repliesCollection
@@ -126,9 +133,9 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}) => {
       ></iframe>
 */
 exports.renderActivity = renderActivity
-function renderActivity (activity) {
+function renderActivity (activity: Activity) {
   const published =
-    (activity.object && activity.object.published) ||
+    (activity.object instanceof ASObject && activity.object.published) ||
     activity.published
   const generator = formatGenerator(activity)
   const location = formatLocation(activity)
@@ -142,7 +149,7 @@ function renderActivity (activity) {
       ${
   activity.name
     ? `<h1>${activity.name}</h1>`
-    : activity.object && activity.object.name
+    : activity.object instanceof ASObject && activity.object.name
       ? `<h1>${activity.object.name}</h1>`
       : ''
 }
@@ -150,7 +157,7 @@ function renderActivity (activity) {
   sanitize(marked(
     activity.content
       ? activity.content
-      : activity.object
+      : activity.object instanceof ASObject
         ? activity.object.content
         : activity.name ||
           activity.url
@@ -172,15 +179,19 @@ function renderActivity (activity) {
 }
 
       <div class="activity-attachments">
-        ${((activity.object && activity.object.attachment) || []).map(attachment => {
+        ${ensureArray(activity.object instanceof ASObject && activity.object.attachment).map((attachment: ASObject & HasLinkPrefetchResult) => {
           if (!attachment) return ''
           switch (attachment.type) {
             case 'Link':
-              const prefetch = attachment['https://distbin.com/ns/linkPrefetch']
-              if (!(prefetch && prefetch.supportedMediaTypes)) return ''
-              if (prefetch.supportedMediaTypes.find(m => m.startsWith('image/'))) {
+              const prefetch: LinkPrefetchResult = attachment['https://distbin.com/ns/linkPrefetch']
+              if (prefetch instanceof LinkPrefetchFailure) {
+                return
+              }
+              const linkPrefetchSuccess = <LinkPrefetchSuccess>prefetch
+              if (!(linkPrefetchSuccess && linkPrefetchSuccess.supportedMediaTypes)) return ''
+              if (linkPrefetchSuccess.supportedMediaTypes.find((m: string) => m.startsWith('image/'))) {
                 return `
-                  <img src="${attachment.href}" />
+                  <img src="${linkPrefetchSuccess.link.href}" />
                 `
               }
               break
@@ -229,11 +240,11 @@ function renderActivity (activity) {
   `
 }
 
-function formatTags (activity) {
-  const tags = activity && activity.object && activity.object.tag
+function formatTags (activity: Activity) {
+  const tags = activity.object instanceof ASObject && activity.object.tag
   if (!Array.isArray(tags)) return
   return tags.map(renderTag).filter(Boolean).join('&nbsp;')
-  function renderTag (tag) {
+  function renderTag (tag: ASObject) {
     const text = tag.name || tag.id || tag.url
     if (!text) return
     const safeText = encodeHtmlEntities(text)
@@ -248,8 +259,8 @@ function formatTags (activity) {
   }
 }
 
-function formatAttributedTo (activity) {
-  const attributedTo = activity.attributedTo || (activity.object && activity.object.attributedTo)
+function formatAttributedTo (activity:ASObject|Activity) {
+  const attributedTo = activity.attributedTo || (activity instanceof Activity && (activity.object instanceof ASObject) && activity.object.attributedTo)
   if (!attributedTo) return
   let formatted = ''
   let url
@@ -268,8 +279,8 @@ function formatAttributedTo (activity) {
   `
 }
 
-function formatLocation (activity) {
-  const location = activity && activity.location
+function formatLocation (activity: ASObject) {
+  const location: Place = activity && activity.location
   if (!location) return
   let imgUrl
   let linkTo
@@ -310,18 +321,21 @@ function formatLocation (activity) {
   `
 }
 
-function formatGenerator (activity) {
-  const object = activity.object || activity
+function formatGenerator (activity: Activity) {
+  if (typeof activity.object === 'string') return ''
+  const object: ASObject = activity.object || activity
   const generator = object.generator
   if (!generator) return ''
-  let generatorText
-  if (generator.name) generatorText = generator.name
-  else if (generator.id) generatorText = generator.id
-  let generatorUrl
-  if (generator.url) generatorUrl = generator.url
-  else if (generator.id) generatorUrl = generator.id
-  if (generatorUrl) {
-    return `<a target="_blank" href="${generatorUrl}">${generatorText}</a>`
+  let generatorText  
+  if (generator instanceof ASObject) {
+    if (generator.name) generatorText = generator.name
+    else if (generator.id) generatorText = generator.id
+    let generatorUrl
+    if (generator.url) generatorUrl = generator.url
+    else if (generator.id) generatorUrl = generator.id
+    if (generatorUrl) {
+      return `<a target="_blank" href="${generatorUrl}">${generatorText}</a>`
+    }
   }
   if (generatorText) {
     return generatorText
@@ -388,7 +402,11 @@ function createActivityCss () {
   `
 }
 
-function renderDescendantsSection (replies) {
+class ASObjectWithFetchedReplies extends ASObject {
+  replies: Collection<ASObjectWithFetchedReplies>  
+}
+
+function renderDescendantsSection (replies:Collection<ASObjectWithFetchedReplies>) {
   let inner = ''
   if (replies.totalItems === 0) return ''
   if (!replies.items && replies.name) {
@@ -396,7 +414,7 @@ function renderDescendantsSection (replies) {
   } else if (replies.items.length === 0) {
     inner = 'uh... totalItems > 0 but no items included. #TODO'
   } else {
-    inner = replies.items.map(a => `
+    inner = replies.items.map((a: ASObjectWithFetchedReplies) => `
       ${renderActivity(a)}
       ${renderDescendantsSection(a.replies)}
     `).join('')
@@ -409,16 +427,14 @@ function renderDescendantsSection (replies) {
 }
 
 // Render a single ancestor activity
-function renderAncestor (ancestor) {
-  if (ancestor[failedToFetch]) {
+function renderAncestor (ancestor:Activity|LinkPrefetchFailure) : string {
+  if (ancestor instanceof LinkPrefetchFailure) {
+    const linkFetchFailure = <LinkPrefetchFailure>ancestor
+    const href = linkFetchFailure.link.href
     // assume its a broken link
     return `
       <article class="activity-item">
-        <a href="${ancestor.href}">${ancestor.href}</a> (${
-  ancestor[failedToFetch] === true
-    ? "couldn't fetch more info"
-    : ancestor[failedToFetch]
-})
+        <a href="${href}">${href}</a> (${linkFetchFailure.error || "couldn't fetch more info"})
       </article>
     `
   }
@@ -427,7 +443,7 @@ function renderAncestor (ancestor) {
 
 // Render an item and its ancestors for each ancestor in the array.
 // This results in a nested structure conducive to indent-styling
-function renderAncestorsSection (ancestors = []) {
+function renderAncestorsSection (ancestors:(Activity|LinkPrefetchFailure)[] = []):string {
   if (!ancestors.length) return ''
   const [ancestor, ...olderAncestors] = ancestors
   return `
@@ -438,13 +454,17 @@ function renderAncestorsSection (ancestors = []) {
   `
 }
 
-async function fetchReplyAncestors (baseUrl, activity) {
-  const inReplyTo = activity.object && activity.object.inReplyTo
+async function fetchReplyAncestors (baseUrl: string, activity:Activity): Promise<(Activity|LinkPrefetchFailure)[]> {
+
+  const inReplyTo = flatten(ensureArray(activity.object)
+    .filter((o:object|string): o is object => typeof o === 'object')
+    .map((o:Activity) => ensureArray(o.inReplyTo))
+  )[0]
   const parentUrl = inReplyTo && url.resolve(baseUrl, inReplyTo)
   if (!parentUrl) {
     return []
   }
-  let parent
+  let parent: Activity
   try {
     parent = activityWithUrlsRelativeTo(await fetchActivity(parentUrl), parentUrl)
   } catch (err) {
@@ -452,19 +472,23 @@ async function fetchReplyAncestors (baseUrl, activity) {
       case 'ECONNREFUSED':
       case 'ENOTFOUND':
         // don't recurse since we can't fetch the parent
-        return [{
-          type: 'Link',
-          href: parentUrl,
-          [failedToFetch]: err.code
-        }]
+        return [<LinkPrefetchFailure>({
+          link: {
+            type: 'Link',
+            href: parentUrl,
+          },
+          error: err
+        })]
     }
     throw err
   }
   // #TODO support limiting at some reasonable amount of depth to avoid too big
-  return [parent].concat(await fetchReplyAncestors(baseUrl, parent))
+  const ancestorsOfParent = await fetchReplyAncestors(baseUrl, parent)
+  const ancestorsOrFailures = [parent, ...ancestorsOfParent]
+  return ancestorsOrFailures
 }
 
-async function fetchActivity (activityUrl) {
+async function fetchActivity (activityUrl: string) {
   debuglog('req activity ' + activityUrl)
   let activityUrlOrRedirect = activityUrl
   let activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
@@ -534,20 +558,25 @@ async function fetchActivity (activityUrl) {
 // given an activity with some URL values as maybe relative URLs,
 // return the activity with them made absolute URLs
 // TODO: use json-ld logic for this incl e.g. @base
-function activityWithUrlsRelativeTo (activity, relativeTo) {
-  const propsWithUrls = ['replies', 'url']
-  const withAbsoluteUrls = Object.assign(activity, propsWithUrls.reduce((a, prop) => {
-    const isRelativeUrl = u => u && !url.parse(u).host
-    if (isRelativeUrl(activity[prop])) {
-      return Object.assign(a, {
-        [prop]: url.resolve(relativeTo, activity[prop])
+function activityWithUrlsRelativeTo (activity:Activity, relativeTo:string): Activity {
+  enum UrlProps {
+    replies,
+    url,
+  }
+  type UrlProp = keyof typeof UrlProps
+  const propsWithUrls: UrlProp[] = Object.keys(UrlProps) as UrlProp[]
+  const withAbsoluteUrls = Object.assign(activity, propsWithUrls.reduce((a, prop: UrlProp) => {
+    const isRelativeUrl = (u: string) => u && !url.parse(u).host
+    return Object.assign(a, {
+      [prop]: ensureArray(activity[prop]).map((relativeUrl:string) => {
+        return isRelativeUrl(relativeUrl) ? url.resolve(relativeTo, relativeUrl) : url
       })
-    }
+    })
   }, {}))
   return withAbsoluteUrls
 }
 
-function formatDate (date, relativeTo = new Date()) {
+function formatDate (date: Date, relativeTo = new Date()) {
   const MONTH_STRINGS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const diffMs = date.getTime() - relativeTo.getTime()
   let dateString

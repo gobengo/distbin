@@ -11,6 +11,6 @@ const DOMPurify = createDOMPurify(window)
 
 exports.sanitize = DOMPurify.sanitize.bind(DOMPurify)
 
-exports.toText = function (html) {
+exports.toText = function (html: string) {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS: ['#text'] })
 }

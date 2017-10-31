@@ -9,19 +9,20 @@ const http = require('http')
 const { readableToString } = require('../src/util')
 const { sendRequest } = require('../src/util')
 const url = require('url')
+import { Activity } from '../src/types'
 
 if (require.main === module) {
-	const [distbinUrl] = process.argv.slice(2)
+  const [distbinUrl] = process.argv.slice(2)
   postManyFixtures(distbinUrl)
   .then(() => process.exit())
-  .catch((err) => {
+  .catch((err: Error) => {
   	console.error("Uncaught Error", err)
   	process.exit(1)
   })
 }
 
 // Create a sample activity
-function createActivityFixture({ inReplyTo }) {
+function createActivityFixture({ inReplyTo }:{inReplyTo:string}) {
 	const fixture = {
 		type: 'Note',
 		content: loremIpsum(),
@@ -32,7 +33,14 @@ function createActivityFixture({ inReplyTo }) {
 }
 
 // post many fixtures, including replies, to distbinUrl over HTTP
-async function postManyFixtures(distbinUrl, { max=32, maxDepth=4, thisDepth=1, inReplyTo=undefined }={}) {
+async function postManyFixtures(
+	distbinUrl: string,
+	{ max=32, maxDepth=4, thisDepth=1, inReplyTo }:{
+		max?: number,
+		maxDepth?: number,
+		thisDepth?: number,
+		inReplyTo?: string
+	}={}): Promise<Activity[]> {
 	const posted = []
 	while (max--) {
 		// console.log('max', max)
@@ -54,7 +62,7 @@ async function postManyFixtures(distbinUrl, { max=32, maxDepth=4, thisDepth=1, i
 }
 
 // post a single fixture to distbinUrl over HTTP
-async function postActivity(distbinUrl, activity) {
+async function postActivity(distbinUrl: string, activity: Activity) {
 	if ( ! distbinUrl) {
 		throw new Error("Please provide a distbinUrl argument")
 	}

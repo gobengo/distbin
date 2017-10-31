@@ -11,18 +11,23 @@ if (require.main === module) {
     .catch(() => process.exit(1))
 }
 
+type Test = Function
+type TestsMap = {
+  [key: string]: Test
+}
+
 // execute some tests (tests are object with test name/msg as key and func as val)
 // if env var TEST_FILTER is defined, only tests whose names contain that string will run
 exports.run = run
-async function run (tests) {
+async function run (tests: TestsMap) {
   const testFilter = process.env.TEST_FILTER
   const results = await Promise.all(
     // map to array of promises of logged errors
     // (or falsy if the test passed)
     Object.keys(tests)
       .map((testName) => [testName, tests[testName]])
-      .map(([testName, runTest]) => {
-        function logFailure (err) {
+      .map(([testName, runTest]: [string, Test]) => {
+        function logFailure (err: Error) {
           console.error(`TEST FAIL: ${testName}\n${err.stack}\n`)
         }
         if (testFilter && testName.indexOf(testFilter) === -1) {

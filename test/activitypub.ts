@@ -5,6 +5,7 @@ import * as http from 'http'
 const { readableToString, sendRequest } = require('../src/util')
 const { listen, requestForListener } = require('./util')
 const { isProbablyAbsoluteUrl } = require('./util')
+import { Activity, LDValue } from './types'
 
 const tests = module.exports
 
@@ -32,9 +33,9 @@ The object's unique global identifier
 type
 The type of the object
 */
-activitypub.objectHasRequiredProperties = (obj) => {
+activitypub.objectHasRequiredProperties = (obj: {[key:string]: any}) => {
   const requiredProperties = ['id', 'type']
-  const missingProperties = requiredProperties.filter(p => obj[p])
+  const missingProperties = requiredProperties.filter((p: string) => obj[p])
   return Boolean(!missingProperties.length)
 }
 
@@ -111,7 +112,7 @@ tests['can address activities to the public Collection when sending to outbox, a
   // #critique ... ok so this is an example of where it's hard to know whether its in the Collection
   // because of id generation and such
   assert(publicCollection.totalItems > 0, 'publicCollection has at least one item')
-  assert(publicCollection.items.filter((a) => a.type === 'Like' && a.object === 'https://rhiaro.co.uk/2016/05/minimal-activitypub').length === 1,
+  assert(publicCollection.items.filter((a: Activity) => a.type === 'Like' && a.object === 'https://rhiaro.co.uk/2016/05/minimal-activitypub').length === 1,
     'publicCollection contains the activity that targeted it')
 }
 
@@ -133,7 +134,7 @@ tests['The inbox must be an OrderedCollection'] = async function () {
   assert(isOrderedCollection(resBody))
 }
 
-function isOrderedCollection (something) {
+function isOrderedCollection (something: string|object) {
   const obj = typeof something === 'string' ? JSON.parse(something) : something
   // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
   let type = obj.type

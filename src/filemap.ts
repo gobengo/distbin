@@ -2,30 +2,26 @@ import * as fs from 'fs'
 import * as path from 'path'
 const { denodeify } = require('./util')
 
-// A Map that reads/writes keys from files in a directory
-// Can only store Strings
-// Oh also get/set return Promises
-const FileMapPrivates = {
-  dir: Symbol('dir')
-}
-
 // TODO: Write tests
 
 // Like a Map, but keys are files in a dir, and object values are written as file contents
-exports.JSONFileMap = class JSONFileMap extends Map {
-  constructor (dir) {
+exports.JSONFileMap = class JSONFileMap<V> extends Map<string,V> {
+  constructor (private dir:string) {
     super()
-    this[FileMapPrivates.dir] = dir
   }
-  ['set'] (key, val) {
+  private keyToString(key: string): string {
+    if (typeof key === 'string') return key
+    return JSON.stringify(key)
+  }
+  ['set'] (key:string, val:V) {
     // coerce to string
-    const filePath = path.join(this[FileMapPrivates.dir], key)
+    const filePath = path.join(this.dir, key)
     const valString = JSON.stringify(val, null, 2)
     fs.writeFileSync(filePath, valString)
     return this
   }
-  ['get'] (key) {
-    const filePath = path.join(this[FileMapPrivates.dir], key)
+  ['get'] (key:string) {
+    const filePath = path.join(this.dir, this.keyToString(key))
     let fileContents
     try {
       fileContents = fs.readFileSync(filePath, 'utf8')
@@ -38,17 +34,17 @@ exports.JSONFileMap = class JSONFileMap extends Map {
     }
     return JSON.parse(fileContents)
   }
-  ['delete'] (key) {
-    fs.unlinkSync(path.join(this[FileMapPrivates.dir], key))
+  ['delete'] (key:string) {
+    fs.unlinkSync(path.join(this.dir, this.keyToString(key)))
     return true
   }
   [Symbol.iterator] () {
     return this.entries()[Symbol.iterator]()
   }
   keys () {
-    const dir = this[FileMapPrivates.dir]
+    const dir = this.dir
     const files = fs.readdirSync(dir)
-    const sortedAscByCreation = files
+    const sortedAscByCreation: string[] = files
       .map(name => {
         const stat = fs.statSync(path.join(dir, name))
         return ({ name, stat })
@@ -68,16 +64,18 @@ exports.JSONFileMap = class JSONFileMap extends Map {
     return sortedAscByCreation[Symbol.iterator]()
   }
   values () {
-    return Array.from(this.keys()).map(file => this.get(file))[Symbol.iterator]()
+    return Array.from(this.keys()).map((file: string) => this.get(file))[Symbol.iterator]()
   }
-  entries (): IterableIterator<[any, any]> {
-    return Array.from(this.keys()).map(file => [file, this.get(file)] as [string, any])[Symbol.iterator]()
+  entries () {
+    return Array.from(this.keys()).map((file) => [file, this.get(file)] as [string,V])[Symbol.iterator]()
   }
   get size () {
     return Array.from(this.keys()).length
   }
 }
 
+type AsyncMapKey = string
+type AsyncMapValue = object
 interface IAsyncMap<K, V> {
     clear(): Promise<void>;
     delete(key: K): Promise<boolean>;
@@ -93,23 +91,23 @@ interface IAsyncMap<K, V> {
 }
 
 // Like a Map, but all methods return a Promise
-class AsyncMap implements IAsyncMap<any,any> {
+class AsyncMap<K, V> implements IAsyncMap<K,V> {
   async clear() {
     return Map.prototype.clear.call(this)
   }
-  async delete(key) {
+  async delete(key: K) {
     return Map.prototype.delete.call(this, key)
   }
-  forEach(...args) {
-    return Map.prototype.forEach.call(this, ...args)
+  forEach(callbackfn: (value: V, index: K, map: Map<K, V>) => void) {
+    return Map.prototype.forEach.call(this, callbackfn)
   }
-  async get(key) {
+  async get(key: K) {
     return Map.prototype.get.call(this, key)
   }
-  async has(key) {
+  async has(key: K) {
     return Map.prototype.has.call(this, key)
   }
-  async set(key, value) {
+  async set(key: K, value: V) {
     return Map.prototype.set.call(this, key, value)
   }
   async entries() {
@@ -130,20 +128,19 @@ class AsyncMap implements IAsyncMap<any,any> {
 
 // Like JSONFileMap, but all methods return Promises of their values
 // and i/o is done async
-exports.JSONFileMapAsync = class JSONFileMapAsync extends AsyncMap implements IAsyncMap<string, any> {
-  constructor (dir) {
+exports.JSONFileMapAsync = class JSONFileMapAsync extends AsyncMap<string, any> implements IAsyncMap<string, any> {
+  constructor (private dir:string) {
     super()
-    this[FileMapPrivates.dir] = dir
   }
-  async ['set'] (key, val) {
+  async ['set'] (key:string, val:string|object) {
     // coerce to string
-    const filePath = path.join(this[FileMapPrivates.dir], key)
+    const filePath = path.join(this.dir, key)
     const valString = typeof val === 'string' ? val : JSON.stringify(val, null, 2)
     return denodeify(fs.writeFile)(filePath, valString)
   }
-  async ['get'] (key) {
+  async ['get'] (key:string) {
     try {
-      return JSON.parse(await denodeify(fs.readFile)(path.join(this[FileMapPrivates.dir], key), 'utf8'))
+      return JSON.parse(await denodeify(fs.readFile)(path.join(this.dir, key), 'utf8'))
     } catch (err) {
       switch (err.code) {
         case 'ENOENT':
@@ -154,16 +151,16 @@ exports.JSONFileMapAsync = class JSONFileMapAsync extends AsyncMap implements IA
       }
     }
   }
-  async ['delete'] (key) {
-    fs.unlinkSync(path.join(this[FileMapPrivates.dir], key))
+  async ['delete'] (key:string) {
+    fs.unlinkSync(path.join(this.dir, key))
     return true
   }
   [Symbol.iterator] () {
-    return this.keys()[Symbol.iterator]()
+    return this.keys().then(keys => keys[Symbol.iterator]())
   }
   // todo make async
   async keys () {
-    const dir = this[FileMapPrivates.dir]
+    const dir = this.dir
     const files = fs.readdirSync(dir)
     const sortedAscByCreation = files
       .map(name => {

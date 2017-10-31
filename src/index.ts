@@ -5,19 +5,23 @@ const {
 } = require('./activitypub')
 import {
   debuglog,
+  ensureArray,
   readableToString,
-  route,
+  route, RoutePattern, RouteResponderFactory,
   requestMaxMemberCount,
-  jsonld
+  jsonld,
+  flatten
 } from './util'
 const url = require('url')
 const uuid = require('node-uuid')
 const querystring = require('querystring')
 const assert = require('assert')
 const accepts = require('accepts')
+import { IncomingMessage, ServerResponse } from 'http'
+import { Activity, ActivityMap, Extendable, HttpRequestResponder, LDValue, LDValues, LDObject, ASObject, JSONLD } from './types'
 
 // given a non-uri activity id, return an activity URI
-const uuidUri = (uuid) => `urn:uuid:${uuid}`
+const uuidUri = (uuid:string) => `urn:uuid:${uuid}`
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
@@ -36,9 +40,9 @@ function distbin ({
   inbox?: Map<string, object>,
   externalUrl?: string
 }={}) {
-  return function (req, res) {
+  return function (req: IncomingMessage, res: ServerResponse) {
     externalUrl = externalUrl || `http://${req.headers.host}${req.url}`
-    let handler = route(new Map<string|RegExp, Function>([
+    let handler = route(new Map<RoutePattern, RouteResponderFactory>([
       ['/', () => index],
       ['/recent', () => recentHandler({ activities })],
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox, externalUrl })],
@@ -47,12 +51,12 @@ function distbin ({
       ['/activitypub/public', () => publicCollectionHandler({ activities })],
       // /activities/{activityUuid}.{format}
       [/^\/activities\/([^/]+?)(\.(.+))$/,
-        (activityUuid, _, format) => activityWithExtensionHandler({ activities, activityUuid, format })],
+        (activityUuid:string, _:string, format:string) => activityWithExtensionHandler({ activities, activityUuid, format })],
       // /activities/{activityUuid}
       [/^\/activities\/([^/]+)$/,
-        (activityUuid) => activityHandler({ activities, activityUuid })],
+        (activityUuid: string) => activityHandler({ activities, activityUuid })],
       [/^\/activities\/([^/]+)\/replies$/,
-        (activityUuid) => activityRepliesHandler({ activities, activityUuid })]
+        (activityUuid: string) => activityRepliesHandler({ activities, activityUuid })]
     ]), req)
 
     if (!handler) {
@@ -69,7 +73,7 @@ function distbin ({
 }
 
 // Return new value for a JSON-LD object's value, appending to any existing one
-function jsonldAppend (oldVal, valToAppend) {
+function jsonldAppend (oldVal:any, valToAppend: any) {
   let newVal
   switch (typeof oldVal) {
     case 'object':
@@ -89,13 +93,13 @@ function jsonldAppend (oldVal, valToAppend) {
   return newVal
 }
 
-function isHostedLocally (activityFreshFromStorage) {
+function isHostedLocally (activityFreshFromStorage:Activity) {
   return !activityFreshFromStorage.hasOwnProperty('url')
 }
 
 // return a an extended version of provided activity with some extra metadata properties like 'inbox', 'url', 'replies'
 // if 'baseUrl' opt is provided, those extra properties will be absolute URLs, not relative
-const locallyHostedActivity = function (activity, { externalUrl = '' } = {}) {
+const locallyHostedActivity = function (activity: Extendable<Activity>, { externalUrl }:{externalUrl?:string} = {}) {
   if (activity.url) {
     debuglog('Unexpected .url property when processing activity assumed to be locally hosted\n' + JSON.stringify(activity))
     throw new Error('Unexpected .url property when processing activity assumed to be locally hosted')
@@ -116,8 +120,8 @@ const locallyHostedActivity = function (activity, { externalUrl = '' } = {}) {
 }
 
 // get specific activity by id
-function activityHandler ({ activities, activityUuid }) {
-  return async function (req, res) {
+function activityHandler ({ activities, activityUuid}:{activities:ActivityMap,activityUuid:string}) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     const uri = uuidUri(activityUuid)
     const activity = await Promise.resolve(activities.get(uri))
     // #TODO: If the activity isn't addressed to the public, we should enforce access controls here.
@@ -131,7 +135,7 @@ function activityHandler ({ activities, activityUuid }) {
       if (activity.url) {
         // see other
         res.writeHead(302, {
-          location: activity.url
+          location: (ensureArray(activity.url).filter((u: any): u is string => typeof u === 'string') as string[])[0]
         })
         res.end(activity.url)
         return
@@ -151,8 +155,12 @@ function activityHandler ({ activities, activityUuid }) {
   }
 }
 
-function activityWithExtensionHandler ({ activities, activityUuid, format }) {
-  return async function (req, res) {
+function activityWithExtensionHandler ({ activities, activityUuid, format }:{
+  activities:ActivityMap,
+  activityUuid: string,
+  format:string
+}) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     if (format !== 'json') {
       res.writeHead(404)
       res.end('Unsupported activity extension .' + format)
@@ -162,19 +170,9 @@ function activityWithExtensionHandler ({ activities, activityUuid, format }) {
   }
 }
 
-
-interface Post {
-  inReplyTo?: string | Post
-}
-
-
-interface Activity {
-  object: string | Post
-}
-
 function activityRepliesHandler ({ activities,
-                                   activityUuid }) {
-  return async function (req, res) {
+                                   activityUuid }:{activities:ActivityMap,activityUuid:string}) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     const uri = uuidUri(activityUuid)
     const activity = await Promise.resolve(activities.get(uri))
     // #TODO: If the activity isn't addressed to the public, we should enforce access controls here.
@@ -186,10 +184,20 @@ function activityRepliesHandler ({ activities,
     const allActivities: Iterable<Activity> = await Promise.resolve(activities.values())
     const replies = Array.from(allActivities)
       .filter(activity => {
-        const parent = activity && (typeof activity.object === 'object') && activity.object.inReplyTo
-        if (!parent) return
-        // TODO .inReplyTo could be a urn, http URL, something else?
-        return url.parse(parent).pathname === '/activities/' + activityUuid
+        type ParentId = string
+        class Reply extends ASObject {}
+        const replies: Reply[] = ensureArray<any>(activity.object).filter((o:any): o is Reply => o instanceof Reply)
+        const inReplyTos = flatten(replies.map((object: Reply) => ensureArray<any>(object.inReplyTo).map((o:any): ParentId => {
+          if (typeof o === 'string') return o
+          if (o instanceof ASObject) return o.id
+        })))
+        const inReplyToStrs: ParentId[] = inReplyTos.map((o: LDValue<ParentId>) => {
+          if (typeof o === 'string') return o
+        })
+        return inReplyTos.some((inReplyTo:ParentId) => {
+          // TODO .inReplyTo could be a urn, http URL, something else?
+          return url.parse(inReplyTo).pathname === '/activities/' + activityUuid
+        })
       })
       .map(activity => {
         if (isHostedLocally(activity)) {
@@ -211,7 +219,7 @@ function activityRepliesHandler ({ activities,
 }
 
 // root route, do nothing for now but 200
-function index (req, res) {
+function index (req: IncomingMessage, res: ServerResponse) {
   res.writeHead(200, {
     'content-type': 'application/json'
   })
@@ -234,8 +242,8 @@ function index (req, res) {
 }
 
 // fetch a collection of recent Activities/things
-function recentHandler ({ activities }) {
-  return async function (req, res) {
+function recentHandler ({ activities }:{activities:ActivityMap}) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     res.writeHead(200, {
       'Access-Control-Allow-Origin': '*',
@@ -256,8 +264,12 @@ function recentHandler ({ activities }) {
 
 // route for ActivityPub Inbox
 // https://w3c.github.io/activitypub/#inbox
-function inboxHandler ({ activities, externalUrl, inbox }) {
-  return async function (req, res) {
+function inboxHandler ({ activities, externalUrl, inbox } : {
+  activities: ActivityMap,
+  externalUrl: string,
+  inbox: ActivityMap,
+}) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     switch (req.method.toLowerCase()) {
       case 'options':
         res.writeHead(200, {
@@ -372,26 +384,32 @@ function inboxHandler ({ activities, externalUrl, inbox }) {
         res.end()
         break
       default:
-        return error(405, 'Method not allowed: ')(req, res)
+        return error(405, new Error('Method not allowed: '))(req, res)
     }
   }
 }
 
 // given a AS2 object, return it's JSON-LD @id
-const getJsonLdId = (obj) => {
-  const jsonLdId = typeof obj === 'string' ? obj : (obj.id || obj['@id'])
-  return jsonLdId
+const getJsonLdId = (obj:string|Activity|JSONLD) => {
+  if (typeof obj === 'string') {
+    return obj
+  } else if (obj instanceof JSONLD) {
+    return obj['@id']
+  } else if (obj instanceof Activity) {
+    return obj.id
+  }
 }
 
 // return whether a given activity targets another resource (e.g. in to, cc, bcc)
-const activityHasTarget = (activity, target) => {
+const activityHasTarget = (activity: Activity, target: ASObject) => {
   const targetId = getJsonLdId(target)
   if (!targetId) {
     throw new Error("Couldn't determine @id of " + target)
   }
   for (const targetList of [activity.to, activity.cc, activity.bcc]) {
     if (!targetList) continue
-    const idsOfTargets = (Array.isArray(targetList) ? targetList : [targetList]).map(getJsonLdId)
+    const targets = ensureArray<string|ASObject>(targetList)
+    const idsOfTargets = targets.map((i:string|ASObject) => getJsonLdId(i))
     if (idsOfTargets.includes(targetId)) return true
   }
   return false
@@ -403,8 +421,8 @@ function outboxHandler ({
   activities,
   // external location of distbin (used for delivery)
   externalUrl
-}) {
-  return async function (req, res) {
+}:{activities:ActivityMap, externalUrl: string}) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     switch (req.method.toLowerCase()) {
       case 'get':
         res.writeHead(200, {
@@ -419,7 +437,7 @@ function outboxHandler ({
       case 'post':
         const requestBody = await readableToString(req)
         const newuuid = uuid()
-        let parsed
+        let parsed: { [key: string]: any }
         try {
           parsed = JSON.parse(requestBody)
         } catch (e) {
@@ -438,7 +456,7 @@ function outboxHandler ({
             'object': parsed
           },
           // copy over audience from submitted object to activity
-          ['to', 'cc', 'bcc'].reduce((props, key) => {
+          ['to', 'cc', 'bcc'].reduce((props: {[key:string]:any}, key) => {
             if (key in parsed) props[key] = parsed[key]
             return props
           }, {})
@@ -464,7 +482,7 @@ function outboxHandler ({
           await targetAndDeliver(activityToDeliver)
         } catch (e) {
           if (e.name === 'SomeDeliveriesFailed') {
-            const failures = e.failures.map(f => {
+            const failures = e.failures.map((f: Error) => {
               return {
                 name: f.name,
                 message: f.message
@@ -486,15 +504,15 @@ function outboxHandler ({
         res.end()
         break
       default:
-        return error(405, 'Method not allowed: ')(req, res)
+        return error(405, new Error('Method not allowed: '))(req, res)
     }
   }
 }
 
 // route for ActivityPub Public Collection
 // https://w3c.github.io/activitypub/#public-addressing
-function publicCollectionHandler ({ activities }) {
-  return async function (req, res) {
+function publicCollectionHandler ({ activities }:{ activities:ActivityMap }) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const publicActivities = []
     const itemsForThisPage = []
@@ -543,12 +561,75 @@ function publicCollectionHandler ({ activities }) {
   }
 }
 
-function publicCollectionPageHandler ({ activities }) {
-  return async function (req, res) {
+
+interface PropertyFilter {
+  readonly [key: string]: Comparison
+}
+
+interface SExpression {
+}
+
+interface AndExpression extends SExpression {
+  and: Filter[]
+}
+
+function isAndExpression(expression: object): expression is AndExpression { //magic happens here
+  return (<AndExpression>expression).and !== undefined;
+}
+
+interface OrExpression extends SExpression {
+  or: Filter[]  
+}
+
+function isOrExpression(expression: object): expression is OrExpression { //magic happens here
+  return (<OrExpression>expression).or !== undefined;
+}
+
+type CompoundFilter = AndExpression | OrExpression
+
+function isCompoundFilter(filter: object): filter is CompoundFilter {
+  return isAndExpression(filter) || isOrExpression(filter)
+}
+
+type Filter = PropertyFilter | CompoundFilter
+
+type FilterComparison = 'lt' | 'equals'
+
+type Cursor = CompoundFilter
+
+interface LessThanComparison {
+  lt: string
+}
+
+function isLessThanComparison(comparison: object): comparison is LessThanComparison {
+  return Boolean((<LessThanComparison>comparison).lt)
+}
+
+interface EqualsComparison {
+  equals: string
+}
+
+function isEqualsComparison(comparison: object): comparison is EqualsComparison {
+  return Boolean((<EqualsComparison>comparison).equals)
+}
+
+type Comparison = LessThanComparison | EqualsComparison
+
+function isComparison(comparison: object): comparison is Comparison {
+  return Boolean((<LessThanComparison>comparison).lt || (<EqualsComparison>comparison).equals)
+}
+
+function getClauses(expression: CompoundFilter): Filter[] {
+  if (isAndExpression(expression)) return expression.and
+  else if (isOrExpression(expression)) return expression.or
+}
+
+function publicCollectionPageHandler ({ activities }:{ activities: Map<string,Activity> }) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const parsedUrl = url.parse(req.url, true)
     let cursor
-    let matchesCursor = a => true
+    let matchesCursor = (a: Activity) => true
     if (parsedUrl.query.cursor) {
       try {
         cursor = JSON.parse(parsedUrl.query.cursor)
@@ -557,45 +638,38 @@ function publicCollectionPageHandler ({ activities }) {
         res.end(JSON.stringify({ message: 'Invalid cursor in querystring' }))
         return
       }
-      const createMatchesCursor = cursor => activity => {
-        const ops = ['and', 'or', 'equals']
+      const createMatchesCursor = (cursor: CompoundFilter) => (activity: Extendable<Activity>) => {
         assert.equal(Object.keys(cursor).length, 1)
-        let bool = Object.keys(cursor).find(k => ops.includes(k))
-
-        const clauses = cursor[bool]
+        const clauses: Filter[] = getClauses(cursor) || []
         for (let i = 0; i < clauses.length; i++) {
-          let filterN = clauses[i]
-          assert.equal(Object.keys(filterN).length, 1)
-          let prop = Object.keys(filterN)[0]
-          let matchesRequirement
-          if (ops.includes(prop)) {
+          let filter = clauses[i]
+          assert.equal(Object.keys(filter).length, 1)
+          let prop = Object.keys(filter)[0]
+          let matchesRequirement: boolean
+          //if (prop instanceof AndExpression | OrExpression | EqualsExpression) {
+          if (isCompoundFilter(filter)) {
+            const compoundFilter: CompoundFilter = filter
             // this is another expression, recurse
-            matchesRequirement = createMatchesCursor(filterN)(activity)
+            matchesRequirement = createMatchesCursor(compoundFilter)(activity)
           } else {
-            let requirement = filterN[prop]
-            assert.equal(Object.keys(requirement).length, 1)
-            let op = Object.keys(requirement)[0]
+            const propertyFilter: PropertyFilter = filter
+            let comparison: Comparison = propertyFilter[prop]
             let propValue = activity[prop]
-            switch (op) {
-              case 'lt':
-                matchesRequirement = propValue < requirement[op]
-                break
-              case 'equals':
-                matchesRequirement = propValue === requirement[op]
-                break
-              default:
-                throw new Error('Unexpected op in createMatchesCursor: ' + op)
+            if (isLessThanComparison(comparison)) {
+              matchesRequirement = propValue < comparison.lt
+            } else if (isEqualsComparison(comparison)) {
+              matchesRequirement = propValue === comparison.equals
             }
           }
-          if (matchesRequirement && (bool === 'or')) {
+          if (matchesRequirement && isOrExpression(cursor)) {
             return true
           }
-          if ((!matchesRequirement) && (bool === 'and')) {
+          if ((!matchesRequirement) && isAndExpression(cursor)) {
             return false
           }
         }
-        if (bool === 'or') return false
-        if (bool === 'and') return true
+        if (isOrExpression(cursor)) return false
+        if (isAndExpression(cursor)) return true
       }
       matchesCursor = createMatchesCursor(cursor)
     }
@@ -660,11 +734,11 @@ function publicCollectionPageHandler ({ activities }) {
   }
 }
 
-function error (statusCode, error?) {
+function error (statusCode: number, error?: Error) {
   if (error) {
     console.error(error)
   }
-  return (req, res) => {
+  return (req: IncomingMessage, res: ServerResponse) => {
     res.writeHead(statusCode)
     const responseText = error ? error.toString() : statusCode.toString()
     res.end(responseText)

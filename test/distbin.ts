@@ -11,6 +11,7 @@ const { requestForListener } = require('./util')
 const { linkToHref } = require('../src/util')
 const { sendRequest } = require('../src/util')
 import * as url from 'url'
+import { HttpRequestResponder, Activity, Extendable, LDValue, LDValues, LDObject, DistbinActivity } from './types'
 
 let tests = module.exports
 
@@ -231,11 +232,22 @@ tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)
   const replyId = JSON.parse(await readableToString(await sendRequest(http.request(replyUrl)))).id
   const distbinAInbox = JSON.parse(await readableToString(await sendRequest(
     await requestForListener(distbinA, '/activitypub/inbox'))))
-  const replyFromDistbinAInbox = distbinAInbox.items.find(a => {
+  const replyFromDistbinAInbox = distbinAInbox.items.find((a: DistbinActivity) => {
     const idMatches = a.id === replyId
     if (idMatches) return true
     const wasDerivedFrom = a['http://www.w3.org/ns/prov#wasDerivedFrom']
-    if (wasDerivedFrom && (wasDerivedFrom.id === replyId)) return true
+    if ( ! wasDerivedFrom) return false
+    function nodeWasDerivedFrom(o: DistbinActivity, nodeId: string): boolean {
+      if (typeof o === 'object') return o.id === nodeId
+      else if (typeof o === 'string') return o === nodeId
+      return false
+    }
+    const matchesReplyId = (o: DistbinActivity): boolean => nodeWasDerivedFrom(o, replyId)    
+    if (wasDerivedFrom instanceof Array) {
+      return wasDerivedFrom.some(matchesReplyId)
+    } else if (wasDerivedFrom instanceof DistbinActivity) {
+      return matchesReplyId(wasDerivedFrom)
+    }
   })
   assert(replyFromDistbinAInbox, 'distbinA inbox contains reply')
   assert.equal(isProbablyAbsoluteUrl(replyFromDistbinAInbox.replies), true,
@@ -327,7 +339,7 @@ tests['GET {activity.id}.json always sends json response, even if html if prefer
 }
 
 // post an activity to a distbin, and return its absolute url
-async function postActivity (distbinListener, activity) {
+async function postActivity (distbinListener: HttpRequestResponder, activity: LDObject<Activity>) {
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({

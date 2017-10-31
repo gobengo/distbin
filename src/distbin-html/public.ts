@@ -9,9 +9,10 @@ const querystring = require('querystring')
 const { linkToHref } = require('../util')
 const { renderActivity } = require('./an-activity')
 const { createActivityCss } = require('./an-activity')
+import { IncomingMessage, ServerResponse } from 'http'
 
-exports.createHandler = function ({ apiUrl }) {
-  return async function (req, res) {
+exports.createHandler = function ({ apiUrl }:{apiUrl:string}) {
+  return async function (req: IncomingMessage, res: ServerResponse) {
     res.writeHead(200)
     res.end(distbinBodyTemplate(`
       ${await createPublicBody(req, {
@@ -21,7 +22,7 @@ exports.createHandler = function ({ apiUrl }) {
   }
 }
 
-async function createPublicBody (req, { apiUrl }) {
+async function createPublicBody (req: IncomingMessage, { apiUrl }:{apiUrl:string}) {
   const limit = requestMaxMemberCount(req) || 10
   if (typeof limit !== 'number') {
     throw new Error('max-member-count must be a number')

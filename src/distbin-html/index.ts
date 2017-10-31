@@ -3,16 +3,17 @@ const publicSection = require('./public')
 const home = require('./home')
 const { route } = require('../util')
 const anActivity = require('./an-activity')
+import {IncomingMessage, ServerResponse} from 'http'
 
-exports.createHandler = ({ apiUrl, externalUrl }) => {
+exports.createHandler = ({ apiUrl, externalUrl }:{apiUrl:string, externalUrl:string}) => {
   const routes = new Map([
     [new RegExp('^/$'), () => home.createHandler({ apiUrl, externalUrl })],
     [new RegExp('^/about$'), () => about.createHandler({ externalUrl })],
     [new RegExp('^/public$'), () => publicSection.createHandler({ apiUrl })],
     [new RegExp('^/activities/([^/.]+)$'),
-      (activityId) => anActivity.createHandler({ apiUrl, activityId, externalUrl })]
+      (activityId: string) => anActivity.createHandler({ apiUrl, activityId, externalUrl })]
   ])
-  return (req, res) => {
+  return (req: IncomingMessage, res: ServerResponse) => {
     const handler = route(routes, req)
     if (!handler) {
       res.writeHead(404)

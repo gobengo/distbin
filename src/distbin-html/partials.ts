@@ -20,14 +20,14 @@ export const everyPageHead = () => `
   </style>
 `
 
-export const aboveFold = (html) => `
+export const aboveFold = (html:string) => `
   <div class="distbin-above-fold">
    ${html}
   </div>
 `
 
 // wrap page with common body template for distbin-html (e.g. header/footer)
-export const distbinBodyTemplate = (page) => `
+export const distbinBodyTemplate = (page:string) => `
   <head>
     ${everyPageHead()}
   </head>

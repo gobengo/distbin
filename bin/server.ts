@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as http from "http";
+import {IncomingMessage, ServerRequest, ServerResponse, Server} from 'http'
 const distbin = require('../');
 const fs = require('fs')
 const path = require('path')
@@ -42,7 +43,7 @@ async function runServer() {
 	// ensure subdirs exist
 	await Promise.all(['activities', 'inbox'].map(dir => {
 		return denodeify(fs.mkdir)(path.join(dbDir, dir))
-		.catch((err) => {
+		.catch((err: NodeJS.ErrnoException) => {
 			switch (err.code) {
 				case 'EEXIST':
 					// folder exists, no prob
@@ -58,21 +59,20 @@ async function runServer() {
 		externalUrl,
 	})
 
+	function listen(server: Server): Promise<string> {
+		return new Promise((resolve, reject) => server.listen(0, (err: Error) => {
+			if (err) return reject(err)
+			resolve(`http://localhost:${server.address().port}`)
+		}))
+	}
+
 	// api
 	const apiServer = http.createServer(apiHandler)
-	const apiServerUrl = await new Promise((resolve) => {
-		apiServer.listen(0, function (err) {
-			resolve(`http://localhost:${apiServer.address().port}`)
-		})
-	})
+	const apiServerUrl = await listen(apiServer)
 
 	// html
 	const htmlServer = http.createServer(distbinHtml.createHandler({ apiUrl: apiServerUrl, externalUrl }))
-	const htmlServerUrl = await new Promise((resolve) => {
-		htmlServer.listen(0, function (err) {
-			resolve(`http://localhost:${htmlServer.address().port}`)
-		})
-	})	
+	const htmlServerUrl = await listen(htmlServer)
 
 	// mainServer delegates to htmlHandler or distbin api handler based on Accept header
 	// of request
@@ -90,7 +90,7 @@ async function runServer() {
 			? acceptHeader.split(',')
 			: []).find((mime) => ['text/html', 'application/json'].includes(mime)) // TODO wtf?
 		// Depending on 'Accept' header, try candidate backends in a certain order (e.g. html first)
-		let prioritizedBackends;
+		let prioritizedBackends: string[];
 		switch (preference) {
 			case 'text/html':
 				prioritizedBackends = [htmlServerUrl, apiServerUrl]
@@ -107,7 +107,7 @@ async function runServer() {
 			}
 			const [candidateBackendUrl, ...nextBackends] = backends;
 			forwardRequest(req, candidateBackendUrl)
-				.then(candidateResponse => {
+				.then((candidateResponse: IncomingMessage) => {
 					switch (candidateResponse.statusCode) {
 						case 404:
 							return attemptBackends(nextBackends, req, res)
@@ -124,7 +124,7 @@ async function runServer() {
 		// 	proxyResponse(htmlServerResponse, res)
 		// 	return
 		// }
-		function forwardRequest(req, toUrl): Promise<http.IncomingMessage> {
+		function forwardRequest(req: ServerRequest, toUrl: string): Promise<http.IncomingMessage> {
 			const reqToForward = http.request(Object.assign(url.parse(toUrl),{
 				method: req.method,
 				path: req.url,
@@ -138,14 +138,14 @@ async function runServer() {
 				})
 			})
 		}
-		async function forwardResponse(res, toRes) {
+		async function forwardResponse(res: IncomingMessage, toRes: ServerResponse) {
 			toRes.writeHead(res.statusCode, res.headers)
 			res.pipe(toRes)
 		}
 	})
 	// listen
 	let mainServerUrl = await new Promise((resolve) => {
-		mainServer.listen(process.env.PORT || 0, (err) => {
+		mainServer.listen(process.env.PORT || 0, (err: Error) => {
 			resolve(externalUrl)
 		})
 	})

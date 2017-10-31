@@ -1,6 +1,7 @@
 {
   "compileOnSave": true,
   "compilerOptions": {
+    "noImplicitAny": true,
     "types": ["node"],
     "allowJs": true,
     "outDir": "dist.ts",

@@ -1,10 +1,13 @@
 import { debuglog } from './util'
 import * as http from 'http'
+import {IncomingMessage} from 'http'
 import * as https from 'http'
 import * as parseLinkHeader from 'parse-link-header'
 import { rdfaToJsonLd } from './util'
-import { readableToString, sendRequest } from './util'
+import { readableToString, sendRequest, ensureArray } from './util'
 import * as url from 'url'
+import {UrlObject} from 'url'
+import {Activity, ASObject, Extendable, JSONLD} from './types'
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
@@ -12,7 +15,7 @@ exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 // as required for https://w3c.github.io/activitypub/#object-without-create
 // #TODO - What if it's an extension activity that describes itself via
 //   rdfs as a subtype of Activity?
-exports.as2ObjectIsActivity = (obj) => {
+exports.as2ObjectIsActivity = (obj:ASObject) => {
   // https://www.w3.org/TR/activitystreams-vocabulary/#activity-types
   const activityTypes = [
     'Accept', 'Add', 'Announce', 'Arrive', 'Block', 'Create', 'Delete',
@@ -25,9 +28,9 @@ exports.as2ObjectIsActivity = (obj) => {
 
 // given an activity, return a set of targets it should be delivered to
 // upon receipt in an outbox
-const activityTargets = (activity) => {
+const activityTargets = (activity:Activity) => {
   const primary = [].concat(activity.to, activity.cc, activity.bcc).filter(Boolean)
-  const notification = [] // #TODO... https://github.com/w3c/activitypub/issues/161
+  const notification: string[] = [] // #TODO... https://github.com/w3c/activitypub/issues/161
   const targets = Array.from(new Set([].concat(primary, notification)))
   return targets
 }
@@ -45,8 +48,8 @@ exports.clientHeaders = (headers = {}) => {
   return Object.assign(requirements, headers)
 }
 
-const makeErrorClass = (name, setUp?:Function) => class extends Error {
-  constructor (msg) {
+const makeErrorClass = (name: string, setUp?:Function) => class extends Error {
+  constructor (msg: string, ...args: any[]) {
     super(msg)
     this.message = msg
     this.name = name
@@ -66,19 +69,19 @@ const deliveryErrors = exports.deliveryErrors = {
   // Succeeded in delivering, but response was an error
   DeliveryErrorResponse: makeErrorClass('DeliveryErrorResponse'),
   // At least one delivery did not succeed. Try again later?
-  SomeDeliveriesFailed: makeErrorClass('SomeDeliveriesFailed', function (failures) {
+  SomeDeliveriesFailed: makeErrorClass('SomeDeliveriesFailed', function (msg: string, failures: Error[]) {
     this.failures = failures
   })
 }
 
-const request = (urlOrOptions, ...otherArgs) => {
+const request = (urlOrOptions:string|UrlObject) => {
   const options = typeof urlOrOptions === 'string' ? url.parse(urlOrOptions) : urlOrOptions;
   const httpModule = options.protocol === 'https:' ? https : http
   return httpModule.request(urlOrOptions)
 }
 
 // deliver an activity to a target
-const deliverActivity = async function (activity, target) {
+const deliverActivity = async function (activity: Activity, target: string) {
   // discover inbox
   const targetProfileRequest = request(Object.assign(url.parse(target), {
     headers: {
@@ -103,10 +106,11 @@ const deliverActivity = async function (activity, target) {
 
   let inbox = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse)
 
-  function inboxFromHeaders (res) {
+  function inboxFromHeaders (res: IncomingMessage) {
     let inbox
     // look in res Link header
-    const inboxLinks = (parseLinkHeader(res.headers.link) || {})['http://www.w3.org/ns/ldp#inbox']
+    const linkHeaders = ensureArray(res.headers.link)
+    const inboxLinks = linkHeaders.map(parseLinkHeader).map((parsed: any) => parsed['http://www.w3.org/ns/ldp#inbox']).filter(Boolean)
     let inboxLink
     if (Array.isArray(inboxLinks)) {
       if (inboxLinks.length > 1) {
@@ -123,8 +127,9 @@ const deliverActivity = async function (activity, target) {
     return inbox
   }
 
-  async function inboxFromBody (res) {
-    const contentType = (res.headers['content-type'] || '').split(';')[0] // strip mediaType params (e.g. charset, profile)
+  async function inboxFromBody (res: IncomingMessage) {
+    const contentTypeHeaders = ensureArray(res.headers['content-type'])
+    const contentType = contentTypeHeaders.map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]
     const body = await readableToString(res)
     let inbox
     switch (contentType) {
@@ -138,8 +143,8 @@ const deliverActivity = async function (activity, target) {
         inbox = url.resolve(target, targetProfile.inbox)
         return inbox
       case 'text/html':
-        let ld = await rdfaToJsonLd(body)
-        let targetSubject = ld.find(x => x['@id'] === 'http://localhost/')
+        let ld: Extendable<JSONLD>[] = await rdfaToJsonLd(body)
+        let targetSubject = ld.find((x) => x['@id'] === 'http://localhost/')
         let inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox']
         if (inboxes.length > 1) {
           console.warn(`Using only first inbox, but there were ${inboxes.length}: ${inboxes}`)
@@ -181,9 +186,9 @@ const deliverActivity = async function (activity, target) {
 
 // Given an activity, determine its targets and deliver to the inbox of each
 // target
-exports.targetAndDeliver = async function (activity, targets = activityTargets(activity)) {
-  let deliveries = []
-  let failures = []
+exports.targetAndDeliver = async function (activity: Activity, targets = activityTargets(activity)) {
+  let deliveries: string[] = []
+  let failures: Error[] = []
   await Promise.all(
     targets
       .map((target) => {
@@ -198,7 +203,7 @@ exports.targetAndDeliver = async function (activity, targets = activityTargets(a
   )
   if (failures.length) {
     debuglog('failures delivering ' + failures)
-    throw new deliveryErrors.SomeDeliveriesFailed(failures)
+    throw new deliveryErrors.SomeDeliveriesFailed('SomeDeliveriesFailed', failures)
   }
   return deliveries
 }

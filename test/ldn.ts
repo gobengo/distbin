@@ -13,7 +13,7 @@ tests['can OPTIONS inbox'] = async () => {
   const distbinUrl = await listen(http.createServer(distbin()))
   const res = await fetch(`${distbinUrl}/activitypub/inbox`, { method: 'OPTIONS' })
   assert.equal(res.status, 200)
-  const acceptPost = res.headers.get('accept-post').split(',').map(m => m.trim())
+  const acceptPost = res.headers.get('accept-post').split(',').map((m: string) => m.trim())
   const shouldAcceptPostOf = ['application/ld+json', 'application/activity+json', 'application/json', 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"']
   shouldAcceptPostOf.forEach(m => {
     assert(acceptPost.includes(m), `Accept-Post header includes ${m}`)

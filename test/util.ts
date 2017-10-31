@@ -6,9 +6,11 @@ const { sendRequest } = require('../src/util')
 import * as url from 'url'
 const activitypub = require('../src/activitypub')
 const assert = require('assert')
+import {Activity, HttpRequestResponder} from './types'
+import {IncomingMessage, RequestOptions, Server, ServerResponse} from 'http'
 
 // Return Promise of an http.Request that will be sent to an http.createServer listener
-export const requestForListener = async function requestForListener (listener, requestOptions) {
+export const requestForListener = async function requestForListener (listener: HttpRequestResponder, requestOptions: RequestOptions) {
   const server = http.createServer(listener)
   await listen(server)
 
@@ -23,14 +25,14 @@ export const requestForListener = async function requestForListener (listener, r
 }
 
 // given an http.Server, return a promise of it listening on a port
-export const listen = function listen (server, port = 0, ...args): Promise<string> {
-  let listened
+export const listen = function listen (server: Server, port = 0, hostname?: string): Promise<string> {
+  let listened: boolean
   return new Promise((resolve, reject) => {
-    server
-      .once('error', (error) => {
+    server.once('error', (error: any) => {
         if (!listened) reject(error)
       })
-      .listen(port, ...args, () => {
+    server
+      .listen(port, hostname, () => {
         listened = true
         resolve(`http://localhost:${server.address().port}`)
       })
@@ -40,7 +42,7 @@ export const listen = function listen (server, port = 0, ...args): Promise<strin
 export const isProbablyAbsoluteUrl = require('../src/util').isProbablyAbsoluteUrl
 
 // post an activity to a distbin, and return its absolute url
-export const postActivity = async function postActivity (distbinListener, activity) {
+export const postActivity = async function postActivity (distbinListener: HttpRequestResponder, activity: Activity) {
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({

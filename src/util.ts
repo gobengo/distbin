@@ -4,17 +4,19 @@ const jsonldLib = require('jsonld')
 jsonldLib.registerRDFParser('text/html', jsonldRdfaParser)
 const url = require('url')
 import * as http from "http";
+import {HttpRequestResponder, Link} from './types';
+import { Url, UrlObject } from 'url'
 const https = require('https')
 const fs = require('fs')
 const path = require('path')
 
 export const debuglog = require('util').debuglog('distbin')
 
-export const readableToString = function (readable): Promise<string> {
+export const readableToString = function (readable: NodeJS.ReadableStream): Promise<string> {
   let body: string = ''
   return new Promise((resolve, reject) => {
     readable.on('error', reject)
-    readable.on('data', (chunk) => {
+    readable.on('data', (chunk:string) => {
       body += chunk
       return body
     })
@@ -22,11 +24,15 @@ export const readableToString = function (readable): Promise<string> {
   })
 }
 
-export const requestUrl = (req) => `http://${req.headers.host}${req.url}`
+export const requestUrl = (req: http.ServerRequest) => `http://${req.headers.host}${req.url}`
+
 
 // given a map of strings/regexes to listener factories,
 // return a matching route (or undefined if no match)
-export const route = (routes, req) => {
+export type RoutePattern = string | RegExp
+export type RouteResponderFactory = (...matches: string[]) => HttpRequestResponder
+export const route = (routes: Map<RoutePattern, RouteResponderFactory>,
+                      req: http.ServerRequest) => {
   const path = url.parse(req.url).pathname
   for (let [route, createHandler] of routes.entries()) {
     if (typeof route === 'string') {
@@ -42,11 +48,11 @@ export const route = (routes, req) => {
   }
 }
 
-export const sendRequest = function (request): Promise<http.IncomingMessage> {
+export const sendRequest = function (request: http.ClientRequest): Promise<http.IncomingMessage> {
   return new Promise((resolve, reject) => {
     request.once('response', resolve)
     request.once('error', reject)
-    if (!request.ended) request.end()
+    request.end()
   })
 }
 
@@ -60,7 +66,7 @@ const NON_ALPHANUMERIC_REGEXP = /([^#-~| |!])/g
  * @param value
  * @returns {string} escaped text
  */
-export const encodeHtmlEntities = function encodeEntities (value) {
+export const encodeHtmlEntities = function encodeEntities (value: string) {
   return value
     .replace(/&/g, '&amp;')
     .replace(SURROGATE_PAIR_REGEXP, function (value) {
@@ -77,10 +83,10 @@ export const encodeHtmlEntities = function encodeEntities (value) {
 
 // given a function that accepts a "node-style" errback as its last argument, return
 // a function that returns a promise instead
-export const denodeify = function denodeify (funcThatAcceptsErrback) {
-  return function (...args) {
+export const denodeify = function denodeify (funcThatAcceptsErrback: Function) {
+  return function (...args: any[]) {
     return new Promise((resolve, reject) => {
-      funcThatAcceptsErrback.apply(this, args.concat([(err, ...results) => {
+      funcThatAcceptsErrback.apply(this, args.concat([(err: Error, ...results: any[]) => {
         if (err) return reject(err)
         return resolve.apply(this, results)
       }]))
@@ -88,30 +94,31 @@ export const denodeify = function denodeify (funcThatAcceptsErrback) {
   }.bind(this)
 }
 
-export const rdfaToJsonLd = async function rdfaToJsonLd (html) {
+export const rdfaToJsonLd = async function rdfaToJsonLd (html: string) {
   return denodeify(jsonldLib.fromRDF)(html, { format: 'text/html' })
   // // use it
   // jsonldLib.fromRDF(html, {format: 'text/html'}, function(err, data) {
 }
 
-export const isProbablyAbsoluteUrl = function isProbablyAbsoluteUrl (url) {
+export const isProbablyAbsoluteUrl = function isProbablyAbsoluteUrl (url: string): boolean {
   const absoluteUrlPattern = new RegExp('^(?:[a-z]+:)?//', 'i')
   return absoluteUrlPattern.test(url)
 }
 
+export const ensureArray = <T>(itemOrItems: T | T[]): T[] => itemOrItems instanceof Array ? itemOrItems : [itemOrItems]
+
+export const flatten = <T>(listOfLists: T[][]): T[] => listOfLists.reduce((flattened, list:T[]) => flattened.concat(list), [])
+
 // given an http request, return a number that is the maximum number of results this client wants in this response
-export const requestMaxMemberCount = function requestMaxMemberCount (req) {
-  const headerMatch = req.headers.prefer ? req.headers.prefer.match(/max-member-count="(\d+)"/) : null
+export const requestMaxMemberCount = function requestMaxMemberCount (req: http.ServerRequest) {
+  const headerMatch = ensureArray(req.headers.prefer).map(header => header.match(/max-member-count="(\d+)"/)).filter(Boolean)[0]
   if (headerMatch) return parseInt(headerMatch[1], 10)
   // check querystring
   return parseInt(url.parse(req.url, true).query['max-member-count'], 10)
 }
 
-export const createHttpOrHttpsRequest = function createHttpOrHttpsRequest (urlOrObj) {
-  let parsedUrl = urlOrObj
-  if (typeof urlOrObj === 'string') {
-    parsedUrl = url.parse(urlOrObj)
-  }
+export const createHttpOrHttpsRequest = function createHttpOrHttpsRequest (urlOrObj:string|UrlObject) {
+  let parsedUrl: UrlObject = (typeof urlOrObj === 'string') ? url.parse(urlOrObj) : urlOrObj
   let createRequest
   switch (parsedUrl.protocol) {
     case 'https:':
@@ -128,7 +135,7 @@ export const createHttpOrHttpsRequest = function createHttpOrHttpsRequest (urlOr
 }
 
 // given a Link object or url string, return an href string that can be used to refer to it
-export const linkToHref = function linkToHref (hrefOrLinkObj) {
+export const linkToHref = function linkToHref (hrefOrLinkObj: Link|string) {
   if (typeof hrefOrLinkObj === 'string') return hrefOrLinkObj
   if (typeof hrefOrLinkObj === 'object') return hrefOrLinkObj.href
   throw new Error('Unexpected link type: ' + typeof hrefOrLinkObj)
@@ -140,7 +147,7 @@ export const jsonld = jsonldLib.promises
 
 function createCustomDocumentLoader () {
   // define a mapping of context URL => context doc
-  var CONTEXTS = {
+  var CONTEXTS: {[key:string]: string} = {
     'https://www.w3.org/ns/activitystreams': fs.readFileSync(path.join(__dirname, '/as2context.json'), 'utf8')
   }
 
@@ -152,7 +159,7 @@ function createCustomDocumentLoader () {
   // change the default document loader using the callback API
   // (you can also do this using the promise-based API, return a promise instead
   // of using a callback)
-  var customLoader = function (url, callback) {
+  var customLoader = function (url: string, callback: Function) {
     if (url in CONTEXTS) {
       return callback(
         null, {
