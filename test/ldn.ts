@@ -6,6 +6,7 @@ const http = require('http')
 const uuid = require('uuid')
 const { jsonld } = require('../src/util')
 import * as url from 'url'
+import { testCli } from './'
 
 let tests = module.exports
 
@@ -171,7 +172,5 @@ function createNotification (props = {}) {
 }
 
 if (require.main === module) {
-  require('./').run(tests)
-    .then(() => process.exit())
-    .catch(() => process.exit(1))
+  testCli(tests)
 }

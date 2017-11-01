@@ -110,7 +110,13 @@ const deliverActivity = async function (activity: Activity, target: string) {
     let inbox
     // look in res Link header
     const linkHeaders = ensureArray(res.headers.link)
-    const inboxLinks = linkHeaders.map(parseLinkHeader).map((parsed: any) => parsed['http://www.w3.org/ns/ldp#inbox']).filter(Boolean)
+    const inboxLinks = linkHeaders
+      .map(parseLinkHeader)
+      .filter(Boolean)
+      .map((parsed: any) => {
+        return parsed['http://www.w3.org/ns/ldp#inbox']
+      })
+      .filter(Boolean)
     let inboxLink
     if (Array.isArray(inboxLinks)) {
       if (inboxLinks.length > 1) {

@@ -16,10 +16,18 @@ type TestsMap = {
   [key: string]: Test
 }
 
+export async function testCli (tests: TestsMap) {
+  run(tests)
+  .then(() => process.exit())
+  .catch((error: Error) => {
+    console.error(error);
+    process.exit(1)
+  })
+}
+
 // execute some tests (tests are object with test name/msg as key and func as val)
 // if env var TEST_FILTER is defined, only tests whose names contain that string will run
-exports.run = run
-async function run (tests: TestsMap) {
+export async function run (tests: TestsMap) {
   const testFilter = process.env.TEST_FILTER
   const results = await Promise.all(
     // map to array of promises of logged errors

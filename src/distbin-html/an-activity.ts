@@ -28,14 +28,18 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}:{apiUrl:string, activ
       return
     }
 
-    const activityWithoutDescendants = activityWithUrlsRelativeTo(JSON.parse(await readableToString(activityRes)), externalUrl)
-    const repliesUrl = url.resolve(activityUrl, activityWithoutDescendants.replies)
-    const descendants = await fetchDescendants(repliesUrl)
+    const incomingActivity = JSON.parse(await readableToString(activityRes))    
+    const activityWithoutDescendants = activityWithUrlsRelativeTo(incomingActivity, externalUrl)
+    const repliesUrls = ensureArray(activityWithoutDescendants.replies)
+      .map((repliesUrl: string) => {
+        return url.resolve(activityUrl, repliesUrl)
+      })
+    
+    const descendants = flatten(await Promise.all(repliesUrls.map(fetchDescendants)))
 
     const activity = Object.assign(activityWithoutDescendants, {
       replies: descendants
     })
-
     const ancestors = await fetchReplyAncestors(externalUrl, activity)
 
     async function fetchDescendants (repliesUrl: string) {
@@ -87,7 +91,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}:{apiUrl:string, activ
         <div class="primary-activity">
           ${renderActivity(activity)}
         </div>
-        ${renderDescendantsSection(activity.replies)} 
+        ${renderDescendantsSection(ensureArray(activity.replies)[0])} 
 
         <script>
         (function () {
@@ -141,6 +145,8 @@ function renderActivity (activity: Activity) {
   const location = formatLocation(activity)
   const attributedTo = formatAttributedTo(activity)
   const tags = formatTags(activity)
+  const activityUrl = ensureArray(activity.url)[0]
+  const activityObject = ensureArray(activity.object).filter((o:ASObject|string) => typeof o === 'object')[0]
   return `
     <article class="activity-item">
       <header>
@@ -149,16 +155,16 @@ function renderActivity (activity: Activity) {
       ${
   activity.name
     ? `<h1>${activity.name}</h1>`
-    : activity.object instanceof ASObject && activity.object.name
-      ? `<h1>${activity.object.name}</h1>`
+    : activityObject && activityObject.name
+      ? `<h1>${activityObject.name}</h1>`
       : ''
 }
       <main>${
   sanitize(marked(
     activity.content
       ? activity.content
-      : activity.object instanceof ASObject
-        ? activity.object.content
+      : activityObject
+        ? activityObject.content
         : activity.name ||
           activity.url
           ? `<a href="${activity.url}">${activity.url}</a>`
@@ -206,7 +212,7 @@ function renderActivity (activity: Activity) {
       <footer>
         <div class="activity-footer-bar">
           <span>
-            <a href="${encodeHtmlEntities(activity.url)}">${
+            <a href="${encodeHtmlEntities(activityUrl)}">${
   published
     ? formatDate(new Date(Date.parse(published)))
     : 'permalink'
@@ -214,7 +220,7 @@ function renderActivity (activity: Activity) {
           </span>
           &nbsp;
           <span>
-            <a href="/?inReplyTo=${encodeHtmlEntities(activity.url)}">reply</a>
+            <a href="/?inReplyTo=${encodeHtmlEntities(activityUrl)}">reply</a>
           </span>
           &nbsp;
           <span class="action-show-raw">
@@ -327,7 +333,7 @@ function formatGenerator (activity: Activity) {
   const generator = object.generator
   if (!generator) return ''
   let generatorText  
-  if (generator instanceof ASObject) {
+  if (typeof generator === 'object') {
     if (generator.name) generatorText = generator.name
     else if (generator.id) generatorText = generator.id
     let generatorUrl
@@ -564,15 +570,18 @@ function activityWithUrlsRelativeTo (activity:Activity, relativeTo:string): Acti
     url,
   }
   type UrlProp = keyof typeof UrlProps
-  const propsWithUrls: UrlProp[] = Object.keys(UrlProps) as UrlProp[]
-  const withAbsoluteUrls = Object.assign(activity, propsWithUrls.reduce((a, prop: UrlProp) => {
+  const propsWithUrls: UrlProp[] = Object.keys(UrlProps)
+    .map((k: any) =>  UrlProps[k])
+    .filter(v => typeof v === 'string') as UrlProp[]
+  const updates = propsWithUrls.reduce((a, prop: UrlProp) => {
     const isRelativeUrl = (u: string) => u && !url.parse(u).host
     return Object.assign(a, {
       [prop]: ensureArray(activity[prop]).map((relativeUrl:string) => {
-        return isRelativeUrl(relativeUrl) ? url.resolve(relativeTo, relativeUrl) : url
+        return isRelativeUrl(relativeUrl) ? url.resolve(relativeTo, relativeUrl) : relativeUrl
       })
     })
-  }, {}))
+  }, {})
+  const withAbsoluteUrls = Object.assign(activity, updates)
   return withAbsoluteUrls
 }
 

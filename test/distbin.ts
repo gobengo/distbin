@@ -2,6 +2,7 @@
 
 const activitypub = require('../src/activitypub')
 const assert = require('assert')
+import { testCli } from '.'
 const distbin = require('../')
 const http = require('http')
 const { isProbablyAbsoluteUrl } = require('./util')
@@ -213,7 +214,7 @@ tests['posted activities have an .inbox (e.g. to receive replies in)'] = async f
 
 // #TODO is notifying the .inReplyTo inbox even encouraged/allowed by activitypub?
 tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)'] = async function () {
-  // ok so we're going to make to distbins, A and B, and test that A delivers to B
+  // ok so we're going to make two distbins, A and B, and test that A delivers to B
   const distbinA = distbin()
   const distbinB = distbin()
   // post a parent to distbinA
@@ -233,19 +234,20 @@ tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)
   const distbinAInbox = JSON.parse(await readableToString(await sendRequest(
     await requestForListener(distbinA, '/activitypub/inbox'))))
   const replyFromDistbinAInbox = distbinAInbox.items.find((a: DistbinActivity) => {
+    debugger
     const idMatches = a.id === replyId
     if (idMatches) return true
     const wasDerivedFrom = a['http://www.w3.org/ns/prov#wasDerivedFrom']
     if ( ! wasDerivedFrom) return false
-    function nodeWasDerivedFrom(o: DistbinActivity, nodeId: string): boolean {
+    function nodeWasDerivedFrom(o: DistbinActivity|string, nodeId: string): boolean {
       if (typeof o === 'object') return o.id === nodeId
       else if (typeof o === 'string') return o === nodeId
       return false
     }
-    const matchesReplyId = (o: DistbinActivity): boolean => nodeWasDerivedFrom(o, replyId)    
+    const matchesReplyId = (o: DistbinActivity|string): boolean => nodeWasDerivedFrom(o, replyId)    
     if (wasDerivedFrom instanceof Array) {
       return wasDerivedFrom.some(matchesReplyId)
-    } else if (wasDerivedFrom instanceof DistbinActivity) {
+    } else {
       return matchesReplyId(wasDerivedFrom)
     }
   })
@@ -277,7 +279,7 @@ tests['When GET an activity, it has information about any replies it may have'] 
     inReplyTo: parentUrl,
     cc: [parentUrl]
   })
-  const replyId = JSON.parse(await readableToString(await sendRequest(http.get(replyUrl)))).id
+  const reply = JSON.parse(await readableToString(await sendRequest(http.get(replyUrl))))
   const parent = JSON.parse(await readableToString(await sendRequest(http.get(parentUrl))))
   assert.equal(typeof parent.replies, 'string', 'has .replies URL')
   const repliesResponse = await sendRequest(http.get(url.resolve(parentUrl, parent.replies)))
@@ -286,7 +288,7 @@ tests['When GET an activity, it has information about any replies it may have'] 
   // should be one reply
   assert.equal(repliesCollection.totalItems, 1, 'replies collection .totalItems is right')
   assert(repliesCollection.items, 'has .items')
-  assert.equal(repliesCollection.items[0].id, replyId, '.items contains the reply')
+  assert.equal(repliesCollection.items[0].id, reply.id, '.items contains the reply')
 }
 
 tests['Activities can have a .generator'] = async function () {
@@ -353,4 +355,8 @@ async function postActivity (distbinListener: HttpRequestResponder, activity: LD
   assert.equal(res.statusCode, 201)
   const activityUrl = url.resolve(distbinUrl, res.headers.location)
   return activityUrl
+}
+
+if (require.main === module) {
+  testCli(tests)
 }

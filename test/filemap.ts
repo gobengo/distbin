@@ -1,4 +1,5 @@
 import * as assert from 'assert'
+import { testCli } from './'
 const { denodeify } = require('../src/util')
 const fs = require('fs')
 const { JSONFileMap } = require('../src/filemap')
@@ -59,7 +60,5 @@ function deleteFolderRecursive (dir: string) {
 };
 
 if (require.main === module) {
-  require('./').run(tests)
-    .then(() => process.exit())
-    .catch(() => process.exit(1))
+  testCli(tests)
 }

@@ -6,6 +6,7 @@ const { readableToString, sendRequest } = require('../src/util')
 const { listen, requestForListener } = require('./util')
 const { isProbablyAbsoluteUrl } = require('./util')
 import { Activity, LDValue } from './types'
+import { testCli } from '.'
 
 const tests = module.exports
 
@@ -87,7 +88,7 @@ tests['can request the public Collection'] = async function () {
 //  Like... should the public collection id bein the 'to' or 'cc' or 'bcc' fields or does it matter?
 tests['can address activities to the public Collection when sending to outbox, and they show up in the public Collection'] = async function () {
   const distbinListener = distbin()
-
+  
   // post an activity addressed to public collection to outbox
   const activityToPublic = {
     '@context': 'https://www.w3.org/ns/activitystreams',
@@ -369,7 +370,9 @@ tests['targets and delivers targeted activities sent to Outbox'] = async functio
   const postNoteResponse = await sendRequest(postNoteRequest)
   assert.equal(postNoteResponse.statusCode, 201)
   // then verify that it is in distbinB's inbox
-  const distbinBInbox = JSON.parse(await readableToString(await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))))
+  const distbinBInboxResponse = await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))
+  assert.equal(distbinBInboxResponse.statusCode, 200)
+  const distbinBInbox = JSON.parse(await readableToString(distbinBInboxResponse))
   assert.equal(distbinBInbox.items.length, 1, 'there is 1 item in distbin B inbox')
   // Ensure that the activity has a URL that is absolute
   // #todo this tests what comes out of the inbox but probably it's a more accurate test to verify what the /inbox *receives from distbinA (the receiver doesn't strictly need to be a distbinB, but any endpoint)
@@ -389,3 +392,7 @@ The values of inReplyTo, object, target and/or tag are objects owned by the serv
 
 The server may filter its delivery targets according to implementation-specific rules, for example, spam filtering.
 */
+
+if (require.main === module) {
+  testCli(tests)
+}

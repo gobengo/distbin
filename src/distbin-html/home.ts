@@ -367,8 +367,8 @@ async function getAttachmentLinkForUrl (attachment: string) {
         }
       }
     }
+    attachmentLink['https://distbin.com/ns/linkPrefetch'] = linkPrefetchResult    
   }
-  attachmentLink['https://distbin.com/ns/linkPrefetch'] = linkPrefetchResult
   return attachmentLink
 }
 

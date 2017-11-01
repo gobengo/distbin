@@ -111,7 +111,7 @@ export const flatten = <T>(listOfLists: T[][]): T[] => listOfLists.reduce((flatt
 
 // given an http request, return a number that is the maximum number of results this client wants in this response
 export const requestMaxMemberCount = function requestMaxMemberCount (req: http.ServerRequest) {
-  const headerMatch = ensureArray(req.headers.prefer).map(header => header.match(/max-member-count="(\d+)"/)).filter(Boolean)[0]
+  const headerMatch = ensureArray(req.headers.prefer).filter(Boolean).map(header => header.match(/max-member-count="(\d+)"/)).filter(Boolean)[0]
   if (headerMatch) return parseInt(headerMatch[1], 10)
   // check querystring
   return parseInt(url.parse(req.url, true).query['max-member-count'], 10)

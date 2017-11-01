@@ -99,7 +99,7 @@ function isHostedLocally (activityFreshFromStorage:Activity) {
 
 // return a an extended version of provided activity with some extra metadata properties like 'inbox', 'url', 'replies'
 // if 'baseUrl' opt is provided, those extra properties will be absolute URLs, not relative
-const locallyHostedActivity = function (activity: Extendable<Activity>, { externalUrl }:{externalUrl?:string} = {}) {
+const locallyHostedActivity = function (activity: Extendable<Activity>, { externalUrl='' }:{externalUrl?:string} = {}) {
   if (activity.url) {
     debuglog('Unexpected .url property when processing activity assumed to be locally hosted\n' + JSON.stringify(activity))
     throw new Error('Unexpected .url property when processing activity assumed to be locally hosted')
@@ -181,22 +181,19 @@ function activityRepliesHandler ({ activities,
       res.end('There is no activity ' + uri)
       return
     }
-    const allActivities: Iterable<Activity> = await Promise.resolve(activities.values())
-    const replies = Array.from(allActivities)
+    const allActivities: Activity[] = Array.from(await Promise.resolve(activities.values()))
+    const replies = allActivities
       .filter(activity => {
         type ParentId = string
-        class Reply extends ASObject {}
-        const replies: Reply[] = ensureArray<any>(activity.object).filter((o:any): o is Reply => o instanceof Reply)
-        const inReplyTos = flatten(replies.map((object: Reply) => ensureArray<any>(object.inReplyTo).map((o:any): ParentId => {
+        const replies: ASObject[] = ensureArray<any>(activity.object).filter(o => typeof o === 'object')
+        const inReplyTos = flatten(replies.map((object: ASObject) => ensureArray<any>(object.inReplyTo).map((o:any): ParentId => {
           if (typeof o === 'string') return o
           if (o instanceof ASObject) return o.id
-        })))
-        const inReplyToStrs: ParentId[] = inReplyTos.map((o: LDValue<ParentId>) => {
-          if (typeof o === 'string') return o
-        })
+        }))).filter(Boolean)
         return inReplyTos.some((inReplyTo:ParentId) => {
           // TODO .inReplyTo could be a urn, http URL, something else?
-          return url.parse(inReplyTo).pathname === '/activities/' + activityUuid
+          const isReply = url.parse(inReplyTo).pathname === '/activities/' + activityUuid
+          return isReply
         })
       })
       .map(activity => {
@@ -377,7 +374,6 @@ function inboxHandler ({ activities, externalUrl, inbox } : {
           // todo: Probably setting on inbox should automagically add to global set of activities
           originalAlreadySaved ? null : activities.set(originalId, parsed)
         ])
-
         res.writeHead(201, {
           location: notificationUrl
         })

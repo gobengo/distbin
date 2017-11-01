@@ -8,6 +8,8 @@ const http = require('http')
 const assert = require('assert')
 const sanitize = require('../../src/distbin-html/sanitize')
 
+import { testCli } from '../'
+
 const distbinHtml = require('../../src/distbin-html')
 let tests = module.exports
 
@@ -181,6 +183,12 @@ tests['/activities/:id renders the .generator.name'] = async function () {
     }
   })))
   const activityHtml = await readableToString(activityResponse)
-  assert(sanitize.toText(activityHtml).includes('via distbin-html'), 'html response includes .generator.name')
+  assert.equal(activityResponse.statusCode, 200)
+  const sanitized = sanitize.toText(activityHtml)
+  assert(sanitized.includes('via distbin-html'), 'html response includes .generator.name')
   // todo rdfa?
+}
+
+if (require.main === module) {
+  testCli(tests)
 }
