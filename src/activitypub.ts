@@ -7,7 +7,7 @@ import { rdfaToJsonLd } from './util'
 import { readableToString, sendRequest, ensureArray } from './util'
 import * as url from 'url'
 import {UrlObject} from 'url'
-import {Activity, ASObject, Extendable, JSONLD} from './types'
+import {Activity, ASObject, Extendable, JSONLD, activitySubtypes} from './types'
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
@@ -16,14 +16,7 @@ exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 // #TODO - What if it's an extension activity that describes itself via
 //   rdfs as a subtype of Activity?
 exports.as2ObjectIsActivity = (obj:ASObject) => {
-  // https://www.w3.org/TR/activitystreams-vocabulary/#activity-types
-  const activityTypes = [
-    'Accept', 'Add', 'Announce', 'Arrive', 'Block', 'Create', 'Delete',
-    'Dislike', 'Flag', 'Follow', 'Ignore', 'Invite', 'Join', 'Leave', 'Like',
-    'Listen', 'Move', 'Offer', 'Question', 'Reject', 'Read', 'Remove',
-    'TentativeReject', 'TentativeAccept', 'Travel', 'Undo', 'Update', 'View'
-  ]
-  return activityTypes.includes(obj.type)
+  return activitySubtypes.includes(obj.type)
 }
 
 // given an activity, return a set of targets it should be delivered to

@@ -386,13 +386,15 @@ function inboxHandler ({ activities, externalUrl, inbox } : {
 }
 
 // given a AS2 object, return it's JSON-LD @id
-const getJsonLdId = (obj:string|Activity|JSONLD) => {
+const getJsonLdId = (obj:string|ASObject|JSONLD) => {
   if (typeof obj === 'string') {
     return obj
   } else if (obj instanceof JSONLD) {
     return obj['@id']
-  } else if (obj instanceof Activity) {
+  } else if (obj instanceof ASObject) {
     return obj.id
+  } else {
+    const _exhaustiveCheck: never = obj;
   }
 }
 
@@ -458,12 +460,18 @@ function outboxHandler ({
           }, {})
         )
 
-        const newActivity = Object.assign(submittedActivity, {
-          // #TODO: validate that newActivity wasn't submitted with an .id, even though spec says to rewrite it
-          id: uuidUri(newuuid),
-          // #TODO: what if it already had published?
-          published: (new Date()).toISOString()
-        })
+        const newActivity = Object.assign(
+          {
+            type: 'Activity'
+          },
+          submittedActivity,
+          {
+            // #TODO: validate that newActivity wasn't submitted with an .id, even though spec says to rewrite it
+            id: uuidUri(newuuid),
+            // #TODO: what if it already had published?
+            published: (new Date()).toISOString()
+          }
+        )
         // #TODO: validate the activity. Like... you probably shouldn't be able to just send '{}'
         const location = '/activities/' + newuuid
 

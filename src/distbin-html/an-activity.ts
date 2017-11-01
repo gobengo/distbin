@@ -12,7 +12,7 @@ const { sendRequest } = require('../util')
 const { ensureArray } = require('../util')
 const { flatten } = require('../util')
 const url = require('url')
-import {Activity,Collection, LDObject, ASObject, Link, Place} from '../types'
+import {Activity, isActivity, Collection, LDObject, ASObject, Link, Place} from '../types'
 import {LinkPrefetchResult, LinkPrefetchSuccess, LinkPrefetchFailure, HasLinkPrefetchResult} from '../types'
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
 
@@ -89,7 +89,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}:{apiUrl:string, activ
         ${renderAncestorsSection(ancestors)}
 
         <div class="primary-activity">
-          ${renderActivity(activity)}
+          ${renderObject(activity)}
         </div>
         ${renderDescendantsSection(ensureArray(activity.replies)[0])} 
 
@@ -136,17 +136,17 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}:{apiUrl:string, activ
         scrolling="no"
       ></iframe>
 */
-exports.renderActivity = renderActivity
-function renderActivity (activity: Activity) {
-  const published =
-    (activity.object instanceof ASObject && activity.object.published) ||
-    activity.published
+export const renderActivity = (activity: Activity) => renderObject(activity)
+
+export function renderObject (activity: ASObject) {
+  const object = (isActivity(activity) && typeof activity.object === 'object') ? activity.object : activity
+  const published = object.published
   const generator = formatGenerator(activity)
   const location = formatLocation(activity)
   const attributedTo = formatAttributedTo(activity)
   const tags = formatTags(activity)
   const activityUrl = ensureArray(activity.url)[0]
-  const activityObject = ensureArray(activity.object).filter((o:ASObject|string) => typeof o === 'object')[0]
+  const activityObject = isActivity(activity) && ensureArray(activity.object).filter((o:ASObject|string) => typeof o === 'object')[0]
   return `
     <article class="activity-item">
       <header>
@@ -185,34 +185,38 @@ function renderActivity (activity: Activity) {
 }
 
       <div class="activity-attachments">
-        ${ensureArray(activity.object instanceof ASObject && activity.object.attachment).map((attachment: ASObject & HasLinkPrefetchResult) => {
-          if (!attachment) return ''
-          switch (attachment.type) {
-            case 'Link':
-              const prefetch: LinkPrefetchResult = attachment['https://distbin.com/ns/linkPrefetch']
-              if (prefetch instanceof LinkPrefetchFailure) {
-                return
-              }
-              const linkPrefetchSuccess = <LinkPrefetchSuccess>prefetch
-              if (!(linkPrefetchSuccess && linkPrefetchSuccess.supportedMediaTypes)) return ''
-              if (linkPrefetchSuccess.supportedMediaTypes.find((m: string) => m.startsWith('image/'))) {
-                return `
-                  <img src="${linkPrefetchSuccess.link.href}" />
-                `
-              }
-              break
-            default:
-              break
-          }
-          return ''
-        }).filter(Boolean).join('\n')}
+        ${ensureArray(isActivity(activity) && (typeof activity.object === 'object') && activity.object.attachment)
+          .map((attachment: ASObject & HasLinkPrefetchResult) => {
+            if (!attachment) return ''
+            switch (attachment.type) {
+              case 'Link':
+                const prefetch: LinkPrefetchResult = attachment['https://distbin.com/ns/linkPrefetch']
+                if (prefetch.type === 'LinkPrefetchFailure') {
+                  return
+                }
+                const linkPrefetchSuccess = <LinkPrefetchSuccess>prefetch
+                if (!(linkPrefetchSuccess && linkPrefetchSuccess.supportedMediaTypes)) return ''
+                if (linkPrefetchSuccess.supportedMediaTypes.find((m: string) => m.startsWith('image/'))) {
+                  return `
+                    <img src="${linkPrefetchSuccess.link.href}" />
+                  `
+                }
+                break
+              default:
+                break
+            }
+            return ''
+          })
+          .filter(Boolean)
+          .join('\n')
+        }
       </div>
 
       ${/* TODO add byline */''}
       <footer>
         <div class="activity-footer-bar">
           <span>
-            <a href="${encodeHtmlEntities(activityUrl)}">${
+            <a href="${activityUrl && encodeHtmlEntities(activityUrl)}">${
   published
     ? formatDate(new Date(Date.parse(published)))
     : 'permalink'
@@ -246,9 +250,9 @@ function renderActivity (activity: Activity) {
   `
 }
 
-function formatTags (activity: Activity) {
-  const tags = activity.object instanceof ASObject && activity.object.tag
-  if (!Array.isArray(tags)) return
+function formatTags (o: ASObject) {
+  const tags = ensureArray(isActivity(o) && typeof o.object === 'object' && o.object.tag
+                           || o.tag).filter(Boolean)
   return tags.map(renderTag).filter(Boolean).join('&nbsp;')
   function renderTag (tag: ASObject) {
     const text = tag.name || tag.id || tag.url
@@ -266,7 +270,8 @@ function formatTags (activity: Activity) {
 }
 
 function formatAttributedTo (activity:ASObject|Activity) {
-  const attributedTo = activity.attributedTo || (activity instanceof Activity && (activity.object instanceof ASObject) && activity.object.attributedTo)
+  const attributedTo = activity.attributedTo
+    || (isActivity(activity)) && (typeof activity.object === 'object') && activity.object.attributedTo
   if (!attributedTo) return
   let formatted = ''
   let url
@@ -327,10 +332,9 @@ function formatLocation (activity: ASObject) {
   `
 }
 
-function formatGenerator (activity: Activity) {
-  if (typeof activity.object === 'string') return ''
-  const object: ASObject = activity.object || activity
-  const generator = object.generator
+function formatGenerator (o: ASObject) {
+  const object: ASObject = isActivity(o) && (typeof o.object === 'object') && o.object
+  const generator = object && object.generator
   if (!generator) return ''
   let generatorText  
   if (typeof generator === 'object') {
@@ -421,7 +425,7 @@ function renderDescendantsSection (replies:Collection<ASObjectWithFetchedReplies
     inner = 'uh... totalItems > 0 but no items included. #TODO'
   } else {
     inner = replies.items.map((a: ASObjectWithFetchedReplies) => `
-      ${renderActivity(a)}
+      ${renderObject(a)}
       ${renderDescendantsSection(a.replies)}
     `).join('')
   }
@@ -434,7 +438,7 @@ function renderDescendantsSection (replies:Collection<ASObjectWithFetchedReplies
 
 // Render a single ancestor activity
 function renderAncestor (ancestor:Activity|LinkPrefetchFailure) : string {
-  if (ancestor instanceof LinkPrefetchFailure) {
+  if (ancestor.type === 'LinkPrefetchFailure') {
     const linkFetchFailure = <LinkPrefetchFailure>ancestor
     const href = linkFetchFailure.link.href
     // assume its a broken link
@@ -444,7 +448,7 @@ function renderAncestor (ancestor:Activity|LinkPrefetchFailure) : string {
       </article>
     `
   }
-  return renderActivity(ancestor)
+  return renderObject(ancestor)
 }
 
 // Render an item and its ancestors for each ancestor in the array.
@@ -478,7 +482,7 @@ async function fetchReplyAncestors (baseUrl: string, activity:Activity): Promise
       case 'ECONNREFUSED':
       case 'ENOTFOUND':
         // don't recurse since we can't fetch the parent
-        return [<LinkPrefetchFailure>({
+        return [new LinkPrefetchFailure({
           link: {
             type: 'Link',
             href: parentUrl,

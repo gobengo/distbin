@@ -23,7 +23,7 @@ exports.createHandler = ({ apiUrl, externalUrl }:{apiUrl:string, externalUrl:str
     Promise.resolve(handler(req, res))
       .catch((e) => {
         res.writeHead(500)
-        console.trace(e)
+        console.error(e)
         res.end('Error: ' + e)
       })
   }

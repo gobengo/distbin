@@ -346,26 +346,26 @@ async function getAttachmentLinkForUrl (attachment: string) {
       console.error(error)
     }
     if (connectionError) {
-      linkPrefetchResult = <LinkPrefetchFailure>{
+      linkPrefetchResult = new LinkPrefetchFailure({
         error: {
           message: connectionError.message
         }
-      }
+      })
     } else if (attachmentResponse.statusCode === 200) {
       const contentType = attachmentResponse.headers['content-type']
       if (contentType) {
-        linkPrefetchResult = <LinkPrefetchSuccess>{
+        linkPrefetchResult = new LinkPrefetchSuccess({
           published: new Date().toISOString(),
           supportedMediaTypes: [contentType]
-        }
+        })
       }
     } else {
       // no connection error, not 200, must be another
-      linkPrefetchResult = <LinkPrefetchFailure>{
+      linkPrefetchResult = new LinkPrefetchFailure({
         error: {
           status: attachmentResponse.statusCode
         }
-      }
+      })
     }
     attachmentLink['https://distbin.com/ns/linkPrefetch'] = linkPrefetchResult    
   }
