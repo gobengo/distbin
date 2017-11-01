@@ -25,9 +25,7 @@ const uuidUri = (uuid:string) => `urn:uuid:${uuid}`
 
 // Factory function for another node.http handler function that defines distbin's web logic
 // (routes requests to sub-handlers with common error handling)
-exports = module.exports = distbin
-exports.distbin = distbin
-function distbin ({
+export default function distbin ({
   // Juse use Map as default, but users should provide more bette data structures
   // #TODO: This should be size-bound e.g. LRU
   // #TODO: This should be persistent :P

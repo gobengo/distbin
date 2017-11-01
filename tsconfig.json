@@ -10,13 +10,9 @@
     "pretty": true,
     "lib": [
       "es7"
-    ]
+    ],
+    "sourceMap": true
   },
-  "include": [
-    "src/**/*",
-    "bin/**/*",
-    "test/**/*"
-  ],
   "exclude": [
     "node_modules",
     "dist.ts"

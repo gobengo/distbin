@@ -3,7 +3,7 @@
 const activitypub = require('../src/activitypub')
 const assert = require('assert')
 import { testCli } from '.'
-const distbin = require('../')
+import distbin from '../'
 const http = require('http')
 const { isProbablyAbsoluteUrl } = require('./util')
 const { listen } = require('./util')
@@ -234,7 +234,6 @@ tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)
   const distbinAInbox = JSON.parse(await readableToString(await sendRequest(
     await requestForListener(distbinA, '/activitypub/inbox'))))
   const replyFromDistbinAInbox = distbinAInbox.items.find((a: DistbinActivity) => {
-    debugger
     const idMatches = a.id === replyId
     if (idMatches) return true
     const wasDerivedFrom = a['http://www.w3.org/ns/prov#wasDerivedFrom']

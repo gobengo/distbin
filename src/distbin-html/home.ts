@@ -8,7 +8,7 @@ const { distbinBodyTemplate } = require('./partials')
 import { requestUrl } from '../util'
 const { isProbablyAbsoluteUrl } = require('../util')
 const { createHttpOrHttpsRequest } = require('../util')
-import { Link, LinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchSuccess, HasLinkPrefetchResult } from '../types'
+import { ASLink, LinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchSuccess, HasLinkPrefetchResult } from '../types'
 
 exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externalUrl:string}) {
   return async function (req: IncomingMessage, res:ServerResponse) {
@@ -328,7 +328,7 @@ function parseLocationFormFields (formFields: {[key:string]:string}) {
 }
 
 async function getAttachmentLinkForUrl (attachment: string) {
-  let attachmentLink: Link & HasLinkPrefetchResult = attachment && {
+  let attachmentLink: ASLink & HasLinkPrefetchResult = attachment && {
     type: 'Link',
     href: attachment
   }

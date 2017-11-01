@@ -4,7 +4,7 @@ const jsonldLib = require('jsonld')
 jsonldLib.registerRDFParser('text/html', jsonldRdfaParser)
 const url = require('url')
 import * as http from "http";
-import {HttpRequestResponder, Link} from './types';
+import {HttpRequestResponder, ASLink} from './types';
 import { Url, UrlObject } from 'url'
 const https = require('https')
 const fs = require('fs')
@@ -135,7 +135,7 @@ export const createHttpOrHttpsRequest = function createHttpOrHttpsRequest (urlOr
 }
 
 // given a Link object or url string, return an href string that can be used to refer to it
-export const linkToHref = function linkToHref (hrefOrLinkObj: Link|string) {
+export const linkToHref = function linkToHref (hrefOrLinkObj: ASLink|string) {
   if (typeof hrefOrLinkObj === 'string') return hrefOrLinkObj
   if (typeof hrefOrLinkObj === 'object') return hrefOrLinkObj.href
   throw new Error('Unexpected link type: ' + typeof hrefOrLinkObj)

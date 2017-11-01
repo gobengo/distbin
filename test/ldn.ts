@@ -1,7 +1,7 @@
 const assert = require('assert')
 const fetch = require('node-fetch')
 const { listen } = require('./util')
-const { distbin } = require('../src')
+import distbin from '../'
 const http = require('http')
 const uuid = require('uuid')
 const { jsonld } = require('../src/util')

@@ -1,4 +1,4 @@
-const distbin = require('../../')
+import distbin from '../../'
 const { listen } = require('../util')
 const url = require('url')
 const querystring = require('querystring')

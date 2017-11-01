@@ -1,6 +1,6 @@
 const activitypub = require('../src/activitypub')
 const assert = require('assert')
-const distbin = require('../')
+import distbin from '../'
 import * as http from 'http'
 const { readableToString, sendRequest } = require('../src/util')
 const { listen, requestForListener } = require('./util')
@@ -9,6 +9,8 @@ import { Activity, LDValue } from './types'
 import { testCli } from '.'
 
 const tests = module.exports
+
+debugger
 
 /*
 
