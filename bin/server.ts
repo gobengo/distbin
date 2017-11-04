@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as http from "http";
 import {IncomingMessage, ServerRequest, ServerResponse, Server} from 'http'
-const distbin = require('../');
+import distbin from '../'
 const fs = require('fs')
 const path = require('path')
 const querystring = require('querystring')
@@ -22,8 +22,7 @@ if (require.main === module) {
   runServer()
     .then(() => process.exit())
     .catch((err) => {
-    	console.error("Uncaught Error in runServer")
-    	console.trace(err)
+    	console.error("Uncaught Error in runServer", err)
     	process.exit(1)
     })
 }
