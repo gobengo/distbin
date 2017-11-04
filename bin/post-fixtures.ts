@@ -9,7 +9,7 @@ const http = require('http')
 const { readableToString } = require('../src/util')
 const { sendRequest } = require('../src/util')
 const url = require('url')
-import { Activity } from '../src/types'
+import { Activity, ASObject } from '../src/types'
 
 if (require.main === module) {
   const [distbinUrl] = process.argv.slice(2)
@@ -22,8 +22,8 @@ if (require.main === module) {
 }
 
 // Create a sample activity
-function createActivityFixture({ inReplyTo }:{inReplyTo:string}) {
-	const fixture = {
+function createNoteFixture({ inReplyTo }:{inReplyTo:string}): ASObject {
+	const fixture: ASObject = {
 		type: 'Note',
 		content: loremIpsum(),
 	  cc: ["https://www.w3.org/ns/activitystreams#Public"],
@@ -44,7 +44,7 @@ async function postManyFixtures(
 	const posted = []
 	while (max--) {
 		// console.log('max', max)
-		let url = await postActivity(distbinUrl, createActivityFixture({ inReplyTo }))
+		let url = await postActivity(distbinUrl, createNoteFixture({ inReplyTo }))
 		console.log(new Array(thisDepth - 1).join('.') + url)
 		posted.push(url)
 		// post children
@@ -62,7 +62,7 @@ async function postManyFixtures(
 }
 
 // post a single fixture to distbinUrl over HTTP
-async function postActivity(distbinUrl: string, activity: Activity) {
+async function postActivity(distbinUrl: string, activity: ASObject) {
 	if ( ! distbinUrl) {
 		throw new Error("Please provide a distbinUrl argument")
 	}

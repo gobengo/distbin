@@ -48,7 +48,7 @@ export class ASObject extends ASBase {
     attachment?: ASObject
     attributedTo?: LDValue<ASObject>    
     bcc?: LDValue<ASObject> 
-    cc?: LDValue<ASObject> 
+    cc?: OneOrMore<LDValue<ASObject>>
     content?: string    
     generator?: LDValue<ASObject>    
     id?: string
