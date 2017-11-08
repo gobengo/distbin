@@ -42,6 +42,6 @@ VOLUME /distbin-db
 # read by ./bin/server
 ENV DB_DIR=/distbin-db
 
-ENV PORT=8080
-EXPOSE 8080
-CMD ["node", "--harmony", "bin/server" ]
+ENV PORT=80
+EXPOSE 80
+CMD ["npm ", "start" ]

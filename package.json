@@ -30,11 +30,16 @@
     "eslint-plugin-standard": "^2.0.1",
     "ts-node": "^3.3.0"
   },
+  "config": {
+    "port": 8000
+  },
   "scripts": {
     "lint": "eslint --fix src test bin",
     "test": "ts-node --harmony test",
-    "start": "PORT=8000 ts-node --harmony bin/server",
-    "tsc": "tsc"
+    "start": "npm run ts.build && node ./dist/bin/server",
+    "start-dev": "ts-node --harmony bin/server",
+    "tsc": "tsc",
+    "ts.build": "tsc && copyfiles './src/**/*.json' dist/"
   },
   "author": "",
   "license": "ISC"

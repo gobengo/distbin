@@ -36,8 +36,11 @@ async function runServer() {
 	  	process.exit()
 	  });
 	});
-
-	const externalUrl = process.env.EXTERNAL_URL || `http://localhost:${process.env.PORT}`
+	const port = process.env.PORT || process.env.npm_package_config_port
+	if ( ! port) {
+		throw new Error('Provide required PORT environment variable to configure distbin HTTP port')
+	}
+	const externalUrl = process.env.EXTERNAL_URL || `http://localhost:${port}`
 	const dbDir = process.env.DB_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'distbin-'));
 	// ensure subdirs exist
 	await Promise.all(['activities', 'inbox'].map(dir => {
@@ -58,8 +61,8 @@ async function runServer() {
 		externalUrl,
 	})
 
-	function listen(server: Server): Promise<string> {
-		return new Promise((resolve, reject) => server.listen(0, (err: Error) => {
+	function listen(server: Server, port:number|string=0): Promise<string> {
+		return new Promise((resolve, reject) => server.listen(port, (err: Error) => {
 			if (err) return reject(err)
 			resolve(`http://localhost:${server.address().port}`)
 		}))
@@ -143,12 +146,7 @@ async function runServer() {
 		}
 	})
 	// listen
-	let mainServerUrl = await new Promise((resolve) => {
-		mainServer.listen(process.env.PORT || 0, (err: Error) => {
-			resolve(externalUrl)
-		})
-	})
-
+	let mainServerUrl = await listen(mainServer, port)
 	console.log(mainServerUrl)
 	// now just like listen
 	await new Promise(function () {

@@ -4,7 +4,7 @@
     "noImplicitAny": true,
     "types": ["node"],
     "allowJs": true,
-    "outDir": "dist.ts",
+    "outDir": "dist",
     "module": "commonjs",
     "target": "es6",
     "pretty": true,
@@ -15,6 +15,6 @@
   },
   "exclude": [
     "node_modules",
-    "dist.ts"
+    "dist"
   ]
 }

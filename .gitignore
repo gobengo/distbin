@@ -1,6 +1,6 @@
 bengo-notes
 /node_modules
 TODO
-/dist.ts
+/dist
 /.vs
 /.vscode
