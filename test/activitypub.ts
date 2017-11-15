@@ -10,8 +10,6 @@ import { testCli } from '.'
 
 const tests = module.exports
 
-debugger
-
 /*
 
 Tests of ActivityPub functionality, including lots of text from the spec itself and #critiques

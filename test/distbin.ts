@@ -13,8 +13,15 @@ const { linkToHref } = require('../src/util')
 const { sendRequest } = require('../src/util')
 import * as url from 'url'
 import { HttpRequestResponder, Activity, isActivity, ASObject, Extendable, LDValue, LDValues, LDObject, DistbinActivity, JSONLD } from './types'
+import { discoverOutbox } from '../src/activitypub'
 
 let tests = module.exports
+
+tests['discoverOutbox'] = async function () {
+  const distbinUrl = await listen(http.createServer(distbin()))
+  const outbox = await discoverOutbox(distbinUrl)
+  assert.equal(outbox, `${distbinUrl}/activitypub/outbox`)
+}
 
 tests['distbin can be imported'] = () => {
   assert(distbin, 'distbin is truthy')

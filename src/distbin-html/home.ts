@@ -1,6 +1,7 @@
 const http = require('http')
 import {IncomingMessage, ServerResponse} from 'http'
 const { publicCollectionId } = require('../activitypub')
+import { discoverOutbox } from '../activitypub'
 const querystring = require('querystring')
 const url = require('url')
 const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
@@ -81,12 +82,12 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
         }
         // submit to outbox
         // #TODO discover outbox URL
-        const postToOutboxRequest = http.request(Object.assign(url.parse(apiUrl + '/activitypub/outbox'), {
+        const outboxUrl = await discoverOutbox(apiUrl)
+        const postToOutboxRequest = http.request(Object.assign(url.parse(outboxUrl), {
           headers: {
             'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
           },
           method: 'post',
-          path: '/activitypub/outbox'
         }))
         postToOutboxRequest.write(JSON.stringify(activity))
         const postToOutboxResponse = await sendRequest(postToOutboxRequest)

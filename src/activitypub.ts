@@ -10,6 +10,9 @@ import {UrlObject} from 'url'
 import { activitySubtypes } from './activitystreams/types'
 import {Activity, ASObject, Extendable, JSONLD} from './types'
 
+const jsonLdProfile = exports.jsonLdProfile = "https://www.w3.org/ns/activitystreams"
+const acceptHeaderValue = exports.acceptHeaderValue = `application/ld+json; profile="${jsonLdProfile}"`
+
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
 // Given an AS2 Object, return whether it appears to be an "subtype of Activity"
@@ -32,9 +35,9 @@ const activityTargets = (activity:Activity) => {
 // Create a headers map for http.request() incl. any specced requirements for ActivityPub Client requests
 exports.clientHeaders = (headers = {}) => {
   const requirements = {
-    // The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams#" media type in order to retrieve the activity.
+    // The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams" media type in order to retrieve the activity.
     //  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
-    accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+    accept: `${acceptHeaderValue}"`
   }
   if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
     throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
@@ -74,12 +77,62 @@ const request = (urlOrOptions:string|UrlObject) => {
   return httpModule.request(urlOrOptions)
 }
 
+const fetchProfile = exports.fetchProfile = async (target: string) => {
+  const targetProfileRequest = request(Object.assign(url.parse(target), {
+    headers: {
+      accept: `${acceptHeaderValue},text/html`
+    }
+  }))
+  debuglog('fetchProfile ' + target)
+  try {
+    var targetProfileResponse = await sendRequest(targetProfileRequest)
+  } catch (e) {
+    throw new deliveryErrors.TargetRequestFailed(e.message)
+  }
+  debuglog(`res ${targetProfileResponse.statusCode} fetchProfile for ${target}`)
+
+  switch (targetProfileResponse.statusCode) {
+    case 200:
+      // cool
+      break
+    default:
+      throw new deliveryErrors.TargetRequestFailed(`Got unexpected status code ${targetProfileResponse.statusCode} when requesting ${target} to fetchProfile`)
+  }
+
+  return targetProfileResponse
+}
+
+export const discoverOutbox = async (target: string) => {
+  const profileResponse = await fetchProfile(target)
+  const outbox = url.resolve(target, await outboxFromResponse(profileResponse))
+  return outbox
+}
+
+async function outboxFromResponse (res: IncomingMessage) {
+  const contentTypeHeaders = ensureArray(res.headers['content-type'])
+  const contentType = contentTypeHeaders.map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]
+  const body = await readableToString(res)
+  let inbox
+  switch (contentType) {
+    case 'application/json':
+      try {
+        var targetProfile = JSON.parse(body)
+      } catch (e) {
+        throw new deliveryErrors.TargetParseFailed(e.message)
+      }
+      // #TODO be more JSON-LD aware when looking for outbox
+      return targetProfile.outbox
+    default:
+      throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
+  }
+}
+
 // deliver an activity to a target
 const deliverActivity = async function (activity: Activity, target: string) {
   // discover inbox
   const targetProfileRequest = request(Object.assign(url.parse(target), {
     headers: {
-      accept: 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#",text/html'
+      accept: `${acceptHeaderValue},text/html`
     }
   }))
   debuglog('req inbox discovery ' + target)
@@ -162,7 +215,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
   const parsedInboxUrl = url.parse(inbox)
   const deliveryRequest = (parsedInboxUrl.protocol === 'https:' ? https : http).request(Object.assign(parsedInboxUrl, {
     headers: {
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
     },
     method: 'post'
   }))

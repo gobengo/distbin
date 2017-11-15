@@ -12,6 +12,7 @@ const { sendRequest } = require('../util')
 const { ensureArray } = require('../util')
 const { flatten } = require('../util')
 const url = require('url')
+const { jsonLdProfile } = require('../activitypub')
 import {Activity, isActivity, Collection, LDObject, ASObject, ASLink, Place} from '../types'
 import {LinkPrefetchResult, LinkPrefetchSuccess, LinkPrefetchFailure, HasLinkPrefetchResult} from '../types'
 const failedToFetch = Symbol('is this a Link that distbin failed to fetch?')
