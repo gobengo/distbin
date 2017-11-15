@@ -2,7 +2,7 @@ FROM debian:jessie
 
 # install gosu
 
-RUN apt-get update && apt-get -y --no-install-recommends install \
+RUN apt-get update --fix-missing && apt-get -y --no-install-recommends install \
     ca-certificates \
     curl \
     sudo
@@ -14,15 +14,20 @@ RUN curl -o /usr/local/bin/gosu -SL "https://github.com/tianon/gosu/releases/dow
     && rm /usr/local/bin/gosu.asc \
     && chmod +x /usr/local/bin/gosu
 
-COPY ./etc/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
+# install and configure authbind
+RUN apt-get install -y authbind git && \
+    touch /etc/authbind/byport/443 && \
+    touch /etc/authbind/byport/80 && \
+    chmod -R 755 /etc/authbind/byport/
 
 # install node.js 8
 RUN curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
 RUN sudo apt-get install -y nodejs
 
+# clean up after apt-get
+RUN rm -rf /var/lib/apt/lists/* && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Change the working directory.
 WORKDIR /home/distbin/app
@@ -35,6 +40,7 @@ RUN npm install --ignore-scripts
 # Copy project directory.
 COPY . ./
 
+RUN npm run ts.build
 
 # distbin will store data as files in this directory
 VOLUME /distbin-db
@@ -44,4 +50,9 @@ ENV DB_DIR=/distbin-db
 
 ENV PORT=80
 EXPOSE 80
-CMD ["npm ", "start" ]
+
+COPY ./etc/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+CMD ["npm", "start"]

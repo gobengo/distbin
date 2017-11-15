@@ -36,7 +36,7 @@
   "scripts": {
     "lint": "eslint --fix src test bin",
     "test": "ts-node --harmony test",
-    "start": "npm run ts.build && node ./dist/bin/server",
+    "start": "node ./dist/bin/server",
     "start-dev": "ts-node --harmony bin/server",
     "tsc": "tsc",
     "ts.build": "tsc && copyfiles './src/**/*.json' dist/"
