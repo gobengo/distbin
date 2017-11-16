@@ -20,7 +20,7 @@ export async function testCli (tests: TestsMap) {
   run(tests)
   .then(() => process.exit())
   .catch((error: Error) => {
-    console.error(error);
+    console.error(error)
     process.exit(1)
   })
 }

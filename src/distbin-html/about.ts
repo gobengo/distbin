@@ -76,7 +76,7 @@ function createAboutMessage () {
         i.e. it is a service where anyone can post things on the web, and others can react by posting anywhere else on the web (including here).
       </p>
       <p>
-        Of course, theres lots of other places you can post things. Most people communicate online dozens of times per day. But all these places where we post and talk and learn are isolated. We talk <i>in</i> them, but they don't talk to each other.
+        Of course, there are lots of other places you can post things. Most people communicate online dozens of times per day. But all these places where we post and talk and learn are isolated. We talk <i>in</i> them, but they don't talk to each other.
       </p>
       <p>
         Because they're isolated, we don't get much choice in how we communicate with our friends. We react to things wherever we find them. Your contributions to the web are fragmented, with no easy way to go back and remember or save them.

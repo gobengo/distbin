@@ -29,8 +29,8 @@ export const listen = function listen (server: Server, port = 0, hostname?: stri
   let listened: boolean
   return new Promise((resolve, reject) => {
     server.once('error', (error: any) => {
-        if (!listened) reject(error)
-      })
+      if (!listened) reject(error)
+    })
     server
       .listen(port, hostname, () => {
         listened = true

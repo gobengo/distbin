@@ -5,10 +5,74 @@ import * as http from 'http'
 const { readableToString, sendRequest } = require('../src/util')
 const { listen, requestForListener } = require('./util')
 const { isProbablyAbsoluteUrl } = require('./util')
-import { Activity, LDValue } from './types'
+import { Activity, LDValue, ASObject } from './types'
 import { testCli } from '.'
+import { objectTargets, targetedAudience, getASId } from '../src/activitypub'
 
 const tests = module.exports
+
+const setsAreEqual = (s1: Set<any>, s2: Set<any>) => (s1.size === s2.size) && Array.from(s1).every(i => s2.has(i))
+
+tests['objectTargets'] = async () => {
+  const activity: Activity = {
+    '@context': ['https://www.w3.org/ns/activitystreams',
+                 {'@language': 'en-GB'}],
+    'type': 'Like',
+    'object': {
+      'id': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
+      'type': 'Article',
+      'name': 'Minimal ActivityPub update client',
+      'content': 'Today I finished morph, a client for posting ActivityStreams2...',
+      'attributedTo': {
+        'id': 'https://rhiaro.co.uk/#amy',
+        'attributedTo': {
+          'id': 'https://rhario.co.uk/attributedTo',
+          'attributedTo': {
+            'id': 'https://rhiaro.co.uk/attributedTo/attributedTo',
+            'cc': [{
+              'id': 'https://rhiaro.co.uk/attributedTo/attributedTo/cc/0'
+            }]
+          }
+        }
+      },
+      'to': 'https://rhiaro.co.uk/followers/',
+      'cc': 'https://e14n.com/evan'
+    }
+  }
+  const levels: Set<string>[] = [
+    ['https://rhiaro.co.uk/#amy', 'https://rhiaro.co.uk/followers/', 'https://e14n.com/evan'],
+    ['https://rhario.co.uk/attributedTo'],
+    ['https://rhiaro.co.uk/attributedTo/attributedTo'],
+    ['https://rhiaro.co.uk/attributedTo/attributedTo/cc/0']
+  ].map((a: string[]) => new Set(a))
+  const targetsShouldBeForLevel = (level: number) => {
+    const theseLevels = levels.slice(0, level+1)
+    const targetsShouldBe = theseLevels.reduce((targets, levelTargetSet) => new Set([...levelTargetSet, ...targets]), new Set())
+    return new Set(targetsShouldBe)
+  }
+  levels.forEach((level, index) => {
+    const targets = objectTargets(activity, index).map(getASId)
+    const targetsShouldBe = targetsShouldBeForLevel(index)
+    // console.log({ level: index, targets, targetsShouldBe })
+    assert(setsAreEqual(targetsShouldBe, new Set(targets)))
+  })
+}
+
+tests['targetedAudience'] = async () => {
+  const asObject: ASObject = {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    'id': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
+    'type': 'Article',
+    'name': 'Minimal ActivityPub update client',
+    'content': 'Today I finished morph, a client for posting ActivityStreams2...',
+    'attributedTo': 'https://rhiaro.co.uk/#amy',
+    'to': 'https://rhiaro.co.uk/followers/',
+    'cc': 'https://e14n.com/evan'
+  }
+  const audience = targetedAudience(asObject)
+  // console.log('audience', audience)
+  assert.deepEqual(audience, ['https://rhiaro.co.uk/followers/', 'https://e14n.com/evan'])
+}
 
 /*
 
@@ -88,7 +152,7 @@ tests['can request the public Collection'] = async function () {
 //  Like... should the public collection id bein the 'to' or 'cc' or 'bcc' fields or does it matter?
 tests['can address activities to the public Collection when sending to outbox, and they show up in the public Collection'] = async function () {
   const distbinListener = distbin()
-  
+
   // post an activity addressed to public collection to outbox
   const activityToPublic = {
     '@context': 'https://www.w3.org/ns/activitystreams',
@@ -311,7 +375,7 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
     'published': '2015-02-10T15:04:55Z',
     'to': [activitypub.publicCollectionId],
     'cc': ['ben@bengo.is'],
-    'bcc': ['benbcc@bengo.is'],
+    'bcc': ['benbcc@bengo.is']
   }
   req.write(JSON.stringify(example10))
   const res = await sendRequest(req)

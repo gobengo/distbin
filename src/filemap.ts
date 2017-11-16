@@ -5,11 +5,11 @@ const { denodeify } = require('./util')
 // TODO: Write tests
 
 // Like a Map, but keys are files in a dir, and object values are written as file contents
-exports.JSONFileMap = class JSONFileMap<V> extends Map<string,V> {
+exports.JSONFileMap = class JSONFileMap<V> extends Map<string, V> {
   constructor (private dir:string) {
     super()
   }
-  private keyToString(key: string): string {
+  private keyToString (key: string): string {
     if (typeof key === 'string') return key
     return JSON.stringify(key)
   }
@@ -67,7 +67,7 @@ exports.JSONFileMap = class JSONFileMap<V> extends Map<string,V> {
     return Array.from(this.keys()).map((file: string) => this.get(file))[Symbol.iterator]()
   }
   entries () {
-    return Array.from(this.keys()).map((file) => [file, this.get(file)] as [string,V])[Symbol.iterator]()
+    return Array.from(this.keys()).map((file) => [file, this.get(file)] as [string, V])[Symbol.iterator]()
   }
   get size () {
     return Array.from(this.keys()).length
@@ -91,35 +91,35 @@ interface IAsyncMap<K, V> {
 }
 
 // Like a Map, but all methods return a Promise
-class AsyncMap<K, V> implements IAsyncMap<K,V> {
-  async clear() {
+class AsyncMap<K, V> implements IAsyncMap<K, V> {
+  async clear () {
     return Map.prototype.clear.call(this)
   }
-  async delete(key: K) {
+  async delete (key: K) {
     return Map.prototype.delete.call(this, key)
   }
-  forEach(callbackfn: (value: V, index: K, map: Map<K, V>) => void) {
+  forEach (callbackfn: (value: V, index: K, map: Map<K, V>) => void) {
     return Map.prototype.forEach.call(this, callbackfn)
   }
-  async get(key: K) {
+  async get (key: K) {
     return Map.prototype.get.call(this, key)
   }
-  async has(key: K) {
+  async has (key: K) {
     return Map.prototype.has.call(this, key)
   }
-  async set(key: K, value: V) {
+  async set (key: K, value: V) {
     return Map.prototype.set.call(this, key, value)
   }
-  async entries() {
+  async entries () {
     return Map.prototype.entries.call(this)
   }
-  async keys() {
+  async keys () {
     return Map.prototype.keys.call(this)
   }
-  async values() {
+  async values () {
     return Map.prototype.values.call(this)
   }
-  get size() {
+  get size () {
     return (async () => {
       return Promise.resolve(Array.from(await this.keys()).length)
     })()

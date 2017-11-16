@@ -1,17 +1,18 @@
 import { debuglog } from './util'
 import * as http from 'http'
 import {IncomingMessage} from 'http'
-import * as https from 'http'
+import * as https from 'https'
 import * as parseLinkHeader from 'parse-link-header'
 import { rdfaToJsonLd } from './util'
+import { jsonld } from './util'
 import { readableToString, sendRequest, ensureArray } from './util'
 import * as url from 'url'
 import {UrlObject} from 'url'
-import { activitySubtypes } from './activitystreams/types'
-import {Activity, ASObject, Extendable, JSONLD} from './types'
+import { activitySubtypes, isASLink, isASObject, ASValue } from './activitystreams/types'
+import {Activity, ASObject, Extendable, JSONLD, LDValue, isActivity} from './types'
 
 const jsonLdProfile = exports.jsonLdProfile = "https://www.w3.org/ns/activitystreams"
-const acceptHeaderValue = exports.acceptHeaderValue = `application/ld+json; profile="${jsonLdProfile}"`
+const apContentType = exports.apContentType = `application/ld+json; profile="${jsonLdProfile}"`
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
@@ -23,21 +24,73 @@ exports.as2ObjectIsActivity = (obj:ASObject) => {
   return ensureArray(obj.type).some((t) => activitySubtypes.includes(t))
 }
 
-// given an activity, return a set of targets it should be delivered to
-// upon receipt in an outbox
-const activityTargets = (activity:Activity) => {
-  const primary = [].concat(activity.to, activity.cc, activity.bcc).filter(Boolean)
-  const notification: string[] = [] // #TODO... https://github.com/w3c/activitypub/issues/161
-  const targets = Array.from(new Set([].concat(primary, notification)))
+export const getASId = (o: LDValue<ASObject>) => {
+  if (typeof o === 'string') return o
+  if (typeof o === 'object') return o.id
+  o as never
+}
+
+const flattenAnyArrays = <T=any> (arr: Array<T|T[]>): T[] => {
+  const flattened: T[] = arr.reduce<T[]>((all, o): T[] => {
+    if (o instanceof Array) return all.concat(o)
+    return all.concat([o])
+  }, [])
+  return flattened
+}
+
+export const activityAudience = (activity: ASObject): ASValue[] => {
+  /* Clients SHOULD look at any objects attached to the new Activity via the object, target, inReplyTo and/or tag fields,
+  retrieve their actor or attributedTo properties, and MAY also retrieve their addressing properties, and add these
+  to the to or cc fields of the new Activity being created. */
+  const related: ASValue[] = flattenAnyArrays([
+    isActivity(activity) && activity.object,
+    isActivity(activity) && activity.target,
+    activity.inReplyTo,
+    activity.tag
+  ]).filter(Boolean)
+  isASObject
+  isActivity
+  const relatedCreators : ASValue[] = flattenAnyArrays(related.map(objectProvenanceAudience))
+    .filter(Boolean)
+  const relatedAudience: ASValue[] = flattenAnyArrays(related.map(o => isASObject(o) && targetedAudience(o)))
+    .filter(Boolean)
+    
+  const targets: ASValue[] = [...relatedCreators, ...relatedAudience]
   return targets
 }
+
+const objectProvenanceAudience = (o: ASObject): ASValue[] => {
+  const actor = isActivity(o) && o.actor
+  const attributedTo = isASObject(o) && o.attributedTo
+  return [actor, attributedTo].filter(Boolean)  
+}
+
+export const targetedAudience = (object:ASObject|Activity) => {
+  const targeted = flattenAnyArrays([object.to, object.bto, object.cc, object.bcc]).filter(Boolean)
+  const deduped = Array.from(new Set([].concat(targeted)))
+  return deduped  
+}
+
+export const objectTargets = (activity:ASObject, recursionLimit: number): ASValue[] => {
+  const audience = [...activityAudience(activity),
+                    ...objectProvenanceAudience(activity),
+                    ...targetedAudience(activity)]
+  const recursedAudience = recursionLimit
+    ? flattenAnyArrays(audience.filter(o => isASObject(o))
+                               .map((o: ASObject) => objectTargets(o, recursionLimit - 1)))
+    : []
+  // console.log('recursionLimit', recursionLimit, activity, { audience, recursedAudience })
+  const targets = [...audience, ...recursedAudience]
+  return targets
+}
+
 
 // Create a headers map for http.request() incl. any specced requirements for ActivityPub Client requests
 exports.clientHeaders = (headers = {}) => {
   const requirements = {
     // The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams" media type in order to retrieve the activity.
     //  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
-    accept: `${acceptHeaderValue}"`
+    accept: `${apContentType}"`
   }
   if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
     throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
@@ -73,14 +126,20 @@ const deliveryErrors = exports.deliveryErrors = {
 
 const request = (urlOrOptions:string|UrlObject) => {
   const options = typeof urlOrOptions === 'string' ? url.parse(urlOrOptions) : urlOrOptions;
-  const httpModule = options.protocol === 'https:' ? https : http
-  return httpModule.request(urlOrOptions)
+  switch (options.protocol) {
+    case 'https:':
+      return https.request(urlOrOptions)
+    case 'http:':
+      return http.request(urlOrOptions)
+    default:
+      throw new Error(`cannot create request for protocol ${options.protocol}`)
+  }
 }
 
 const fetchProfile = exports.fetchProfile = async (target: string) => {
   const targetProfileRequest = request(Object.assign(url.parse(target), {
     headers: {
-      accept: `${acceptHeaderValue},text/html`
+      accept: `${apContentType},text/html`
     }
   }))
   debuglog('fetchProfile ' + target)
@@ -123,7 +182,7 @@ async function outboxFromResponse (res: IncomingMessage) {
       // #TODO be more JSON-LD aware when looking for outbox
       return targetProfile.outbox
     default:
-      throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
+      throw new Error(`Don't know how to parse ${contentType} to determine outbox URL`)
   }
 }
 
@@ -132,7 +191,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
   // discover inbox
   const targetProfileRequest = request(Object.assign(url.parse(target), {
     headers: {
-      accept: `${acceptHeaderValue},text/html`
+      accept: `${apContentType},text/html`
     }
   }))
   debuglog('req inbox discovery ' + target)
@@ -179,7 +238,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
     }
     return inbox
   }
-
+  var x
   async function inboxFromBody (res: IncomingMessage) {
     const contentTypeHeaders = ensureArray(res.headers['content-type'])
     const contentType = contentTypeHeaders.map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]
@@ -204,6 +263,30 @@ const deliverActivity = async function (activity: Activity, target: string) {
         }
         inbox = inboxes[0]['@id']
         return inbox
+      case 'application/ld+json':
+        case 'application/ld+json':
+        const obj = JSON.parse(body)
+        const compacted = await jsonld.compact(obj, {
+          '@context': [
+            'https://www.w3.org/ns/activitystreams',
+            {
+              'distbin:inbox': {
+                '@id': 'ldp:inbox',
+                '@container': '@set'
+              }
+            }
+          ]
+        })
+        const compactedInbox = (compacted['distbin:inbox'] || []).map((o: {id: string}) => typeof o === 'object' ? o.id : o)
+        inbox = compactedInbox.length ? compactedInbox : obj.inbox
+        if (!inbox || !inbox.length) {
+          throw new Error('Could not determine ActivityPub inbox from ${contentType} response')
+        }
+        if (inbox.length > 1) {
+          console.log('Got multiple inboxes. Just using first')
+        }
+        inbox = inbox[0]
+        return inbox
       default:
         throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
     }
@@ -213,7 +296,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
 
   // post to inbox
   const parsedInboxUrl = url.parse(inbox)
-  const deliveryRequest = (parsedInboxUrl.protocol === 'https:' ? https : http).request(Object.assign(parsedInboxUrl, {
+  const deliveryRequest = request(Object.assign(parsedInboxUrl, {
     headers: {
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
     },
@@ -231,7 +314,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
   debuglog(`ldn notify res ${deliveryResponse.statusCode} ${inbox} ${deliveryResponseBody.slice(0, 100)}`)
   if (deliveryResponse.statusCode >= 400 && deliveryResponse.statusCode <= 599) {
     // client or server error
-    throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}\n${deliveryResponseBody}`)
+    throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}\nResponse Body:\n${deliveryResponseBody}`)
   }
   // #TODO handle retry/timeout?
   return target
@@ -239,12 +322,14 @@ const deliverActivity = async function (activity: Activity, target: string) {
 
 // Given an activity, determine its targets and deliver to the inbox of each
 // target
-exports.targetAndDeliver = async function (activity: Activity, targets = activityTargets(activity)) {
+exports.targetAndDeliver = async function (activity: Activity,
+                                           targets : string[] = objectTargets(activity, 0).map(getASId),
+                                          ) {
   let deliveries: string[] = []
   let failures: Error[] = []
   await Promise.all(
     targets
-      .map((target) => {
+      .map((target): Promise<any> => {
       // Don't actually deliver to publicCollection URI as it is 'special'
         if (target === exports.publicCollectionId) {
           return Promise.resolve(target)
@@ -255,7 +340,7 @@ exports.targetAndDeliver = async function (activity: Activity, targets = activit
       })
   )
   if (failures.length) {
-    debuglog('failures delivering ' + failures)
+    debuglog('failures delivering ' + failures.map(e => e.stack))
     throw new deliveryErrors.SomeDeliveriesFailed('SomeDeliveriesFailed', failures)
   }
   return deliveries

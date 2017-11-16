@@ -12,28 +12,28 @@ export type Extendable<T> = T & {
 
 // extra fields used by distbin
 export class DistbinActivity extends Activity {
-    'http://www.w3.org/ns/prov#wasDerivedFrom'?: LDValue<object>
-    'distbin:activityPubDeliveryFailures'?: Error[]
+  'http://www.w3.org/ns/prov#wasDerivedFrom'?: LDValue<object>
+  'distbin:activityPubDeliveryFailures'?: Error[]
 }
 export type ActivityMap = Map<string, Activity|DistbinActivity>
 
 type mediaType = string
 export class LinkPrefetchResult {
-    type: string
-    link: ASLink
-    constructor (props:any) {
-        this.type = this.constructor.name
-        Object.assign(this, props)
-    }
+  type: string
+  link: ASLink
+  constructor (props:any) {
+    this.type = this.constructor.name
+    Object.assign(this, props)
+  }
 }
 export class LinkPrefetchSuccess extends LinkPrefetchResult {
-    type: 'LinkPrefetchSuccess'
-    published: ISO8601
-    supportedMediaTypes: mediaType[]
+  type: 'LinkPrefetchSuccess'
+  published: ISO8601
+  supportedMediaTypes: mediaType[]
 }
 export class LinkPrefetchFailure extends LinkPrefetchResult {
-    type: 'LinkPrefetchFailure'
-    error: {
+  type: 'LinkPrefetchFailure'
+  error: {
        status?: number
        message: string
     }

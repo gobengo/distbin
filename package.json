@@ -26,15 +26,17 @@
     "copyfiles": "^1.2.0",
     "eslint": "^3.7.1",
     "eslint-config-standard": "^6.2.0",
+    "eslint-plugin-no-only-tests": "^2.0.0",
     "eslint-plugin-promise": "^3.0.0",
     "eslint-plugin-standard": "^2.0.1",
-    "ts-node": "^3.3.0"
+    "ts-node": "^3.3.0",
+    "typescript-eslint-parser": "^8.0.1"
   },
   "config": {
     "port": 8000
   },
   "scripts": {
-    "lint": "eslint --fix src test bin",
+    "lint": "eslint --fix 'src/**/*.ts' 'test/**/*.ts' 'bin/**/*.ts'",
     "test": "ts-node --harmony test",
     "start": "node ./dist/bin/server",
     "start-dev": "ts-node --harmony bin/server",
