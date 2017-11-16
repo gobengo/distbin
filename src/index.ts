@@ -580,7 +580,7 @@ function isAndExpression(expression: object): expression is AndExpression { //ma
 }
 
 interface OrExpression extends SExpression {
-  or: Filter[]  
+  or: Filter[]
 }
 
 function isOrExpression(expression: object): expression is OrExpression { //magic happens here

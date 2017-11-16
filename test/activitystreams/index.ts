@@ -15,9 +15,9 @@ tests['has types'] = () => {
   }
   const example2: Extendable<Activity> = {
     '@context': {
-      "@vocab": 'https://www.w3.org/ns/activitystreams',
-      "ext": 'https://canine-extension.example/terms/',
-      "@language": 'en'
+      '@vocab': 'https://www.w3.org/ns/activitystreams',
+      'ext': 'https://canine-extension.example/terms/',
+      '@language': 'en'
     },
     'summary': 'A note',
     'type': 'Note',
@@ -27,7 +27,7 @@ tests['has types'] = () => {
   }
   const example3: Extendable<Activity> = {
     '@context': [
-      "https://www.w3.org/ns/activitystreams",
+      'https://www.w3.org/ns/activitystreams',
       {
         'css': 'http://www.w3.org/ns/oa#styledBy'
       }
@@ -50,34 +50,34 @@ tests['has types'] = () => {
     'type': 'Add',
     'published': '2015-02-10T15:04:55Z',
     'actor': {
-      "type": 'Person',
-      "id": 'http://www.test.example/martin',
-      "name": 'Martin Smith',
-      "url": 'http://example.org/martin',
-      "image": {
-       'type': 'Link',
-       'href': 'http://example.org/martin/image.jpg',
-       'mediaType': 'image/jpeg'
-     }
+      'type': 'Person',
+      'id': 'http://www.test.example/martin',
+      'name': 'Martin Smith',
+      'url': 'http://example.org/martin',
+      'image': {
+        'type': 'Link',
+        'href': 'http://example.org/martin/image.jpg',
+        'mediaType': 'image/jpeg'
+      }
     },
-    'object' : {
-      "id": 'http://www.test.example/blog/abc123/xyz',
-      "type": 'Article',
-      "url": 'http://example.org/blog/2011/02/entry',
-      "name": 'Why I love Activity Streams'
+    'object': {
+      'id': 'http://www.test.example/blog/abc123/xyz',
+      'type': 'Article',
+      'url': 'http://example.org/blog/2011/02/entry',
+      'name': 'Why I love Activity Streams'
     },
-    'target' : {
-      "id": 'http://example.org/blog/',
-      "type": 'OrderedCollection',
-      "name": "Martin's Blog"
+    'target': {
+      'id': 'http://example.org/blog/',
+      'type': 'OrderedCollection',
+      'name': 'Martin\'s Blog'
     }
   }
   const example6: Collection<Activity> = {
     '@context': 'https://www.w3.org/ns/activitystreams',
-    'summary': "Martin's recent activities",
+    'summary': 'Martin\'s recent activities',
     'type': 'Collection',
     'totalItems': 1,
-    'items' : [
+    'items': [
       {
         'type': 'Add',
         'published': '2011-02-10T15:04:55Z',
@@ -99,7 +99,7 @@ tests['has types'] = () => {
             'height': 250
           }
         },
-        'object' : {
+        'object': {
           'name': 'My fluffy cat',
           'type': 'Image',
           'id': 'http://example.org/album/máiréad.jpg',
@@ -125,7 +125,7 @@ tests['has types'] = () => {
           'type': 'Collection',
           'id': 'http://example.org/album/',
           'nameMap': {
-            'en': "Martin's Photo Album",
+            'en': 'Martin\'s Photo Album',
             'ga': 'Grianghraif Mairtin'
           },
           'image': {
@@ -157,15 +157,15 @@ tests['has types'] = () => {
       }
     ],
     'type': ['Place', 'gr:Location'],
-    'name': "Sally's Restaurant",
+    'name': 'Sally\'s Restaurant',
     'longitude': 12.34,
     'latitude': 56.78,
     'gr:category': 'restaurants/french_restaurants'
   }
   const example9: Note = {
-    "@context": "https://www.w3.org/ns/activitystreams",
-    "type": "Note",
-    "id": "http://example.org/note/123",
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    'type': 'Note',
+    'id': 'http://example.org/note/123',
     'name': 'Our Weather Is Fine',
     'content': 'I feel that the weather is appropriate to our season and location.'
   }
@@ -289,7 +289,7 @@ tests['has types'] = () => {
           'id': 'http://example.org/entry/20150101000000',
           'type': [ 'Note', 'prov:Entity' ],
           'attributedTo': 'http://example.org/#eric',
-          'content': "Remember... all I'm offering is the trooth. Nothing more."
+          'content': 'Remember... all I\'m offering is the trooth. Nothing more.'
         },
         'published': '2015-01-01T00:00:00Z'
       },
@@ -302,7 +302,7 @@ tests['has types'] = () => {
         'oa:hasBody': {
           'id': 'http://example.org/entry/20150101000059',
           'type': [ 'Note', 'prov:Entity' ],
-          'content': "Remember... all I'm offering is the truth. Nothing more.",
+          'content': 'Remember... all I\'m offering is the truth. Nothing more.',
           'prov:wasAttributedTo': { '@id': 'http://example.org/#eric' },
           'prov:wasRevisionOf': { '@id': 'http://example.org/entry/20150101000000' }
         },
