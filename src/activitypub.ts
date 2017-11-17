@@ -79,9 +79,10 @@ export const objectTargets = (activity:ASObject, recursionLimit: number): ASValu
     ? flattenAnyArrays(audience.filter(o => isASObject(o))
                                .map((o: ASObject) => objectTargets(o, recursionLimit - 1)))
     : []
-  // console.log('recursionLimit', recursionLimit, activity, { audience, recursedAudience })
+  // debuglog('recursionLimit', recursionLimit, activity, { audience, recursedAudience })
   const targets = [...audience, ...recursedAudience]
-  return targets
+  const deduped = Array.from(new Set(targets))
+  return deduped
 }
 
 
@@ -283,7 +284,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
           throw new Error('Could not determine ActivityPub inbox from ${contentType} response')
         }
         if (inbox.length > 1) {
-          console.log('Got multiple inboxes. Just using first')
+          debuglog('Got multiple inboxes. Just using first')
         }
         inbox = inbox[0]
         return inbox

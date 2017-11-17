@@ -387,7 +387,16 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
   const newCreateActivity = JSON.parse(await readableToString(newCreateActivityResponse))
   // The server then must attach this object as the object of a Create Activity.
   assert.equal(newCreateActivity.type, 'Create')
-  assert.deepEqual(newCreateActivity.object, example10)
+  assert.ok('id' in newCreateActivity.object, 'object.id was provisioned')
+  assert.notEqual(newCreateActivity.id, newCreateActivity.object.id)
+  const withoutProperties = (obj: Object, withoutProps: string[]) => {
+    const lesserObj = Array.from(Object.entries(obj)).reduce((obj, [prop, val]) => {
+      if ( ! withoutProps.includes(prop)) obj[prop] = val
+      return obj
+    }, {} as {[key: string]: any})
+    return lesserObj
+  }
+  assert.deepEqual(withoutProperties(newCreateActivity.object, ['id']), example10)
   // The audience specified on the object must be copied over to the new Create activity by the server.
   assert.deepEqual(newCreateActivity.to, example10.to)
   assert.deepEqual(newCreateActivity.cc, example10.cc)

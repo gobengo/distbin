@@ -449,7 +449,7 @@ function outboxHandler ({
           {
             '@context': 'https://www.w3.org/ns/activitystreams',
             'type': 'Create',
-            'object': parsed
+            'object': parsed,
           },
           // copy over audience from submitted object to activity
           ['to', 'cc', 'bcc'].reduce((props: {[key:string]:any}, key) => {
@@ -467,9 +467,17 @@ function outboxHandler ({
             // #TODO: validate that newActivity wasn't submitted with an .id, even though spec says to rewrite it
             id: uuidUri(newuuid),
             // #TODO: what if it already had published?
-            published: (new Date()).toISOString()
+            published: (new Date()).toISOString(),
+          },
+          typeof submittedActivity.object === 'object' && {
+            // ensure object has id
+            object: Object.assign(
+              { id: uuidUri(uuid()) },
+              submittedActivity.object
+            )
           }
         )
+
         // #TODO: validate the activity. Like... you probably shouldn't be able to just send '{}'
         const location = '/activities/' + newuuid
 
