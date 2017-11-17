@@ -293,6 +293,10 @@ tests['can submit an Activity to the Outbox'] = async function () {
   const getActivityResponse = await sendRequest(await requestForListener(distbinListener, location))
   assert.equal(getActivityResponse.statusCode, 200)
 
+  const newCreateActivity = JSON.parse(await readableToString(getActivityResponse))
+  assert.ok(newCreateActivity.id)
+  assert.ok(isProbablyAbsoluteUrl(newCreateActivity.id))
+  
   /*
   If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.
     #critique - noooo. It's better to block requests that already have IDs than ignore what the client sends. I think a 409 Conflict or 400 Bad Request would be better.

@@ -20,6 +20,8 @@ const accepts = require('accepts')
 import { IncomingMessage, ServerResponse } from 'http'
 import { Activity, ActivityMap, Extendable, HttpRequestResponder, LDValue, LDValues, LDObject, ASObject, JSONLD } from './types'
 
+const owlSameAs = 'http://www.w3.org/2002/07/owl#sameAs'
+
 // given a non-uri activity id, return an activity URI
 const uuidUri = (uuid:string) => `urn:uuid:${uuid}`
 
@@ -45,16 +47,16 @@ export default function distbin ({
       ['/recent', () => recentHandler({ activities })],
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox, externalUrl })],
       ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl })],
-      ['/activitypub/public/page', () => publicCollectionPageHandler({ activities })],
-      ['/activitypub/public', () => publicCollectionHandler({ activities })],
+      ['/activitypub/public/page', () => publicCollectionPageHandler({ activities, externalUrl })],
+      ['/activitypub/public', () => publicCollectionHandler({ activities, externalUrl })],
       // /activities/{activityUuid}.{format}
       [/^\/activities\/([^/]+?)(\.(.+))$/,
-        (activityUuid:string, _:string, format:string) => activityWithExtensionHandler({ activities, activityUuid, format })],
+        (activityUuid:string, _:string, format:string) => activityWithExtensionHandler({ activities, activityUuid, format, externalUrl })],
       // /activities/{activityUuid}
       [/^\/activities\/([^/]+)$/,
-        (activityUuid: string) => activityHandler({ activities, activityUuid })],
+        (activityUuid: string) => activityHandler({ activities, activityUuid, externalUrl })],
       [/^\/activities\/([^/]+)\/replies$/,
-        (activityUuid: string) => activityRepliesHandler({ activities, activityUuid })]
+        (activityUuid: string) => activityRepliesHandler({ activities, activityUuid, externalUrl })]
     ]), req)
 
     if (!handler) {
@@ -95,9 +97,19 @@ function isHostedLocally (activityFreshFromStorage:Activity) {
   return !activityFreshFromStorage.hasOwnProperty('url')
 }
 
+type UrnUuid = string
+type ExternalUrl = string
+function externalizeActivityId (activityId: UrnUuid, externalUrl: ExternalUrl): ExternalUrl {
+  const uuidMatch = activityId.match(/^urn:uuid:([^$]+)$/)
+  if (!uuidMatch) throw new Error(`Couldn't determine UUID for activity with id: ${activityId}`)
+  const uuid = uuidMatch[1]
+  const activityUrl = url.resolve(externalUrl, '/activities/' + uuid)
+  return activityUrl
+}
+
 // return a an extended version of provided activity with some extra metadata properties like 'inbox', 'url', 'replies'
 // if 'baseUrl' opt is provided, those extra properties will be absolute URLs, not relative
-const locallyHostedActivity = function (activity: Extendable<Activity>, { externalUrl='' }:{externalUrl?:string} = {}) {
+const locallyHostedActivity = function (activity: Extendable<Activity>, { externalUrl }:{externalUrl:string}) {
   if (activity.url) {
     debuglog('Unexpected .url property when processing activity assumed to be locally hosted\n' + JSON.stringify(activity))
     throw new Error('Unexpected .url property when processing activity assumed to be locally hosted')
@@ -110,6 +122,8 @@ const locallyHostedActivity = function (activity: Extendable<Activity>, { extern
   const activityUrl = url.resolve(externalUrl, '/activities/' + uuid)
   const repliesUrl = url.resolve(externalUrl, '/activities/' + uuid + '/replies')
   return Object.assign({}, activity, {
+    id: externalizeActivityId(activity.id, externalUrl),
+    [owlSameAs]: jsonldAppend(activity[owlSameAs], activity.id),
     inbox: jsonldAppend(activity.inbox, inboxUrl),
     url: jsonldAppend(activity.url, activityUrl),
     uuid: uuid,
@@ -118,7 +132,11 @@ const locallyHostedActivity = function (activity: Extendable<Activity>, { extern
 }
 
 // get specific activity by id
-function activityHandler ({ activities, activityUuid}:{activities:ActivityMap,activityUuid:string}) {
+function activityHandler ({ activities, activityUuid, externalUrl}:{
+  activities: ActivityMap,
+  activityUuid: string,
+  externalUrl: ExternalUrl,
+}) {
   return async function (req: IncomingMessage, res: ServerResponse) {
     const uri = uuidUri(activityUuid)
     const activity = await Promise.resolve(activities.get(uri))
@@ -144,7 +162,7 @@ function activityHandler ({ activities, activityUuid}:{activities:ActivityMap,ac
       }
     }
     // return the activity
-    const extendedActivity = locallyHostedActivity(activity)
+    const extendedActivity = locallyHostedActivity(activity, {externalUrl})
     // woo its here
     res.writeHead(200, {
       'content-type': 'application/json'
@@ -153,10 +171,11 @@ function activityHandler ({ activities, activityUuid}:{activities:ActivityMap,ac
   }
 }
 
-function activityWithExtensionHandler ({ activities, activityUuid, format }:{
+function activityWithExtensionHandler ({ activities, activityUuid, format, externalUrl }:{
   activities:ActivityMap,
   activityUuid: string,
-  format:string
+  format:string,
+  externalUrl: ExternalUrl,
 }) {
   return async function (req: IncomingMessage, res: ServerResponse) {
     if (format !== 'json') {
@@ -164,12 +183,15 @@ function activityWithExtensionHandler ({ activities, activityUuid, format }:{
       res.end('Unsupported activity extension .' + format)
       return
     }
-    return activityHandler({ activities, activityUuid })(req, res)
+    return activityHandler({ activities, activityUuid, externalUrl })(req, res)
   }
 }
 
-function activityRepliesHandler ({ activities,
-                                   activityUuid }:{activities:ActivityMap,activityUuid:string}) {
+function activityRepliesHandler ({ activities, activityUuid, externalUrl }:{
+  activities:ActivityMap,
+  activityUuid:string,
+  externalUrl: ExternalUrl,
+}) {
   return async function (req: IncomingMessage, res: ServerResponse) {
     const uri = uuidUri(activityUuid)
     const activity = await Promise.resolve(activities.get(uri))
@@ -196,7 +218,7 @@ function activityRepliesHandler ({ activities,
       })
       .map(activity => {
         if (isHostedLocally(activity)) {
-          return locallyHostedActivity(activity)
+          return locallyHostedActivity(activity, {externalUrl})
         }
         return activity
       })
@@ -354,12 +376,12 @@ function inboxHandler ({ activities, externalUrl, inbox } : {
 
         notificationToSave.id = notificationUrl
 
-        const owlSameAs = 'http://www.w3.org/2002/07/owl#sameAs'
         notificationToSave[owlSameAs] = { id: notificationUrnUuid }
 
         // If receiving a notification about an activity we've seen before (e.g. it is canonically hosted here),
         // this will be true
-        const originalAlreadySaved = originalId ? await Promise.resolve(activities.get(originalId)) : false
+        const originalIdsIncludingSameAs = [originalId, ...ensureArray(compacted[owlSameAs])]
+        const originalAlreadySaved = (await Promise.all(originalIdsIncludingSameAs.map(aid => activities.has(aid)))).some(Boolean)
         if (originalAlreadySaved) {
           // #TODO merge or something? Consider storing local ones and remote ones in different places
           debuglog('Inbox received activity already stored in activities store. Not overwriting internal one. But #TODO')
@@ -521,7 +543,10 @@ function outboxHandler ({
 
 // route for ActivityPub Public Collection
 // https://w3c.github.io/activitypub/#public-addressing
-function publicCollectionHandler ({ activities }:{ activities:ActivityMap }) {
+function publicCollectionHandler ({ activities, externalUrl }:{
+  activities: ActivityMap,
+  externalUrl: ExternalUrl
+}) {
   return async function (req: IncomingMessage, res: ServerResponse) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const publicActivities = []
@@ -541,7 +566,7 @@ function publicCollectionHandler ({ activities }:{ activities:ActivityMap }) {
     }
     const currentItems = itemsForThisPage.map(activity => {
       if (isHostedLocally(activity)) {
-        return locallyHostedActivity(activity)
+        return locallyHostedActivity(activity, {externalUrl})
       }
       return activity
     })
@@ -634,7 +659,10 @@ function getClauses(expression: CompoundFilter): Filter[] {
   else if (isOrExpression(expression)) return expression.or
 }
 
-function publicCollectionPageHandler ({ activities }:{ activities: Map<string,Activity> }) {
+function publicCollectionPageHandler ({ activities, externalUrl }:{
+  activities: Map<string,Activity>,
+  externalUrl: ExternalUrl
+}) {
   return async function (req: IncomingMessage, res: ServerResponse) {
     const maxMemberCount = requestMaxMemberCount(req) || 10
     const parsedUrl = url.parse(req.url, true)
@@ -706,7 +734,7 @@ function publicCollectionPageHandler ({ activities }:{ activities: Map<string,Ac
     }
     const currentItems = itemsForThisPage.map(activity => {
       if (isHostedLocally(activity)) {
-        return locallyHostedActivity(activity)
+        return locallyHostedActivity(activity, {externalUrl})
       }
       return activity
     })
