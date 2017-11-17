@@ -457,6 +457,46 @@ tests['targets and delivers targeted activities sent to Outbox'] = async functio
   assert(isProbablyAbsoluteUrl(distbinBInbox.items[0].url), '.url should be an absolute url')
 }
 
+tests['does not deliver to localhost'] = async function () {
+  // ok so we're going to make to distbins, A and B, and test that A delivers to B
+  const distbinA = distbin({ deliverToLocalhost: false })
+  const distbinB = distbin({ deliverToLocalhost: false })
+  const distbinBUrl = await listen(http.createServer(distbinB))
+  // post an Activity to distbinA that has cc distbinB
+  const a = {
+    type: 'Note',
+    content: 'Man, distbinB is really killing it today.',
+    cc: distbinBUrl
+  }
+  const postNoteRequest = await requestForListener(distbinA, {
+    headers: activitypub.clientHeaders({
+      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+    }),
+    method: 'post',
+    path: '/activitypub/outbox'
+  })
+  postNoteRequest.write(JSON.stringify(a))
+  const postNoteResponse = await sendRequest(postNoteRequest)
+  assert.equal(postNoteResponse.statusCode, 201)
+
+  debugger;
+  const noteResponse = await sendRequest(await requestForListener(distbinA, {
+    path: postNoteResponse.headers.location
+  }))
+  const noteActivity = JSON.parse(await readableToString(noteResponse))
+  const inboxDeliveryFailures = noteActivity['distbin:activityPubDeliveryFailures']
+  assert(inboxDeliveryFailures.length >= 1)
+  // 'distbin:activityPubDeliveryFailures': [ { name: 'Error', message: 'I will not deliver to localhost' } ],
+  assert(inboxDeliveryFailures.some((failure: { name: String, message: String }) => failure.message.includes('server:security-considerations:do-not-post-to-localhost')))
+  
+  // then verify that it is in distbinB's inbox
+  const distbinBInboxResponse = await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))
+  assert.equal(distbinBInboxResponse.statusCode, 200)
+  const distbinBInbox = JSON.parse(await readableToString(distbinBInboxResponse))
+  assert.equal(distbinBInbox.items.length, 0, 'there is 0 item in distbin B inbox')
+}
+
+
 /*
 8.2.2 Inbox Delivery
 

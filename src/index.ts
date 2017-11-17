@@ -35,10 +35,12 @@ export default function distbin ({
   inbox = new Map(),
   // used for delivering to other inboxes so they can find this guy
   externalUrl,
+  deliverToLocalhost = true,
 }:{
   activities?: Map<string, object>,
   inbox?: Map<string, object>,
-  externalUrl?: string
+  externalUrl?: string,
+  deliverToLocalhost?: Boolean,
 }={}) {
   return function (req: IncomingMessage, res: ServerResponse) {
     externalUrl = externalUrl || `http://${req.headers.host}${req.url}`
@@ -46,7 +48,7 @@ export default function distbin ({
       ['/', () => index],
       ['/recent', () => recentHandler({ activities })],
       ['/activitypub/inbox', () => inboxHandler({ activities, inbox, externalUrl })],
-      ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl })],
+      ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl, deliverToLocalhost })],
       ['/activitypub/public/page', () => publicCollectionPageHandler({ activities, externalUrl })],
       ['/activitypub/public', () => publicCollectionHandler({ activities, externalUrl })],
       // /activities/{activityUuid}.{format}
@@ -438,8 +440,9 @@ const activityHasTarget = (activity: Activity, target: ASObject) => {
 function outboxHandler ({
   activities,
   // external location of distbin (used for delivery)
-  externalUrl
-}:{activities:ActivityMap, externalUrl: string}) {
+  externalUrl,
+  deliverToLocalhost
+}:{activities:ActivityMap, externalUrl: string, deliverToLocalhost: Boolean}) {
   return async function (req: IncomingMessage, res: ServerResponse) {
     switch (req.method.toLowerCase()) {
       case 'get':
@@ -511,7 +514,7 @@ function outboxHandler ({
         try {
           // Target and Deliver to other inboxes
           const activityToDeliver = locallyHostedActivity(newActivity, { externalUrl })
-          await targetAndDeliver(activityToDeliver)
+          await targetAndDeliver(activityToDeliver, undefined, deliverToLocalhost)
         } catch (e) {
           if (e.name === 'SomeDeliveriesFailed') {
             const failures = e.failures.map((f: Error) => {

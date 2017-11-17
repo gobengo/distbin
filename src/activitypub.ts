@@ -188,7 +188,7 @@ async function outboxFromResponse (res: IncomingMessage) {
 }
 
 // deliver an activity to a target
-const deliverActivity = async function (activity: Activity, target: string) {
+const deliverActivity = async function (activity: Activity, target: string, { deliverToLocalhost } : { deliverToLocalhost: Boolean }) {
   // discover inbox
   const targetProfileRequest = request(Object.assign(url.parse(target), {
     headers: {
@@ -239,7 +239,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
     }
     return inbox
   }
-  var x
+
   async function inboxFromBody (res: IncomingMessage) {
     const contentTypeHeaders = ensureArray(res.headers['content-type'])
     const contentType = contentTypeHeaders.map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]
@@ -297,6 +297,12 @@ const deliverActivity = async function (activity: Activity, target: string) {
 
   // post to inbox
   const parsedInboxUrl = url.parse(inbox)
+
+  // https://w3c.github.io/activitypub/#security-localhost
+  if (parsedInboxUrl.hostname === 'localhost' && ! deliverToLocalhost) {
+    throw new Error('I will not deliver to localhost (protocol feature server:security-considerations:do-not-post-to-localhost)')
+  }
+
   const deliveryRequest = request(Object.assign(parsedInboxUrl, {
     headers: {
       'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
@@ -325,7 +331,7 @@ const deliverActivity = async function (activity: Activity, target: string) {
 // target
 exports.targetAndDeliver = async function (activity: Activity,
                                            targets : string[] = objectTargets(activity, 0).map(getASId),
-                                          ) {
+                                           deliverToLocalhost : Boolean = true) {
   let deliveries: string[] = []
   let failures: Error[] = []
   await Promise.all(
@@ -335,7 +341,7 @@ exports.targetAndDeliver = async function (activity: Activity,
         if (target === exports.publicCollectionId) {
           return Promise.resolve(target)
         }
-        return deliverActivity(activity, target)
+        return deliverActivity(activity, target, { deliverToLocalhost })
           .then(d => deliveries.push(d))
           .catch(e => failures.push(e))
       })
