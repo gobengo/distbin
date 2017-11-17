@@ -9,10 +9,8 @@ import { readableToString, sendRequest, ensureArray } from './util'
 import * as url from 'url'
 import {UrlObject} from 'url'
 import { activitySubtypes, isASLink, isASObject, ASValue } from './activitystreams/types'
+import { ASJsonLdProfileContentType } from './activitystreams'
 import {Activity, ASObject, Extendable, JSONLD, LDValue, isActivity} from './types'
-
-const jsonLdProfile = exports.jsonLdProfile = "https://www.w3.org/ns/activitystreams"
-const apContentType = exports.apContentType = `application/ld+json; profile="${jsonLdProfile}"`
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
@@ -91,7 +89,7 @@ exports.clientHeaders = (headers = {}) => {
   const requirements = {
     // The client MUST specify an Accept header with the application/ld+json; profile="https://www.w3.org/ns/activitystreams" media type in order to retrieve the activity.
     //  #critique: This is weird because AS2's official mimetype is application/activity+json, and the ld+json + profile is only a SHOULD, but in ActivityPub this is switched
-    accept: `${apContentType}"`
+    accept: `${ASJsonLdProfileContentType}"`
   }
   if (Object.keys(headers).map(h => h.toLowerCase()).includes('accept')) {
     throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
@@ -140,7 +138,7 @@ const request = (urlOrOptions:string|UrlObject) => {
 const fetchProfile = exports.fetchProfile = async (target: string) => {
   const targetProfileRequest = request(Object.assign(url.parse(target), {
     headers: {
-      accept: `${apContentType},text/html`
+      accept: `${ASJsonLdProfileContentType},text/html`
     }
   }))
   debuglog('fetchProfile ' + target)
@@ -192,7 +190,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
   // discover inbox
   const targetProfileRequest = request(Object.assign(url.parse(target), {
     headers: {
-      accept: `${apContentType},text/html`
+      accept: `${ASJsonLdProfileContentType}, text/html`
     }
   }))
   debuglog('req inbox discovery ' + target)
@@ -211,6 +209,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
       throw new deliveryErrors.TargetRequestFailed(`Got unexpected status code ${targetProfileResponse.statusCode} when requesting ${target} to determine inbox URL`)
   }
 
+  debuglog(`deliverActivity to target ${target}`)
   let inbox = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse)
 
   function inboxFromHeaders (res: IncomingMessage) {
@@ -245,6 +244,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
     const contentType = contentTypeHeaders.map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]
     const body = await readableToString(res)
     let inbox
+    debuglog(`inboxFromBody got response contentType=${contentType}`)
     switch (contentType) {
       case 'application/json':
         try {

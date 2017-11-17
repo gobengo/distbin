@@ -8,6 +8,7 @@ const activitypub = require('../src/activitypub')
 const assert = require('assert')
 import {Activity, HttpRequestResponder} from './types'
 import {IncomingMessage, RequestOptions, Server, ServerResponse} from 'http'
+import { ASJsonLdProfileContentType } from '../src/activitystreams'
 
 // Return Promise of an http.Request that will be sent to an http.createServer listener
 export const requestForListener = async function requestForListener (listener: HttpRequestResponder, requestOptions: RequestOptions) {
@@ -46,7 +47,7 @@ export const postActivity = async function postActivity (distbinListener: HttpRe
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'

@@ -35,7 +35,7 @@ export default function distbin ({
   inbox = new Map(),
   // used for delivering to other inboxes so they can find this guy
   externalUrl,
-  deliverToLocalhost = true,
+  deliverToLocalhost = false,
 }:{
   activities?: Map<string, object>,
   inbox?: Map<string, object>,
@@ -516,6 +516,7 @@ function outboxHandler ({
           const activityToDeliver = locallyHostedActivity(newActivity, { externalUrl })
           await targetAndDeliver(activityToDeliver, undefined, deliverToLocalhost)
         } catch (e) {
+          debuglog('Error delivering activity other inboxes', e)
           if (e.name === 'SomeDeliveriesFailed') {
             const failures = e.failures.map((f: Error) => {
               return {

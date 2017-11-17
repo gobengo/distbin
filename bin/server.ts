@@ -58,7 +58,7 @@ async function runServer() {
 
 	const deliverToLocalhost =  ('DISTBIN_DELIVER_TO_LOCALHOST' in process.env)
 		? JSON.parse(process.env.DISTBIN_DELIVER_TO_LOCALHOST)
-		: undefined
+		: process.env.NODE_ENV !== 'production'
 	const apiHandler = distbin({
 		activities: new JSONFileMapAsync(path.join(dbDir, 'activities/')),
 		inbox: new JSONFileMapAsync(path.join(dbDir, 'inbox/')),

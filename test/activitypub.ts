@@ -8,6 +8,7 @@ const { isProbablyAbsoluteUrl } = require('./util')
 import { Activity, LDValue, ASObject } from './types'
 import { testCli } from '.'
 import { objectTargets, targetedAudience, getASId } from '../src/activitypub'
+import { ASJsonLdProfileContentType } from '../src/activitystreams'
 
 const tests = module.exports
 
@@ -162,7 +163,7 @@ tests['can address activities to the public Collection when sending to outbox, a
   }
   const postActivityRequest = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'
@@ -252,7 +253,7 @@ The inbox accepts HTTP POST requests, with behaviour described in Delivery.
 
 /*
 To submit new Activities to a user's server, clients must discover the URL of the user's outbox from their profile
-  and then must make an HTTP POST request to to this URL with the Content-Type of application/ld+json; profile="https://www.w3.org/ns/activitystreams#".
+  and then must make an HTTP POST request to to this URL with the Content-Type of application/ld+json; profile="https://www.w3.org/ns/activitystreams".
   #critique: no mention of application/activity+json even though it is the most correct mimetype of ActivityStreams
 
 The request must be authenticated with the credentials of the user to whom the outbox belongs.
@@ -266,7 +267,7 @@ tests['can submit an Activity to the Outbox'] = async function () {
   const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'
@@ -326,7 +327,7 @@ tests['can submit an Activity to the Outbox'] = async function () {
 tests['can submit a Create Activity to the Outbox'] = async function () {
   const req = await requestForListener(distbin(), {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'
@@ -366,7 +367,7 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
   const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'
@@ -378,8 +379,8 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
     'content': 'This is a note',
     'published': '2015-02-10T15:04:55Z',
     'to': [activitypub.publicCollectionId],
-    'cc': ['ben@bengo.is'],
-    'bcc': ['benbcc@bengo.is']
+    'cc': ['https://bengo.is/cc'],
+    'bcc': ['https://bengo.is/bcc']
   }
   req.write(JSON.stringify(example10))
   const res = await sendRequest(req)
@@ -427,7 +428,7 @@ These fields will have been populated appropriately by the client which posted t
 
 tests['targets and delivers targeted activities sent to Outbox'] = async function () {
   // ok so we're going to make to distbins, A and B, and test that A delivers to B
-  const distbinA = distbin()
+  const distbinA = distbin({ deliverToLocalhost: true })
   const distbinB = distbin()
   const distbinBUrl = await listen(http.createServer(distbinB))
   // post an Activity to distbinA that has cc distbinB
@@ -438,7 +439,7 @@ tests['targets and delivers targeted activities sent to Outbox'] = async functio
   }
   const postNoteRequest = await requestForListener(distbinA, {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'
@@ -470,7 +471,7 @@ tests['does not deliver to localhost'] = async function () {
   }
   const postNoteRequest = await requestForListener(distbinA, {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'

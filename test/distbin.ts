@@ -14,6 +14,7 @@ const { sendRequest } = require('../src/util')
 import * as url from 'url'
 import { HttpRequestResponder, Activity, isActivity, ASObject, Extendable, LDValue, LDValues, LDObject, DistbinActivity, JSONLD } from './types'
 import { discoverOutbox } from '../src/activitypub'
+import { ASJsonLdProfileContentType } from '../src/activitystreams'
 
 let tests = module.exports
 
@@ -190,7 +191,7 @@ tests['posted activities have an .inbox (e.g. to receive replies in)'] = async f
   const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'
@@ -223,7 +224,7 @@ tests['posted activities have an .inbox (e.g. to receive replies in)'] = async f
 tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)'] = async function () {
   // ok so we're going to make two distbins, A and B, and test that A delivers to B
   const distbinA = distbin()
-  const distbinB = distbin()
+  const distbinB = distbin({ deliverToLocalhost: true })
   // post a parent to distbinA
   const parentUrl = await postActivity(distbinA, {
     type: 'Note',
@@ -359,7 +360,7 @@ async function postActivity (distbinListener: HttpRequestResponder, activity: LD
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+      'content-type': ASJsonLdProfileContentType
     }),
     method: 'post',
     path: '/activitypub/outbox'

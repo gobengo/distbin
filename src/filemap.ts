@@ -158,7 +158,9 @@ exports.JSONFileMapAsync = class JSONFileMapAsync extends AsyncMap<string, any> 
   [Symbol.iterator] () {
     return this.keys().then(keys => keys[Symbol.iterator]())
   }
-  // todo make async
+  async has (key: string) {
+    return Boolean(this.get(key))
+  }
   async keys () {
     const dir = this.dir
     const files = fs.readdirSync(dir)

@@ -511,7 +511,7 @@ async function fetchActivity (activityUrl: string) {
   let activityUrlOrRedirect = activityUrl
   let activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
     headers: {
-      accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
+      accept: `application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", text/html`
     }
   })))
   debuglog(`res activity ${activityResponse.statusCode} ${activityUrl}`)
@@ -525,7 +525,7 @@ async function fetchActivity (activityUrl: string) {
         let activityUrlOrRedirect = url.resolve(activityUrl, activityResponse.headers.location)
         activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
           headers: {
-            accept: 'application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams#, text/html'
+            accept: `application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams", text/html`
           }
         })))
         redirectsLeft--

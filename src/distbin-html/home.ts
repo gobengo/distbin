@@ -10,6 +10,7 @@ import { requestUrl } from '../util'
 const { isProbablyAbsoluteUrl } = require('../util')
 const { createHttpOrHttpsRequest } = require('../util')
 import { ASLink, LinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchSuccess, HasLinkPrefetchResult } from '../types'
+import { ASJsonLdProfileContentType } from '../activitystreams'
 
 exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externalUrl:string}) {
   return async function (req: IncomingMessage, res:ServerResponse) {
@@ -85,7 +86,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
         const outboxUrl = await discoverOutbox(apiUrl)
         const postToOutboxRequest = http.request(Object.assign(url.parse(outboxUrl), {
           headers: {
-            'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams#"'
+            'content-type': ASJsonLdProfileContentType
           },
           method: 'post',
         }))
