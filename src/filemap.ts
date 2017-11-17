@@ -76,7 +76,7 @@ exports.JSONFileMap = class JSONFileMap<V> extends Map<string, V> {
 
 type AsyncMapKey = string
 type AsyncMapValue = object
-interface IAsyncMap<K, V> {
+export interface IAsyncMap<K, V> {
     clear(): Promise<void>;
     delete(key: K): Promise<boolean>;
     forEach(callbackfn: (value: V, index: K, map: Map<K, V>) => void, thisArg?: any): void;
@@ -128,7 +128,7 @@ class AsyncMap<K, V> implements IAsyncMap<K, V> {
 
 // Like JSONFileMap, but all methods return Promises of their values
 // and i/o is done async
-exports.JSONFileMapAsync = class JSONFileMapAsync extends AsyncMap<string, any> implements IAsyncMap<string, any> {
+export class JSONFileMapAsync extends AsyncMap<string, any> implements IAsyncMap<string, any> {
   constructor (private dir:string) {
     super()
   }

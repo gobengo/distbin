@@ -15,6 +15,7 @@ import * as url from 'url'
 import { HttpRequestResponder, Activity, isActivity, ASObject, Extendable, LDValue, LDValues, LDObject, DistbinActivity, JSONLD } from './types'
 import { discoverOutbox } from '../src/activitypub'
 import { ASJsonLdProfileContentType } from '../src/activitystreams'
+import { get } from 'lodash'
 
 let tests = module.exports
 
@@ -277,6 +278,46 @@ tests['Posting a reply will notify the inReplyTo inbox (even if another distbin)
   // }))
   // assert.equal(replicatedReplyResponse.statusCode, 302)
   // assert(isProbablyAbsoluteUrl(replicatedReplyResponse.headers.location), 'location header is absolute URL')
+}
+
+
+// #TODO is notifying the .inReplyTo inbox even encouraged/allowed by activitypub?
+tests['can configure spam checking for inbox to reject some things (server:security-considerations:filter-incoming-content)'] = async function () {
+  // ok so we're going to make two distbins, A and B, and test that A delivers to B
+  const distbinA = distbin({
+    inboxFilter: async (obj: ASObject) => {
+      const content = get(obj, 'object.content')
+      if (content && content.toLowerCase().includes('viagra')) {
+        return false
+      }
+      return true
+    }
+  })
+  const distbinB = distbin({
+    deliverToLocalhost: true,
+  })
+  // post a parent to distbinA
+  const parentUrl = await postActivity(distbinA, {
+    type: 'Note',
+    content: 'Spam me'
+  })
+  // ok now to post the reply to distbinB
+  const replyUrl = await postActivity(distbinB, {
+    type: 'Note',
+    content: 'Click here for free Viagra',
+    inReplyTo: parentUrl,
+    cc: [parentUrl]
+  })
+  // then verify that it is NOT in distbinA's inbox
+  const reply = JSON.parse(await readableToString(await sendRequest(http.request(replyUrl))))
+  const deliveryFailures = reply['distbin:activityPubDeliveryFailures']
+  assert.ok(deliveryFailures)
+  assert.ok(deliveryFailures.some((failure:{message: string, name: string}) => {
+    return failure.message.includes('This activity has been blocked by the configured inboxFilter')
+  }))
+  const distbinAInbox = JSON.parse(await readableToString(await sendRequest(
+    await requestForListener(distbinA, '/activitypub/inbox'))))
+  assert.equal(distbinAInbox.totalItems, 0, 'distbinA inbox does NOT contain spam reply')
 }
 
 tests['When GET an activity, it has information about any replies it may have'] = async function () {

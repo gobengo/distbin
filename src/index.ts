@@ -33,12 +33,14 @@ export default function distbin ({
   // #TODO: This should be persistent :P
   activities = new Map(),
   inbox = new Map(),
+  inboxFilter = async () => true,
   // used for delivering to other inboxes so they can find this guy
   externalUrl,
   deliverToLocalhost = false,
 }:{
   activities?: Map<string, object>,
   inbox?: Map<string, object>,
+  inboxFilter?: (obj: ASObject) => Promise<Boolean>,
   externalUrl?: string,
   deliverToLocalhost?: Boolean,
 }={}) {
@@ -47,7 +49,7 @@ export default function distbin ({
     let handler = route(new Map<RoutePattern, RouteResponderFactory>([
       ['/', () => index],
       ['/recent', () => recentHandler({ activities })],
-      ['/activitypub/inbox', () => inboxHandler({ activities, inbox, externalUrl })],
+      ['/activitypub/inbox', () => inboxHandler({ activities, inbox, inboxFilter, externalUrl })],
       ['/activitypub/outbox', () => outboxHandler({ activities, externalUrl, deliverToLocalhost })],
       ['/activitypub/public/page', () => publicCollectionPageHandler({ activities, externalUrl })],
       ['/activitypub/public', () => publicCollectionHandler({ activities, externalUrl })],
@@ -283,10 +285,11 @@ function recentHandler ({ activities }:{activities:ActivityMap}) {
 
 // route for ActivityPub Inbox
 // https://w3c.github.io/activitypub/#inbox
-function inboxHandler ({ activities, externalUrl, inbox } : {
+function inboxHandler ({ activities, externalUrl, inbox, inboxFilter } : {
   activities: ActivityMap,
   externalUrl: string,
   inbox: ActivityMap,
+  inboxFilter?: (obj: ASObject) => Promise<Boolean>,  
 }) {
   return async function (req: IncomingMessage, res: ServerResponse) {
     switch (req.method.toLowerCase()) {
@@ -352,6 +355,14 @@ function inboxHandler ({ activities, externalUrl, inbox } : {
           res.end("Couldn't parse request body as JSON: " + requestBody)
           return
         }
+
+        const inboxFilterResult = await inboxFilter(parsed)
+        if ( ! inboxFilterResult) {
+          res.writeHead(400);
+          res.end('This activity has been blocked by the configured inboxFilter')
+          return
+        }
+
         const existsAlreadyInInbox = parsed.id ? await Promise.resolve(inbox.get(parsed.id)) : false
         if (existsAlreadyInInbox) {
           // duplicate!

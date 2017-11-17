@@ -2,12 +2,14 @@
 import * as http from "http";
 import {IncomingMessage, ServerRequest, ServerResponse, Server} from 'http'
 import distbin from '../'
+import * as portfinder from 'portfinder'
 const fs = require('fs')
 const path = require('path')
 const querystring = require('querystring')
 const os = require('os')
 const url = require('url')
 const { JSONFileMapAsync } = require('../src/filemap');
+import createDistbinConfig from '../config'
 
 const distbinHtml= require('../src/distbin-html')
 const { debuglog, denodeify, readableToString, sendRequest } = require('../src/util');
@@ -36,35 +38,17 @@ async function runServer() {
 	  	process.exit()
 	  });
 	});
-	const port = process.env.PORT || process.env.npm_package_config_port
+	const distbinConfig = await createDistbinConfig()	
+	const port = distbinConfig.port || await portfinder.getPortPromise()
 	if ( ! port) {
 		throw new Error('Provide required PORT environment variable to configure distbin HTTP port')
 	}
-	const externalUrl = process.env.EXTERNAL_URL || `http://localhost:${port}`
-	const dbDir = process.env.DB_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'distbin-'));
-	// ensure subdirs exist
-	await Promise.all(['activities', 'inbox'].map(dir => {
-		return denodeify(fs.mkdir)(path.join(dbDir, dir))
-		.catch((err: NodeJS.ErrnoException) => {
-			switch (err.code) {
-				case 'EEXIST':
-					// folder exists, no prob
-					return;
-			}
-			throw err;
-		})
-	}));
-	debuglog("using db directory", dbDir)
 
-	const deliverToLocalhost =  ('DISTBIN_DELIVER_TO_LOCALHOST' in process.env)
-		? JSON.parse(process.env.DISTBIN_DELIVER_TO_LOCALHOST)
-		: process.env.NODE_ENV !== 'production'
-	const apiHandler = distbin({
-		activities: new JSONFileMapAsync(path.join(dbDir, 'activities/')),
-		inbox: new JSONFileMapAsync(path.join(dbDir, 'inbox/')),
-		externalUrl,
-		deliverToLocalhost,
-	})
+	const externalUrl = distbinConfig.externalUrl || `http://localhost:${port}`
+	const apiHandler = distbin(Object.assign(
+		distbinConfig,		
+		( ! distbinConfig.externalUrl ) && { externalUrl },
+	))
 
 	function listen(server: Server, port:number|string=0): Promise<string> {
 		return new Promise((resolve, reject) => server.listen(port, (err: Error) => {
