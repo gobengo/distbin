@@ -36,6 +36,7 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}:{apiUrl:string, activ
         return url.resolve(activityUrl, repliesUrl)
       })
     
+    
     const descendants = flatten(await Promise.all(repliesUrls.map(fetchDescendants)))
 
     const activity = Object.assign(activityWithoutDescendants, {
@@ -51,17 +52,23 @@ exports.createHandler = ({apiUrl, activityId, externalUrl}:{apiUrl:string, activ
         }
       }
       const repliesCollection = JSON.parse(await readableToString(repliesCollectionResponse))
+
       if (repliesCollection.totalItems <= 0) return repliesCollection
       repliesCollection.items = await Promise.all(repliesCollection.items.map(async function (activity: Activity) {
         // activity with resolved .replies collection
         const withAbsoluteUrls = activityWithUrlsRelativeTo(activity, repliesUrl)
-        
+        const { replies } = withAbsoluteUrls
+        const nextRepliesUrl = (typeof replies === 'string')
+          ? replies
+          : (Array.isArray(replies) && replies.length)
+            && replies[0]
         return Object.assign(withAbsoluteUrls, {
-          replies: (typeof withAbsoluteUrls.replies === 'string')
-            ? await fetchDescendants(withAbsoluteUrls.replies)
-            : withAbsoluteUrls.replies
+          replies: (typeof nextRepliesUrl === 'string')
+            ? await fetchDescendants(nextRepliesUrl)
+            : replies
         })
       }))
+      
       return repliesCollection
     }
 
@@ -538,12 +545,6 @@ async function fetchActivity (activityUrl: string) {
   }
   /* eslint-enable no-labels */
 
-  // if (activityResponse.statusCode === 500) {
-  //   return {
-  //     url: activityUrl,
-  //     name: "500 fetching activity: " + await readableToString(activityResponse)
-  //   }
-  // }
   const resContentType = activityResponse.headers['content-type']
     ? activityResponse.headers['content-type'].split(';')[0].toLowerCase() // strip off params like charset, profile, etc
     : undefined

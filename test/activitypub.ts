@@ -296,7 +296,7 @@ tests['can submit an Activity to the Outbox'] = async function () {
   const newCreateActivity = JSON.parse(await readableToString(getActivityResponse))
   assert.ok(newCreateActivity.id)
   assert.ok(isProbablyAbsoluteUrl(newCreateActivity.id))
-  
+
   /*
   If an Activity is submitted with a value in the id property, servers must ignore this and generate a new id for the Activity.
     #critique - noooo. It's better to block requests that already have IDs than ignore what the client sends. I think a 409 Conflict or 400 Bad Request would be better.
@@ -395,7 +395,7 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
   assert.notEqual(newCreateActivity.id, newCreateActivity.object.id)
   const withoutProperties = (obj: Object, withoutProps: string[]) => {
     const lesserObj = Array.from(Object.entries(obj)).reduce((obj, [prop, val]) => {
-      if ( ! withoutProps.includes(prop)) obj[prop] = val
+      if (!withoutProps.includes(prop)) obj[prop] = val
       return obj
     }, {} as {[key: string]: any})
     return lesserObj
@@ -479,7 +479,6 @@ tests['does not deliver to localhost'] = async function () {
   const postNoteResponse = await sendRequest(postNoteRequest)
   assert.equal(postNoteResponse.statusCode, 201)
 
-  debugger;
   const noteResponse = await sendRequest(await requestForListener(distbinA, {
     path: postNoteResponse.headers.location
   }))
@@ -488,14 +487,13 @@ tests['does not deliver to localhost'] = async function () {
   assert(inboxDeliveryFailures.length >= 1)
   // 'distbin:activityPubDeliveryFailures': [ { name: 'Error', message: 'I will not deliver to localhost' } ],
   assert(inboxDeliveryFailures.some((failure: { name: String, message: String }) => failure.message.includes('server:security-considerations:do-not-post-to-localhost')))
-  
+
   // then verify that it is in distbinB's inbox
   const distbinBInboxResponse = await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))
   assert.equal(distbinBInboxResponse.statusCode, 200)
   const distbinBInbox = JSON.parse(await readableToString(distbinBInboxResponse))
   assert.equal(distbinBInbox.items.length, 0, 'there is 0 item in distbin B inbox')
 }
-
 
 /*
 8.2.2 Inbox Delivery

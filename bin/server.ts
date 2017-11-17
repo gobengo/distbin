@@ -55,10 +55,15 @@ async function runServer() {
 		})
 	}));
 	debuglog("using db directory", dbDir)
+
+	const deliverToLocalhost =  ('DISTBIN_DELIVER_TO_LOCALHOST' in process.env)
+		? JSON.parse(process.env.DISTBIN_DELIVER_TO_LOCALHOST)
+		: undefined
 	const apiHandler = distbin({
 		activities: new JSONFileMapAsync(path.join(dbDir, 'activities/')),
 		inbox: new JSONFileMapAsync(path.join(dbDir, 'inbox/')),
 		externalUrl,
+		deliverToLocalhost,
 	})
 
 	function listen(server: Server, port:number|string=0): Promise<string> {
