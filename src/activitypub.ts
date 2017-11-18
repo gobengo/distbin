@@ -5,7 +5,8 @@ import * as https from 'https'
 import * as parseLinkHeader from 'parse-link-header'
 import { rdfaToJsonLd } from './util'
 import { jsonld } from './util'
-import { readableToString, sendRequest, ensureArray } from './util'
+import { readableToString, sendRequest, ensureArray, jsonldAppend } from './util'
+import { request } from './util'
 import * as url from 'url'
 import {UrlObject} from 'url'
 import { activitySubtypes, isASLink, isASObject, ASValue } from './activitystreams/types'
@@ -36,18 +37,53 @@ const flattenAnyArrays = <T=any> (arr: Array<T|T[]>): T[] => {
   return flattened
 }
 
-export const activityAudience = (activity: ASObject): ASValue[] => {
+/**
+ * Get the audience of an activity. Those who might be interested about getting notified.
+ * @param activity 
+ * @param fetch - whether to fetch related objects that are only mentioned by URL
+ */
+export const activityAudience = async (activity: ASObject, fetch : Boolean = false): Promise<ASValue[]> => {
   /* Clients SHOULD look at any objects attached to the new Activity via the object, target, inReplyTo and/or tag fields,
   retrieve their actor or attributedTo properties, and MAY also retrieve their addressing properties, and add these
   to the to or cc fields of the new Activity being created. */
-  const related: ASValue[] = flattenAnyArrays([
+  const related: ASValue[] = await Promise.all(flattenAnyArrays([
     isActivity(activity) && activity.object,
     isActivity(activity) && activity.target,
     activity.inReplyTo,
     activity.tag
-  ]).filter(Boolean)
-  isASObject
-  isActivity
+  ])
+  .filter(Boolean)
+  .map(async (objOrUrl) => {
+    if (fetch && typeof objOrUrl === 'string') {
+      // need to fetch it by url
+      const res = await sendRequest(request(Object.assign(url.parse(objOrUrl), {
+        headers: {
+          accept: ASJsonLdProfileContentType
+        }
+      })))
+      if (res.statusCode !== 200) {
+        console.warn('got non-200 response when fetching ${obj} as part of activityAudience()')
+        return
+      }
+      const body = await readableToString(res)
+      const resContentType = res.headers['content-type']
+      switch (resContentType) {
+        case ASJsonLdProfileContentType:
+        case 'application/json':
+          try {
+            return JSON.parse(body)
+          } catch (error) {
+            console.error("Couldn't parse fetched response body as JSON when determining activity audience", {body}, error)
+            return
+          }
+        default:
+          console.warn(`Unexpected contentType=${resContentType} of response when fetching ${objOrUrl} to determine activityAudience`)
+          return
+      }
+    }
+    return objOrUrl
+  }))
+
   const relatedCreators : ASValue[] = flattenAnyArrays(related.map(objectProvenanceAudience))
     .filter(Boolean)
   const relatedAudience: ASValue[] = flattenAnyArrays(related.map(o => isASObject(o) && targetedAudience(o)))
@@ -69,13 +105,15 @@ export const targetedAudience = (object:ASObject|Activity) => {
   return deduped  
 }
 
-export const objectTargets = (activity:ASObject, recursionLimit: number): ASValue[] => {
-  const audience = [...activityAudience(activity),
+export const objectTargets = async (activity:ASObject, recursionLimit: number, fetch : Boolean = false): Promise<ASValue[]> => {
+  const audience = [...(await activityAudience(activity, fetch)),
                     ...objectProvenanceAudience(activity),
                     ...targetedAudience(activity)]
   const recursedAudience = recursionLimit
-    ? flattenAnyArrays(audience.filter(o => isASObject(o))
-                               .map((o: ASObject) => objectTargets(o, recursionLimit - 1)))
+    ? flattenAnyArrays(await Promise.all(
+        audience.filter(o => isASObject(o))
+                .map((o: ASObject) => objectTargets(o, recursionLimit - 1, fetch))
+      ))
     : []
   // debuglog('recursionLimit', recursionLimit, activity, { audience, recursedAudience })
   const targets = [...audience, ...recursedAudience]
@@ -83,6 +121,18 @@ export const objectTargets = (activity:ASObject, recursionLimit: number): ASValu
   return deduped
 }
 
+/**
+ * Given an activity, return an updated version of that activity that has been client-addressed.
+ * So then you can submit the addressed activity to an outbox and make sure it's delivered to everyone who might care.
+ * @param activity 
+ */
+export const clientAddressedActivity = async (activity: Activity, recursionLimit: number, fetch : Boolean = false): Promise<Activity> => {
+  const audience = await objectTargets(activity, recursionLimit, fetch)
+  const audienceIds = audience.map(getASId)
+  return Object.assign({}, activity, {
+    cc: jsonldAppend(activity.cc, audienceIds)
+  })
+}
 
 // Create a headers map for http.request() incl. any specced requirements for ActivityPub Client requests
 exports.clientHeaders = (headers = {}) => {
@@ -121,18 +171,6 @@ const deliveryErrors = exports.deliveryErrors = {
   SomeDeliveriesFailed: makeErrorClass('SomeDeliveriesFailed', function (msg: string, failures: Error[]) {
     this.failures = failures
   })
-}
-
-const request = (urlOrOptions:string|UrlObject) => {
-  const options = typeof urlOrOptions === 'string' ? url.parse(urlOrOptions) : urlOrOptions;
-  switch (options.protocol) {
-    case 'https:':
-      return https.request(urlOrOptions)
-    case 'http:':
-      return http.request(urlOrOptions)
-    default:
-      throw new Error(`cannot create request for protocol ${options.protocol}`)
-  }
 }
 
 const fetchProfile = exports.fetchProfile = async (target: string) => {
@@ -210,7 +248,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
   }
 
   debuglog(`deliverActivity to target ${target}`)
-  let inbox = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse)
+  let inbox: string = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse)
 
   function inboxFromHeaders (res: IncomingMessage) {
     let inbox
@@ -243,7 +281,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
     const contentTypeHeaders = ensureArray(res.headers['content-type'])
     const contentType = contentTypeHeaders.map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]
     const body = await readableToString(res)
-    let inbox
+    let inboxes
     debuglog(`inboxFromBody got response contentType=${contentType}`)
     switch (contentType) {
       case 'application/json':
@@ -252,20 +290,14 @@ const deliverActivity = async function (activity: Activity, target: string, { de
         } catch (e) {
           throw new deliveryErrors.TargetParseFailed(e.message)
         }
-        // #TODO be more JSON-LD aware when looking for inbox
-        inbox = url.resolve(target, targetProfile.inbox)
-        return inbox
+        inboxes = ensureArray(targetProfile.inbox).map(inbox => url.resolve(target, inbox))
+        break
       case 'text/html':
         let ld: Extendable<JSONLD>[] = await rdfaToJsonLd(body)
         let targetSubject = ld.find((x) => x['@id'] === 'http://localhost/')
-        let inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox']
-        if (inboxes.length > 1) {
-          console.warn(`Using only first inbox, but there were ${inboxes.length}: ${inboxes}`)
-        }
-        inbox = inboxes[0]['@id']
-        return inbox
+        inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox'].map((i: JSONLD) => i['@id'])
+        break;
       case 'application/ld+json':
-        case 'application/ld+json':
         const obj = JSON.parse(body)
         const compacted = await jsonld.compact(obj, {
           '@context': [
@@ -279,18 +311,19 @@ const deliverActivity = async function (activity: Activity, target: string, { de
           ]
         })
         const compactedInbox = (compacted['distbin:inbox'] || []).map((o: {id: string}) => typeof o === 'object' ? o.id : o)
-        inbox = compactedInbox.length ? compactedInbox : obj.inbox
-        if (!inbox || !inbox.length) {
-          throw new Error('Could not determine ActivityPub inbox from ${contentType} response')
-        }
-        if (inbox.length > 1) {
-          debuglog('Got multiple inboxes. Just using first')
-        }
-        inbox = inbox[0]
-        return inbox
+        inboxes = compactedInbox.length ? compactedInbox : ensureArray(obj.inbox)
+        break;
       default:
         throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
     }
+    if (!inboxes || !inboxes.length) {
+      throw new Error(`Could not determine ActivityPub inbox from ${contentType} response`)
+    }
+    if (inboxes.length > 1) {
+      console.warn(`Using only first inbox, but there were ${inboxes.length}: ${inboxes}`)
+    }
+    const inbox: string = inboxes[0]
+    return inbox
   }
 
   if (!inbox) throw new deliveryErrors.InboxDiscoveryFailed('No .inbox found for target ' + target)
@@ -330,8 +363,9 @@ const deliverActivity = async function (activity: Activity, target: string, { de
 // Given an activity, determine its targets and deliver to the inbox of each
 // target
 exports.targetAndDeliver = async function (activity: Activity,
-                                           targets : string[] = objectTargets(activity, 0).map(getASId),
+                                           targets? : string[],
                                            deliverToLocalhost : Boolean = true) {
+  targets = targets ||  (await objectTargets(activity, 0)).map(getASId)
   let deliveries: string[] = []
   let failures: Error[] = []
   await Promise.all(

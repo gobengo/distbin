@@ -2,12 +2,12 @@ const activitypub = require('../src/activitypub')
 const assert = require('assert')
 import distbin from '../'
 import * as http from 'http'
-const { readableToString, sendRequest } = require('../src/util')
+const { ensureArray, readableToString, sendRequest } = require('../src/util')
 const { listen, requestForListener } = require('./util')
 const { isProbablyAbsoluteUrl } = require('./util')
 import { Activity, LDValue, ASObject } from './types'
 import { testCli } from '.'
-import { objectTargets, targetedAudience, getASId } from '../src/activitypub'
+import { objectTargets, targetedAudience, getASId, clientAddressedActivity } from '../src/activitypub'
 import { ASJsonLdProfileContentType } from '../src/activitystreams'
 
 const tests = module.exports
@@ -51,12 +51,22 @@ tests['objectTargets'] = async () => {
     const targetsShouldBe = theseLevels.reduce((targets, levelTargetSet) => new Set([...levelTargetSet, ...targets]), new Set())
     return new Set(targetsShouldBe)
   }
-  levels.forEach((level, index) => {
-    const targets = objectTargets(activity, index).map(getASId)
+
+  for (let [index, level] of enumerate(levels)) {
+    const targets = (await objectTargets(activity, index)).map(getASId)
     const targetsShouldBe = targetsShouldBeForLevel(index)
     // console.log({ level: index, targets, targetsShouldBe })
     assert(setsAreEqual(targetsShouldBe, new Set(targets)))
-  })
+  }
+}
+
+function* enumerate (iterable: Iterable<any>) {
+  let i = 0
+
+  for (const x of iterable) {
+    yield [i, x]
+    i++
+  }
 }
 
 tests['targetedAudience'] = async () => {
@@ -73,6 +83,26 @@ tests['targetedAudience'] = async () => {
   const audience = targetedAudience(asObject)
   // console.log('audience', audience)
   assert.deepEqual(audience, ['https://rhiaro.co.uk/followers/', 'https://e14n.com/evan'])
+}
+
+tests['clientAddressedActivity'] = async () => {
+  const attributedToId = 'https://bengo.is/clientAddressedActivityTest'
+  const parentUrl = await listen(http.createServer((req, res) => {
+    res.writeHead(200, {'content-type': ASJsonLdProfileContentType})
+    res.end(JSON.stringify({
+      type: 'Note',
+      attributedTo: {
+        id: attributedToId
+      }
+    }, null, 2))
+  }))
+
+  const activityToAddress = {
+    type: 'Activity',
+    inReplyTo: parentUrl
+  }
+  const addressed = await clientAddressedActivity(activityToAddress, 0, true)
+  assert(ensureArray(addressed.cc).includes(attributedToId))
 }
 
 /*

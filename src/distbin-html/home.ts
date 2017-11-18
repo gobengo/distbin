@@ -1,7 +1,9 @@
 const http = require('http')
 import {IncomingMessage, ServerResponse} from 'http'
 const { publicCollectionId } = require('../activitypub')
+import { clientAddressedActivity } from '../activitypub'
 import { discoverOutbox } from '../activitypub'
+import { Activity, ASObject } from '../activitystreams'
 const querystring = require('querystring')
 const url = require('url')
 const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
@@ -58,7 +60,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
           })
         }
 
-        let note = Object.assign(
+        let note: ASObject = Object.assign(
           {
             'type': 'Note',
             'content': content,
@@ -73,7 +75,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
           },
           inReplyTo ? { inReplyTo } : {}
         )
-        const activity = {
+        const unaddressedActivity: Activity = {
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: 'Create',
           object: note,
@@ -81,6 +83,9 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
           cc: [publicCollectionId, inReplyTo].filter(Boolean),
           attributedTo
         }
+
+        const addressedActivity = await clientAddressedActivity(unaddressedActivity, 0, true)
+
         // submit to outbox
         // #TODO discover outbox URL
         const outboxUrl = await discoverOutbox(apiUrl)
@@ -90,7 +95,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
           },
           method: 'post',
         }))
-        postToOutboxRequest.write(JSON.stringify(activity))
+        postToOutboxRequest.write(JSON.stringify(addressedActivity))
         const postToOutboxResponse = await sendRequest(postToOutboxRequest)
         switch (postToOutboxResponse.statusCode) {
           case 201:

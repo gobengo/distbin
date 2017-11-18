@@ -10,7 +10,7 @@ const { listen } = require('./util')
 const { readableToString } = require('../src/util')
 const { requestForListener } = require('./util')
 const { linkToHref } = require('../src/util')
-const { sendRequest } = require('../src/util')
+const { ensureArray, sendRequest } = require('../src/util')
 import * as url from 'url'
 import { HttpRequestResponder, Activity, isActivity, ASObject, Extendable, LDValue, LDValues, LDObject, DistbinActivity, JSONLD } from './types'
 import { discoverOutbox } from '../src/activitypub'
@@ -77,7 +77,7 @@ tests['can page through /public collection.current'] = async function () {
   ].map(a => Object.assign(a, {
     cc: ['https://www.w3.org/ns/activitystreams#Public']
   }))
-  let created = []
+  let created: string[] = []
   for (let i = 0; i < toCreate.length; i++) {
     created.push(await postActivity(d, toCreate[i]))
   }
@@ -98,7 +98,10 @@ tests['can page through /public collection.current'] = async function () {
   assert.equal(collection.type, 'Collection')
   assert.equal(collection.items.length, 1)
   // we get the most recently created one
-  assert.equal(url.parse(collection.items[0].url).pathname, url.parse(created[created.length - 1]).pathname)
+  ensureArray(collection.items[0].url).forEach((itemUrl: string) => {
+    assert.equal(url.parse(itemUrl).pathname,
+                 url.parse(created[created.length - 1]).pathname)
+  })
   assert(!collection.next, 'collection does not have a next property')
   assert(collection.current, 'collection has a .current property')
   assert(collection.first, 'collection has a .first property')
@@ -136,8 +139,12 @@ tests['can page through /public collection.current'] = async function () {
   assert.equal(page2.orderedItems.length, 2)
   assert(page2.next, 'has a next property')
   // should have second most recently created
-  assert.equal(url.parse(page2.orderedItems[0].url).pathname, url.parse(created[created.length - 2]).pathname)
-  assert.equal(url.parse(page2.orderedItems[1].url).pathname, url.parse(created[created.length - 3]).pathname)
+  ensureArray(page2.orderedItems[0].url).forEach((itemUrl: string) =>
+    assert.equal(url.parse(itemUrl).pathname,
+                 url.parse(created[created.length - 2]).pathname))
+  ensureArray(page2.orderedItems[1].url).forEach((itemUrl: string) =>
+    assert.equal(url.parse(itemUrl).pathname,
+                 url.parse(created[created.length - 3]).pathname))  
   // ok so if we post one more new thing, the startIndex on page2 should go up by one.
   const fifth = {
     cc: ['https://www.w3.org/ns/activitystreams#Public'],
@@ -167,7 +174,10 @@ tests['can page through /public collection.current'] = async function () {
   assert.equal(page3.type, 'OrderedCollectionPage')
   assert.equal(page3.startIndex, 4)
   assert.equal(page3.orderedItems.length, 1)
-  assert.equal(url.parse(page3.orderedItems[0].url).pathname, url.parse(created[created.length - 5]).pathname)
+  // assert.equal(url.parse(page3.orderedItems[0].url).pathname, url.parse(created[created.length - 5]).pathname)
+  ensureArray(page3.orderedItems[0].url).forEach((itemUrl: string) =>
+    assert.equal(url.parse(itemUrl).pathname,
+                 url.parse(created[created.length - 5]).pathname))
   // page3 can specify a next, but when fetched it shouldn't have any items
   // or continue pointing to next
   if (page3.next) {
@@ -377,8 +387,10 @@ tests['GET an activity has a .url that resolves'] = async function () {
   assert.equal(activityResponse.statusCode, 200)
   const fetchedActivity = JSON.parse(await readableToString(activityResponse))
   assert(fetchedActivity.url, 'has .url property')
-  const urlResponse = await sendRequest(http.request(url.resolve(activityUrl, fetchedActivity.url)))
-  assert.equal(urlResponse.statusCode, 200)
+  await Promise.all(ensureArray(fetchedActivity.url).map(async (fetchedActivityUrl: string) => {
+    const urlResponse = await sendRequest(http.request(url.resolve(activityUrl, fetchedActivityUrl)))
+    assert.equal(urlResponse.statusCode, 200)
+  }))
 }
 
 tests['GET {activity.id}.json always sends json response, even if html if preferred by user-agent'] = async function () {

@@ -10,6 +10,7 @@ import {
   route, RoutePattern, RouteResponderFactory,
   requestMaxMemberCount,
   jsonld,
+  jsonldAppend,
   flatten
 } from './util'
 const url = require('url')
@@ -74,27 +75,6 @@ export default function distbin ({
       return error(500, err)(req, res)
     }
   }
-}
-
-// Return new value for a JSON-LD object's value, appending to any existing one
-function jsonldAppend (oldVal:any, valToAppend: any) {
-  let newVal
-  switch (typeof oldVal) {
-    case 'object':
-      if (Array.isArray(oldVal)) {
-        newVal = oldVal.concat(valToAppend)
-      } else {
-        newVal = [oldVal, valToAppend]
-      }
-      break
-    case 'undefined':
-      newVal = valToAppend
-      break
-    default:
-      newVal = [oldVal, valToAppend]
-      break
-  }
-  return newVal
 }
 
 function isHostedLocally (activityFreshFromStorage:Activity) {

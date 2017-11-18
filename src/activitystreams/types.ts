@@ -49,7 +49,7 @@ type ASObjectType<T> = T | [T]
 export type ASValue = string | ASObject | ASLink
 // W3C ActivityStreams 2.0
 export class ASObject extends ASBase {
-  attachment?: ASObject
+  attachment?: OneOrMore<ASObject|ASLink>
   attributedTo?: LDValue<ASObject>
   bcc?: LDValue<ASObject>
   cc?: OneOrMore<LDValue<ASObject>>

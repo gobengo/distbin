@@ -10,6 +10,18 @@ const https = require('https')
 const fs = require('fs')
 const path = require('path')
 
+export const request = (urlOrOptions:string|UrlObject) => {
+  const options = typeof urlOrOptions === 'string' ? url.parse(urlOrOptions) : urlOrOptions;
+  switch (options.protocol) {
+    case 'https:':
+      return https.request(urlOrOptions)
+    case 'http:':
+      return http.request(urlOrOptions)
+    default:
+      throw new Error(`cannot create request for protocol ${options.protocol}`)
+  }
+}
+
 export const debuglog = require('util').debuglog('distbin')
 
 export const readableToString = function (readable: NodeJS.ReadableStream): Promise<string> {
@@ -177,4 +189,30 @@ function createCustomDocumentLoader () {
     loader. For example: jsonldLib.documentLoaders.xhr({usePromise: false}); */
   }
   return customLoader
+}
+
+export function assertNever(x: never): never {
+  throw new Error("Unexpected object: " + x);
+}
+
+// Return new value for a JSON-LD object's value, appending to any existing one
+export function jsonldAppend (oldVal:any, valToAppend: any[]|any) {
+  valToAppend = Array.isArray(valToAppend) ? valToAppend : [valToAppend]
+  let newVal
+  switch (typeof oldVal) {
+    case 'object':
+      if (Array.isArray(oldVal)) {
+        newVal = oldVal.concat(valToAppend)
+      } else {
+        newVal = [oldVal, ...valToAppend]
+      }
+      break
+    case 'undefined':
+      newVal = valToAppend
+      break
+    default:
+      newVal = [oldVal, ...valToAppend]
+      break
+  }
+  return newVal
 }
