@@ -11,6 +11,7 @@ const { distbinBodyTemplate } = require('./partials')
 import { requestUrl } from '../util'
 const { isProbablyAbsoluteUrl } = require('../util')
 const { createHttpOrHttpsRequest } = require('../util')
+import { debuglog } from '../util'
 import { ASLink, LinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchSuccess, HasLinkPrefetchResult } from '../types'
 import { ASJsonLdProfileContentType } from '../activitystreams'
 
@@ -84,8 +85,9 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
           attributedTo
         }
 
+        
         const addressedActivity = await clientAddressedActivity(unaddressedActivity, 0, true)
-
+        debuglog('addressedActivity', addressedActivity)
         // submit to outbox
         // #TODO discover outbox URL
         const outboxUrl = await discoverOutbox(apiUrl)

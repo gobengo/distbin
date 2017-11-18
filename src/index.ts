@@ -521,7 +521,8 @@ function outboxHandler ({
               failures: failures
             }))
             activities.set(newActivity.id, Object.assign({}, newActivity, {
-              'distbin:activityPubDeliveryFailures': failures
+              'distbin:activityPubDeliveryFailures': failures,
+              'distbin:activityPubDeliverySuccesses': e.successes
             }))
             return
           }

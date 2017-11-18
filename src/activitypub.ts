@@ -1,4 +1,4 @@
-import { debuglog } from './util'
+import { debuglog, flatten } from './util'
 import * as http from 'http'
 import {IncomingMessage} from 'http'
 import * as https from 'https'
@@ -12,6 +12,7 @@ import {UrlObject} from 'url'
 import { activitySubtypes, isASLink, isASObject, ASValue } from './activitystreams/types'
 import { ASJsonLdProfileContentType } from './activitystreams'
 import {Activity, ASObject, Extendable, JSONLD, LDValue, isActivity} from './types'
+import { get } from 'lodash'
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
@@ -39,55 +40,67 @@ const flattenAnyArrays = <T=any> (arr: Array<T|T[]>): T[] => {
 
 /**
  * Get the audience of an activity. Those who might be interested about getting notified.
- * @param activity 
+ * @param o 
  * @param fetch - whether to fetch related objects that are only mentioned by URL
  */
-export const activityAudience = async (activity: ASObject, fetch : Boolean = false): Promise<ASValue[]> => {
+export const activityAudience = async (
+  o: ASObject,
+  fetch : Boolean = false,
+  // relatedObjectTargetedAudience is a MAY in the spec. And if you leave it on and start replying to long chains, you'll end up having to deliver to every ancestor, which takes a long time in big threads. So you might want to disable it to get a smaller result set
+  { relatedObjectTargetedAudience = true } : { relatedObjectTargetedAudience?: Boolean } = {}
+): Promise<ASValue[]> => {
   /* Clients SHOULD look at any objects attached to the new Activity via the object, target, inReplyTo and/or tag fields,
   retrieve their actor or attributedTo properties, and MAY also retrieve their addressing properties, and add these
   to the to or cc fields of the new Activity being created. */
-  const related: ASValue[] = await Promise.all(flattenAnyArrays([
-    isActivity(activity) && activity.object,
-    isActivity(activity) && activity.target,
-    activity.inReplyTo,
-    activity.tag
-  ])
-  .filter(Boolean)
-  .map(async (objOrUrl) => {
-    if (fetch && typeof objOrUrl === 'string') {
-      // need to fetch it by url
-      const res = await sendRequest(request(Object.assign(url.parse(objOrUrl), {
-        headers: {
-          accept: ASJsonLdProfileContentType
-        }
-      })))
-      if (res.statusCode !== 200) {
-        console.warn('got non-200 response when fetching ${obj} as part of activityAudience()')
-        return
+  // console.log('isActivity(o)', isActivity(o), o)
+  const related = flattenAnyArrays([
+    isActivity(o) && o.object,
+    isActivity(o) && o.target,
+    // this isn't really mentioned in the spec but required to get working how I'd expect.
+    isActivity(o) && o.type === 'Create' && get(o, 'object.inReplyTo'),
+    o.inReplyTo,
+    o.tag
+  ]).filter(Boolean)
+  // console.log('o.related', related)
+  const relatedObjects = (await Promise.all(related.map(async (objOrUrl) => {
+    if (typeof objOrUrl === 'object') return objOrUrl;
+    if ( ! fetch) return
+    // fetch url to get an object
+    const audienceUrl: string = objOrUrl
+    // need to fetch it by url
+    const res = await sendRequest(request(Object.assign(url.parse(audienceUrl), {
+      headers: {
+        accept: ASJsonLdProfileContentType
       }
-      const body = await readableToString(res)
-      const resContentType = res.headers['content-type']
-      switch (resContentType) {
-        case ASJsonLdProfileContentType:
-        case 'application/json':
-          try {
-            return JSON.parse(body)
-          } catch (error) {
-            console.error("Couldn't parse fetched response body as JSON when determining activity audience", {body}, error)
-            return
-          }
-        default:
-          console.warn(`Unexpected contentType=${resContentType} of response when fetching ${objOrUrl} to determine activityAudience`)
-          return
-      }
+    })))
+    if (res.statusCode !== 200) {
+      console.warn('got non-200 response when fetching ${obj} as part of activityAudience()')
+      return
     }
-    return objOrUrl
-  }))
-
-  const relatedCreators : ASValue[] = flattenAnyArrays(related.map(objectProvenanceAudience))
+    const body = await readableToString(res)
+    const resContentType = res.headers['content-type']
+    switch (resContentType) {
+      case ASJsonLdProfileContentType:
+      case 'application/json':
+        try {
+          return JSON.parse(body)
+        } catch (error) {
+          console.error("Couldn't parse fetched response body as JSON when determining activity audience", {body}, error)
+          return
+        }
+      default:
+        console.warn(`Unexpected contentType=${resContentType} of response when fetching ${audienceUrl} to determine activityAudience`)
+        return
+    }
+  }))).filter(Boolean)
+  // console.log('o.relatedObjects', relatedObjects)
+  
+  const relatedCreators : ASValue[] = flattenAnyArrays(relatedObjects.map(objectProvenanceAudience))
     .filter(Boolean)
-  const relatedAudience: ASValue[] = flattenAnyArrays(related.map(o => isASObject(o) && targetedAudience(o)))
-    .filter(Boolean)
+  const relatedAudience: ASValue[] = relatedObjectTargetedAudience
+    ? flattenAnyArrays(relatedObjects.map(o => isASObject(o) && targetedAudience(o)))
+        .filter(Boolean)
+    : []
     
   const targets: ASValue[] = [...relatedCreators, ...relatedAudience]
   return targets
@@ -106,16 +119,20 @@ export const targetedAudience = (object:ASObject|Activity) => {
 }
 
 export const objectTargets = async (activity:ASObject, recursionLimit: number, fetch : Boolean = false): Promise<ASValue[]> => {
+  // console.log('start objectTargets', recursionLimit, activity)
   const audience = [...(await activityAudience(activity, fetch)),
                     ...objectProvenanceAudience(activity),
                     ...targetedAudience(activity)]
+  // console.log('objectTargets got audience', audience)
   const recursedAudience = recursionLimit
     ? flattenAnyArrays(await Promise.all(
-        audience.filter(o => isASObject(o))
-                .map((o: ASObject) => objectTargets(o, recursionLimit - 1, fetch))
+        audience.map(async (o: ASObject) => {
+                  const recursedTargets = await objectTargets(o, recursionLimit - 1, fetch)
+                  return recursedTargets
+                })
       ))
     : []
-  // debuglog('recursionLimit', recursionLimit, activity, { audience, recursedAudience })
+  // debuglog('objectTargets', { audience, recursedAudience, recursionLimit, activity })
   const targets = [...audience, ...recursedAudience]
   const deduped = Array.from(new Set(targets))
   return deduped
@@ -130,7 +147,7 @@ export const clientAddressedActivity = async (activity: Activity, recursionLimit
   const audience = await objectTargets(activity, recursionLimit, fetch)
   const audienceIds = audience.map(getASId)
   return Object.assign({}, activity, {
-    cc: jsonldAppend(activity.cc, audienceIds)
+    cc: Array.from(new Set(jsonldAppend(activity.cc, audienceIds)))
   })
 }
 
@@ -168,8 +185,9 @@ const deliveryErrors = exports.deliveryErrors = {
   // Succeeded in delivering, but response was an error
   DeliveryErrorResponse: makeErrorClass('DeliveryErrorResponse'),
   // At least one delivery did not succeed. Try again later?
-  SomeDeliveriesFailed: makeErrorClass('SomeDeliveriesFailed', function (msg: string, failures: Error[]) {
+  SomeDeliveriesFailed: makeErrorClass('SomeDeliveriesFailed', function (msg: string, failures: Error[], successes: string[]) {
     this.failures = failures
+    this.successes = successes
   })
 }
 
@@ -248,7 +266,9 @@ const deliverActivity = async function (activity: Activity, target: string, { de
   }
 
   debuglog(`deliverActivity to target ${target}`)
-  let inbox: string = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(targetProfileResponse)
+  const body = await readableToString(targetProfileResponse)
+  const contentType = ensureArray(targetProfileResponse.headers['content-type']).map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]  
+  let inbox: string = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(body, contentType)
 
   function inboxFromHeaders (res: IncomingMessage) {
     let inbox
@@ -277,10 +297,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
     return inbox
   }
 
-  async function inboxFromBody (res: IncomingMessage) {
-    const contentTypeHeaders = ensureArray(res.headers['content-type'])
-    const contentType = contentTypeHeaders.map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]
-    const body = await readableToString(res)
+  async function inboxFromBody (body: string, contentType: string) {
     let inboxes
     debuglog(`inboxFromBody got response contentType=${contentType}`)
     switch (contentType) {
@@ -317,7 +334,8 @@ const deliverActivity = async function (activity: Activity, target: string, { de
         throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
     }
     if (!inboxes || !inboxes.length) {
-      throw new Error(`Could not determine ActivityPub inbox from ${contentType} response`)
+      debuglog(`Could not determine ActivityPub inbox from ${contentType} response`)
+      return
     }
     if (inboxes.length > 1) {
       console.warn(`Using only first inbox, but there were ${inboxes.length}: ${inboxes}`)
@@ -366,6 +384,7 @@ exports.targetAndDeliver = async function (activity: Activity,
                                            targets? : string[],
                                            deliverToLocalhost : Boolean = true) {
   targets = targets ||  (await objectTargets(activity, 0)).map(getASId)
+  debuglog('targetAndDeliver targets', targets)
   let deliveries: string[] = []
   let failures: Error[] = []
   await Promise.all(
@@ -380,9 +399,10 @@ exports.targetAndDeliver = async function (activity: Activity,
           .catch(e => failures.push(e))
       })
   )
+  debuglog('finished targetAndDeliver', { failures, deliveries })
   if (failures.length) {
     debuglog('failures delivering ' + failures.map(e => e.stack))
-    throw new deliveryErrors.SomeDeliveriesFailed('SomeDeliveriesFailed', failures)
+    throw new deliveryErrors.SomeDeliveriesFailed('SomeDeliveriesFailed', failures, deliveries)
   }
   return deliveries
 }
