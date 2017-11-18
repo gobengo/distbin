@@ -7,7 +7,7 @@ const { listen, requestForListener } = require('./util')
 const { isProbablyAbsoluteUrl } = require('./util')
 import { Activity, LDValue, ASObject } from './types'
 import { testCli } from '.'
-import { objectTargets, targetedAudience, getASId, clientAddressedActivity, activityAudience } from '../src/activitypub'
+import { objectTargets, targetedAudience, getASId, clientAddressedActivity, objectTargetsNoRecurse } from '../src/activitypub'
 import { ASJsonLdProfileContentType } from '../src/activitystreams'
 
 const tests = module.exports
@@ -85,33 +85,6 @@ tests['targetedAudience'] = async () => {
   assert.deepEqual(audience, ['https://rhiaro.co.uk/followers/', 'https://e14n.com/evan'])
 }
 
-tests['activityAudience'] = async () => {
-  const attributedToId = 'https://bengo.is/clientAddressedActivityTest'
-  const parentUrl = await listen(http.createServer((req, res) => {
-    res.writeHead(200, {'content-type': ASJsonLdProfileContentType})
-    res.end(JSON.stringify({
-      type: 'Note',
-      name: 'note served by this server (so this is the parent of the other object with inReplyTo',
-      attributedTo: {
-        id: attributedToId
-      }
-    }, null, 2))
-  }))
-  const note = {
-    type: 'Note',
-    content: 'i reply to u ok',
-    inReplyTo: parentUrl,      
-  }
-  const activity = {
-    type: 'Create',
-    object: note
-  }
-  const audience = await activityAudience(activity, true)
-  const audienceIds = audience.map(getASId)
-  assert(audienceIds.length > 0, 'has an audience')
-  assert(audienceIds.includes(attributedToId))
-}
-
 tests['clientAddressedActivity'] = async () => {
   const attributedToId = 'https://bengo.is/clientAddressedActivityTest'
   const parentUrl = await listen(http.createServer((req, res) => {
@@ -129,7 +102,7 @@ tests['clientAddressedActivity'] = async () => {
     object: {
       type: 'Note',
       content: 'i reply to u ok',
-      inReplyTo: parentUrl,      
+      inReplyTo: parentUrl
     }
   }
   const addressed = await clientAddressedActivity(activityToAddress, 0, true)

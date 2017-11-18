@@ -39,11 +39,36 @@ const flattenAnyArrays = <T=any> (arr: Array<T|T[]>): T[] => {
 }
 
 /**
- * Get the audience of an activity. Those who might be interested about getting notified.
+ * Get the targets of an AS Object. Those who might be interested about getting notified.
  * @param o 
  * @param fetch - whether to fetch related objects that are only mentioned by URL
  */
-export const activityAudience = async (
+export const objectTargets = async (o:ASObject, recursionLimit: number, fetch : Boolean = false): Promise<ASValue[]> => {
+  // console.log('start objectTargets', recursionLimit, activity)
+  const audience = [...(await objectTargetsNoRecurse(o, fetch)),
+                    ...objectProvenanceAudience(o),
+                    ...targetedAudience(o)]
+  // console.log('objectTargets got audience', audience)
+  const recursedAudience = recursionLimit
+    ? flattenAnyArrays(await Promise.all(
+        audience.map(async (o: ASObject) => {
+                  const recursedTargets = await objectTargets(o, recursionLimit - 1, fetch)
+                  return recursedTargets
+                })
+      ))
+    : []
+  // debuglog('objectTargets', { audience, recursedAudience, recursionLimit, activity })
+  const targets = [...audience, ...recursedAudience]
+  const deduped = Array.from(new Set(targets))
+  return deduped
+}
+
+/**
+ * Get the targets of a single level of an AS Object. Don't recurse (see objectTargets)
+ * @param o 
+ * @param fetch - whether to fetch related objects that are only mentioned by URL
+ */
+export const objectTargetsNoRecurse = async (
   o: ASObject,
   fetch : Boolean = false,
   // relatedObjectTargetedAudience is a MAY in the spec. And if you leave it on and start replying to long chains, you'll end up having to deliver to every ancestor, which takes a long time in big threads. So you might want to disable it to get a smaller result set
@@ -106,36 +131,24 @@ export const activityAudience = async (
   return targets
 }
 
+/**
+ * Given a resource, return a list of other resources that helped create the original one
+ * @param o - AS Object to get provenance audience for
+ */
 const objectProvenanceAudience = (o: ASObject): ASValue[] => {
   const actor = isActivity(o) && o.actor
   const attributedTo = isASObject(o) && o.attributedTo
   return [actor, attributedTo].filter(Boolean)  
 }
 
+/**
+ * Given a resource, return a list of other resources that are explicitly targeted using audience targeting properties
+ * @param o - AS Object to get targeted audience for
+ */
 export const targetedAudience = (object:ASObject|Activity) => {
   const targeted = flattenAnyArrays([object.to, object.bto, object.cc, object.bcc]).filter(Boolean)
   const deduped = Array.from(new Set([].concat(targeted)))
   return deduped  
-}
-
-export const objectTargets = async (activity:ASObject, recursionLimit: number, fetch : Boolean = false): Promise<ASValue[]> => {
-  // console.log('start objectTargets', recursionLimit, activity)
-  const audience = [...(await activityAudience(activity, fetch)),
-                    ...objectProvenanceAudience(activity),
-                    ...targetedAudience(activity)]
-  // console.log('objectTargets got audience', audience)
-  const recursedAudience = recursionLimit
-    ? flattenAnyArrays(await Promise.all(
-        audience.map(async (o: ASObject) => {
-                  const recursedTargets = await objectTargets(o, recursionLimit - 1, fetch)
-                  return recursedTargets
-                })
-      ))
-    : []
-  // debuglog('objectTargets', { audience, recursedAudience, recursionLimit, activity })
-  const targets = [...audience, ...recursedAudience]
-  const deduped = Array.from(new Set(targets))
-  return deduped
 }
 
 /**
