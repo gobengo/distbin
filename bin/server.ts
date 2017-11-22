@@ -10,6 +10,12 @@ const os = require('os')
 const url = require('url')
 const { JSONFileMapAsync } = require('../src/filemap');
 import createDistbinConfig from '../config'
+import * as morgan from 'morgan'
+import * as express from 'express'
+import { Writable } from 'stream'
+
+import { createLogger } from '../src/logger'
+const logger = createLogger('bin/server')
 
 const distbinHtml= require('../src/distbin-html')
 const { debuglog, denodeify, readableToString, sendRequest } = require('../src/util');
@@ -60,9 +66,29 @@ async function runServer() {
 	// api
 	const apiServer = http.createServer(apiHandler)
 	const apiServerUrl = await listen(apiServer)
+	
+	function logMiddleware (next: (...args: any[]) => any) {
+		return async (req: express.Request, res: express.Response) => {
+			const morganMode = process.env.DISTBIN_MORGAN_MODE || (process.env.NODE_ENV === 'production' ? 'combined' : 'dev')
+			return morgan(morganMode, /*
+				// I don't actually want to prefix stderr with the logger name. It makes it nonstandard to parse. But this is how you'd do it.
+				{
+				stream: new Writable({
+					write: (chunk, encoding, callback) => {
+						logger.info(chunk.toString())
+						callback()
+					}
+				})
+			}*/)(req, res, async (err: Error) => {
+				if (err) console.error('error in distbin/bin/server logMiddleware', err)
+				await next(req, res)
+			})			
+		}
+
+	}
 
 	// html
-	const htmlServer = http.createServer(distbinHtml.createHandler({ apiUrl: apiServerUrl, externalUrl }))
+	const htmlServer = http.createServer(logMiddleware(distbinHtml.createHandler({ apiUrl: apiServerUrl, externalUrl })))
 	const htmlServerUrl = await listen(htmlServer)
 
 	// mainServer delegates to htmlHandler or distbin api handler based on Accept header
