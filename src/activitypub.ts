@@ -325,7 +325,12 @@ const deliverActivity = async function (activity: Activity, target: string, { de
       case 'text/html':
         let ld: Extendable<JSONLD>[] = await rdfaToJsonLd(body)
         let targetSubject = ld.find((x) => x['@id'] === 'http://localhost/')
-        inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox'].map((i: JSONLD) => i['@id'])
+        if ( ! targetSubject) {
+          debuglog('no targetSubject so no ldb:inbox after checking text/html for ld. got ld', ld)
+          inboxes = []
+        } else {
+          inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox'].map((i: JSONLD) => i['@id'])          
+        }
         break;
       case 'application/ld+json':
         const obj = JSON.parse(body)
