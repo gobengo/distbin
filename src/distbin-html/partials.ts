@@ -17,6 +17,9 @@ export const everyPageHead = () => `
     max-width: 100%;
     overflow-x: auto;
   }
+  p a {
+    word-wrap: break-word;
+  }
   </style>
 `
 
