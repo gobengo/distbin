@@ -20,6 +20,9 @@ export const everyPageHead = () => `
   p a {
     word-wrap: break-word;
   }
+  p img {
+    max-width: 100%;
+  }
   </style>
 `
 
