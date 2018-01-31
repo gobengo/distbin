@@ -205,7 +205,7 @@ export function renderObject (activity: ASObject) {
                 const linkPrefetchSuccess = <LinkPrefetchSuccess>prefetch
                 if (!(linkPrefetchSuccess && linkPrefetchSuccess.supportedMediaTypes)) return ''
                 if (linkPrefetchSuccess.supportedMediaTypes.find((m: string) => m.startsWith('image/'))) {
-                  return `
+                  return linkPrefetchSuccess.link && `
                     <img src="${linkPrefetchSuccess.link.href}" />
                   `
                 }
