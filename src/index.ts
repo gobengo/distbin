@@ -520,7 +520,7 @@ function outboxHandler ({
               content: "Activity was created, but delivery to some others servers' inbox failed. They will not be retried.",
               failures: failures
             }))
-            activities.set(newActivity.id, Object.assign({}, newActivity, {
+            await activities.set(newActivity.id, Object.assign({}, newActivity, {
               'distbin:activityPubDeliveryFailures': failures,
               'distbin:activityPubDeliverySuccesses': e.successes
             }))
