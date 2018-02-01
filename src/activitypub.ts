@@ -5,7 +5,7 @@ import * as https from 'https'
 import * as parseLinkHeader from 'parse-link-header'
 import { rdfaToJsonLd } from './util'
 import { jsonld } from './util'
-import { readableToString, sendRequest, ensureArray, jsonldAppend } from './util'
+import { readableToString, sendRequest, followRedirects, ensureArray, jsonldAppend, makeErrorClass } from './util'
 import { request } from './util'
 import * as url from 'url'
 import {UrlObject} from 'url'
@@ -13,6 +13,9 @@ import { activitySubtypes, isASLink, isASObject, ASValue } from './activitystrea
 import { ASJsonLdProfileContentType } from './activitystreams'
 import {Activity, ASObject, Extendable, JSONLD, LDValue, isActivity} from './types'
 import { get } from 'lodash'
+
+import { createLogger } from '../src/logger'
+const logger = createLogger('activitypub')
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
 
@@ -160,7 +163,7 @@ export const clientAddressedActivity = async (activity: Activity, recursionLimit
   const audience = await objectTargets(activity, recursionLimit, fetch)
   const audienceIds = audience.map(getASId)
   return Object.assign({}, activity, {
-    cc: Array.from(new Set(jsonldAppend(activity.cc, audienceIds)))
+    cc: Array.from(new Set(jsonldAppend(activity.cc, audienceIds))).filter(Boolean)
   })
 }
 
@@ -175,15 +178,6 @@ exports.clientHeaders = (headers = {}) => {
     throw new Error(`ActivityPub Client requests can't include custom Accept header. Must always be the same value of "${requirements.accept}"`)
   }
   return Object.assign(requirements, headers)
-}
-
-const makeErrorClass = (name: string, setUp?:Function) => class extends Error {
-  constructor (msg: string, ...args: any[]) {
-    super(msg)
-    this.message = msg
-    this.name = name
-    if (typeof setUp === 'function') setUp.apply(this, arguments)
-  }
 }
 
 const deliveryErrors = exports.deliveryErrors = {
@@ -257,15 +251,15 @@ async function outboxFromResponse (res: IncomingMessage) {
 // deliver an activity to a target
 const deliverActivity = async function (activity: Activity, target: string, { deliverToLocalhost } : { deliverToLocalhost: Boolean }) {
   // discover inbox
-  const targetProfileRequest = request(Object.assign(url.parse(target), {
-    headers: {
-      accept: `${ASJsonLdProfileContentType}, text/html`
-    }
-  }))
   debuglog('req inbox discovery ' + target)
   try {
-    var targetProfileResponse = await sendRequest(targetProfileRequest)
+    var targetProfileResponse = await followRedirects(Object.assign(url.parse(target), {
+      headers: {
+        accept: `${ASJsonLdProfileContentType}, text/html`
+      }
+    }))
   } catch (e) {
+    logger.error("Error delivering activity to target. This is normal if the target doesnt speak great ActivityPub.", e)
     throw new deliveryErrors.TargetRequestFailed(e.message)
   }
   debuglog(`res ${targetProfileResponse.statusCode} inbox discovery for ${target}`)
@@ -401,7 +395,13 @@ const deliverActivity = async function (activity: Activity, target: string, { de
 exports.targetAndDeliver = async function (activity: Activity,
                                            targets? : string[],
                                            deliverToLocalhost : Boolean = true) {
-  targets = targets ||  (await objectTargets(activity, 0)).map(getASId)
+  targets = targets ||  (await objectTargets(activity, 0))
+    .map(t => {
+      const url = getASId(t)
+      if ( ! url) debuglog('Cant determine URL to deliver to for target, so skipping', t)
+      return url
+    })
+    .filter(Boolean)
   debuglog('targetAndDeliver targets', targets)
   let deliveries: string[] = []
   let failures: Error[] = []

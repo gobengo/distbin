@@ -3,12 +3,17 @@ const jsonldRdfaParser = require('jsonld-rdfa-parser')
 const jsonldLib = require('jsonld')
 jsonldLib.registerRDFParser('text/html', jsonldRdfaParser)
 const url = require('url')
+import {ClientRequestArgs} from 'http';
+import * as assert from 'assert';
 import * as http from "http";
 import {HttpRequestResponder, ASLink} from './types';
 import { Url, UrlObject } from 'url'
 const https = require('https')
 const fs = require('fs')
 const path = require('path')
+
+import { createLogger } from '../src/logger'
+const logger = createLogger('util')
 
 export const request = (urlOrOptions:string|UrlObject) => {
   const options = typeof urlOrOptions === 'string' ? url.parse(urlOrOptions) : urlOrOptions;
@@ -65,6 +70,37 @@ export const sendRequest = function (request: http.ClientRequest): Promise<http.
     request.once('response', resolve)
     request.once('error', reject)
     request.end()
+  })
+}
+
+export async function followRedirects(requestOpts: ClientRequestArgs, maxRedirects=5) {
+  let redirectsLeft = maxRedirects
+  const initialUrl = url.format(requestOpts)
+  let latestUrl = initialUrl
+  assert(latestUrl)
+  logger.silly('followRedirects', latestUrl)
+  
+  let latestResponse = await sendRequest(request(requestOpts))
+  /* eslint-disable no-labels */
+  followRedirects: while (redirectsLeft > 0) {
+    logger.debug('followRedirects got response', { statusCode: latestResponse.statusCode })
+    switch (latestResponse.statusCode) {
+      case 301:
+      case 302:
+        let nextUrl = url.resolve(latestUrl, latestResponse.headers.location)
+        logger.debug('followRedirects is following to', nextUrl)        
+        latestResponse = await sendRequest(request(Object.assign(url.parse(nextUrl), {
+          headers: requestOpts.headers
+        })))
+        redirectsLeft--
+        continue followRedirects
+      default:
+        return latestResponse
+    }
+  }
+  throw Object.assign(new Error(`Max redirects reached when requesting ${initialUrl}`), {
+    response: latestResponse,
+    redirects: maxRedirects - redirectsLeft,
   })
 }
 
@@ -215,4 +251,13 @@ export function jsonldAppend (oldVal:any, valToAppend: any[]|any) {
       break
   }
   return newVal
+}
+
+export const makeErrorClass = (name: string, setUp?:Function) => class extends Error {
+  constructor (msg: string, ...args: any[]) {
+    super(msg)
+    this.message = msg
+    this.name = name
+    if (typeof setUp === 'function') setUp.apply(this, arguments)
+  }
 }

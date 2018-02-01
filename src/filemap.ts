@@ -2,6 +2,23 @@ import * as fs from 'fs'
 import * as path from 'path'
 const { denodeify } = require('./util')
 
+import { createLogger } from '../src/logger'
+const logger = createLogger('filemap')
+
+const filenameEncoder = {
+  encode: (key: string) => {
+    const base64encoded = Buffer.from(key).toString('base64')
+    return `data:base64,${base64encoded}`
+  },
+  decode: (filename: string) => {
+    const pattern = /^data:(.+)?(;base64)?,([^$]*)$/
+    const match = filename.match(pattern)
+    if (!match) return filename
+    const base64encoded = match[3]
+    return Buffer.from(base64encoded, 'base64').toString()
+  }
+}
+
 // TODO: Write tests
 
 // Like a Map, but keys are files in a dir, and object values are written as file contents
@@ -9,33 +26,45 @@ exports.JSONFileMap = class JSONFileMap<V> extends Map<string, V> {
   constructor (private dir:string) {
     super()
   }
-  private keyToString (key: string): string {
-    if (typeof key === 'string') return key
-    return JSON.stringify(key)
+  private keyToFilename (key: string): string {
+    if (typeof key !== 'string') key = JSON.stringify(key)
+    return filenameEncoder.encode(key)
+  }
+  private keyToPath (key: string): string {
+    const keyPath = path.join(this.dir, this.keyToFilename(key))
+    return keyPath
+  }
+  private keyToOldPath (key: string): string {
+    return path.join(this.dir, key)
+  }
+  private filenameToKey (filename: string): string {
+    return filenameEncoder.decode(filename)
+  }
+  private keyToExistentPath (key: string): string|void {
+    for (let pathToTry of [this.keyToPath(key), this.keyToOldPath(key)]) {
+      if (fs.existsSync(pathToTry)) return pathToTry
+    }
   }
   ['set'] (key:string, val:V) {
+    const pathForKey = this.keyToExistentPath(key) || this.keyToPath(key)
     // coerce to string
-    const filePath = path.join(this.dir, key)
     const valString = JSON.stringify(val, null, 2)
-    fs.writeFileSync(filePath, valString)
+    fs.writeFileSync(pathForKey, valString)
     return this
   }
   ['get'] (key:string) {
-    const filePath = path.join(this.dir, this.keyToString(key))
-    let fileContents
-    try {
-      fileContents = fs.readFileSync(filePath, 'utf8')
-    } catch (err) {
-      switch (err.code) {
-        case 'ENOENT':
-          // file does not exist. This is common, just means it's not 'in the Map'
-          return
-      }
-    }
+    const pathForKey = this.keyToExistentPath(key)
+    if (!pathForKey) return
+    const fileContents = fs.readFileSync(pathForKey, 'utf8')
     return JSON.parse(fileContents)
   }
+  has (key: string) {
+    const got = this.get(key)
+    return Boolean(got)
+  }
   ['delete'] (key:string) {
-    fs.unlinkSync(path.join(this.dir, this.keyToString(key)))
+    const pathForKey = this.keyToExistentPath(key)
+    if (pathForKey) fs.unlinkSync(pathForKey)
     return true
   }
   [Symbol.iterator] () {
@@ -60,7 +89,7 @@ exports.JSONFileMap = class JSONFileMap<V> extends Map<string, V> {
         }
         return timeDelta
       })
-      .map(({ name }) => name)
+      .map(({ name }) => this.filenameToKey(name))
     return sortedAscByCreation[Symbol.iterator]()
   }
   values () {
@@ -132,34 +161,49 @@ export class JSONFileMapAsync extends AsyncMap<string, any> implements IAsyncMap
   constructor (private dir:string) {
     super()
   }
-  async ['set'] (key:string, val:string|object) {
-    // coerce to string
-    const filePath = path.join(this.dir, key)
-    const valString = typeof val === 'string' ? val : JSON.stringify(val, null, 2)
-    return denodeify(fs.writeFile)(filePath, valString)
+  private keyToFilename (key: string): string {
+    if (typeof key !== 'string') key = JSON.stringify(key)
+    return filenameEncoder.encode(key)
   }
-  async ['get'] (key:string) {
-    try {
-      return JSON.parse(await denodeify(fs.readFile)(path.join(this.dir, key), 'utf8'))
-    } catch (err) {
-      switch (err.code) {
-        case 'ENOENT':
-          // file does not exist. This is common, just means it's not 'in the Map'
-          return
-        default:
-          throw err
-      }
+  private keyToPath (key: string): string {
+    const keyPath = path.join(this.dir, this.keyToFilename(key))
+    return keyPath
+  }
+  private keyToOldPath (key: string): string {
+    return path.join(this.dir, key)
+  }
+  private filenameToKey (filename: string): string {
+    return filenameEncoder.decode(filename)
+  }
+  private keyToExistentPath (key: string): string|void {
+    for (let pathToTry of [this.keyToPath(key), this.keyToOldPath(key)]) {
+      if (fs.existsSync(pathToTry)) return pathToTry
     }
   }
+  async ['set'] (key:string, val:string|object) {
+    // coerce to string
+    const pathForKey = this.keyToExistentPath(key) || this.keyToPath(key)
+    const valString = typeof val === 'string' ? val : JSON.stringify(val, null, 2)
+    return denodeify(fs.writeFile)(pathForKey, valString)
+  }
+  async ['get'] (key:string) {
+    const pathForKey = this.keyToExistentPath(key)
+    if (!pathForKey) return
+    return JSON.parse(await denodeify(fs.readFile)(pathForKey, 'utf8'))
+  }
   async ['delete'] (key:string) {
-    fs.unlinkSync(path.join(this.dir, key))
+    const path = this.keyToExistentPath(key)
+    if (path) {
+      fs.unlinkSync(path)
+    }
     return true
   }
   [Symbol.iterator] () {
     return this.keys().then(keys => keys[Symbol.iterator]())
   }
   async has (key: string) {
-    return Boolean(this.get(key))
+    const got = await this.get(key)
+    return Boolean(got)
   }
   async keys () {
     const dir = this.dir
@@ -180,7 +224,7 @@ export class JSONFileMapAsync extends AsyncMap<string, any> implements IAsyncMap
         }
         return timeDelta
       })
-      .map(({ name }) => name)
+      .map(({ name }) => filenameEncoder.decode(name))
     return sortedAscByCreation[Symbol.iterator]()
   }
   async values () {

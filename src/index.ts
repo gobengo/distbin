@@ -21,6 +21,9 @@ const accepts = require('accepts')
 import { IncomingMessage, ServerResponse } from 'http'
 import { Activity, ActivityMap, Extendable, HttpRequestResponder, LDValue, LDValues, LDObject, ASObject, JSONLD } from './types'
 
+import { createLogger } from './logger'
+const logger = createLogger('index')
+
 const owlSameAs = 'http://www.w3.org/2002/07/owl#sameAs'
 
 // given a non-uri activity id, return an activity URI
@@ -185,9 +188,12 @@ function activityRepliesHandler ({ activities, activityUuid, externalUrl }:{
       res.end('There is no activity ' + uri)
       return
     }
-    const allActivities: Activity[] = Array.from(await Promise.resolve(activities.values()))
-    const replies = allActivities
-      .filter(activity => {
+    const replies = Array.from(await Promise.resolve(activities.entries()))
+      .filter(([key, activity]) => {
+        if ( ! activity) {
+          logger.warn("activities map has a falsy value for key", key)
+          return false
+        }
         type ParentId = string
         const replies: ASObject[] = ensureArray<any>(activity.object).filter(o => typeof o === 'object')
         const inReplyTos = flatten(replies.map((object: ASObject) => ensureArray<any>(object.inReplyTo).map((o:any): ParentId => {
@@ -200,7 +206,7 @@ function activityRepliesHandler ({ activities, activityUuid, externalUrl }:{
           return isReply
         })
       })
-      .map(activity => {
+      .map(([id, activity]) => {
         if (isHostedLocally(activity)) {
           return locallyHostedActivity(activity, {externalUrl})
         }
@@ -374,7 +380,8 @@ function inboxHandler ({ activities, externalUrl, inbox, inboxFilter } : {
         // If receiving a notification about an activity we've seen before (e.g. it is canonically hosted here),
         // this will be true
         const originalIdsIncludingSameAs = [originalId, ...ensureArray(compacted[owlSameAs])]
-        const originalAlreadySaved = (await Promise.all(originalIdsIncludingSameAs.map(aid => activities.has(aid)))).some(Boolean)
+        const originalIdsHave = await Promise.all(originalIdsIncludingSameAs.map(aid => activities.has(aid)))
+        const originalAlreadySaved = originalIdsHave.some(Boolean)
         if (originalAlreadySaved) {
           // #TODO merge or something? Consider storing local ones and remote ones in different places
           debuglog('Inbox received activity already stored in activities store. Not overwriting internal one. But #TODO')
