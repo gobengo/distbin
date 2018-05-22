@@ -155,6 +155,26 @@ export function renderObject (activity: ASObject) {
   const tags = formatTags(activity)
   const activityUrl = ensureArray(activity.url)[0]
   const activityObject = isActivity(activity) && ensureArray(activity.object).filter((o:ASObject|string) => typeof o === 'object')[0]
+  const mainHtml = (() => {
+    try {
+      const maybeMarkdown = 
+        activity.content
+          ? activity.content
+        : activityObject && activityObject.content
+          ? activityObject.content
+        : activity.name || activity.url
+          ? `<a href="${activity.url}">${activity.url}</a>`
+        : activity.id
+          ? `<a href="${activity.id}">${activity.id}</a>`
+        : ''
+      const html = marked(maybeMarkdown)
+      const sanitized = sanitize(html);
+      return sanitized;
+    } catch (error) {
+      console.error("Error rendering activity object.", activity, error)
+      return `<p>distbin failed to render this</p>`
+    }
+  })()
   return `
     <article class="activity-item">
       <header>
@@ -167,20 +187,7 @@ export function renderObject (activity: ASObject) {
       ? `<h1>${activityObject.name}</h1>`
       : ''
 }
-      <main>${
-  sanitize(marked(
-    activity.content
-      ? activity.content
-      : activityObject
-        ? activityObject.content
-        : activity.name ||
-          activity.url
-          ? `<a href="${activity.url}">${activity.url}</a>`
-          : activity.id
-            ? `<a href="${activity.id}">${activity.id}</a>`
-            : ''
-  ))
-}</main>
+      <main>${mainHtml}</main>
 
       ${
   tags
