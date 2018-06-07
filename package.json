@@ -46,7 +46,8 @@
     "port": 8000
   },
   "scripts": {
-    "lint": "eslint --fix 'src/**/*.ts' 'test/**/*.ts' 'bin/**/*.ts'",
+    "lint": "tslint -c tslint.json 'src/**/*.ts' 'test/**/*.ts' 'bin/**/*.ts'",
+    "lint-fix": "tslint --fix -c tslint.json 'src/**/*.ts' 'test/**/*.ts' 'bin/**/*.ts'",
     "test": "ts-node --harmony test",
     "start": "node ./dist/bin/server",
     "start-dev": "tsc-watch --onSuccess 'npm start'",
