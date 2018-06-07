@@ -40,7 +40,7 @@ RUN npm install --ignore-scripts
 # Copy project directory.
 COPY . ./
 
-RUN npm run ts.build
+RUN npm run build
 
 # distbin will store data as files in this directory
 VOLUME /distbin-db
