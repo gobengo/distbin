@@ -6,7 +6,7 @@ const { sendRequest } = require('../src/util')
 import * as url from 'url'
 const activitypub = require('../src/activitypub')
 const assert = require('assert')
-import {Activity, HttpRequestResponder} from './types'
+import {Activity, HttpRequestResponder, LDObject} from './types'
 import {IncomingMessage, RequestOptions, Server, ServerResponse} from 'http'
 import { ASJsonLdProfileContentType } from '../src/activitystreams'
 
@@ -43,7 +43,7 @@ export const listen = function listen (server: Server, port = 0, hostname?: stri
 export const isProbablyAbsoluteUrl = require('../src/util').isProbablyAbsoluteUrl
 
 // post an activity to a distbin, and return its absolute url
-export const postActivity = async function postActivity (distbinListener: HttpRequestResponder, activity: Activity) {
+export const postActivity = async function postActivity (distbinListener: HttpRequestResponder, activity: LDObject<Activity>) {
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({

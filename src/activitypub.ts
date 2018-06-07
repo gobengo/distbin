@@ -259,9 +259,9 @@ const deliverActivity = async function (activity: Activity, target: string, { de
         accept: `${ASJsonLdProfileContentType}, text/html`
       }
     }))
-  } catch (e) {
-    logger.error("Error delivering activity to target. This is normal if the target doesnt speak great ActivityPub.", e)
-    throw new deliveryErrors.TargetRequestFailed(e.message)
+  } catch (error) {
+    logger.error(`Error delivering activity to target=${target}. This is normal if the target doesnt speak great ActivityPub.`, error)
+    throw new deliveryErrors.TargetRequestFailed(error.message)
   }
   logger.debug(`res ${targetProfileResponse.statusCode} inbox discovery for ${target}`)
 
@@ -427,7 +427,7 @@ async function actorInboxesFromBody (body: string, contentType: string): Promise
       return []
     }
   }))
-  logger.warn("Actor URLs", actorUrls)
+  logger.debug("Actor URLs", actorUrls)
   const actorInboxes = flatten(await Promise.all(actorUrls.map(async actorUrl => {
     try {
       const res = await fetch(actorUrl, {

@@ -7,7 +7,7 @@ import { readableToString } from "../src/util";
 import { linkToHref } from "../src/util";
 import { ensureArray, sendRequest } from "../src/util";
 import { inboxUrl } from "../src/activitypub";
-import { postActivity } from "./distbin";
+import { postActivity } from "./util";
 import { Activity, ASObject, DistbinActivity, Extendable, HttpRequestResponder,
   isActivity, JSONLD, LDObject, LDValue, LDValues } from "./types";
 import { isProbablyAbsoluteUrl } from "./util";

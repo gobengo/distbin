@@ -1,3 +1,8 @@
+
+import { createLogger } from '../src/logger'
+
+const logger = createLogger('test')
+
 // Run tests if this file is executed
 if (require.main === module) {
   Promise.all([
@@ -44,7 +49,7 @@ export async function run (tests: TestsMap) {
         // skip, doesn't match filter
           return
         }
-        // console.log('TEST: ', testName)
+        logger.debug('TEST: ', testName)
         let result
         try {
           result = runTest()

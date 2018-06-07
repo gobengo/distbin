@@ -309,7 +309,7 @@ tests['can submit an Activity to the Outbox'] = async function () {
   req.write(JSON.stringify({
     '@context': 'https://www.w3.org/ns/activitypub',
     'type': 'Like',
-    'actor': 'https://dustycloud.org/chris/', // #TODO fix that there was a missing comma here in spec
+    'actor': 'https://bengo.is/proxy/dustycloud.org/chris/', // #TODO fix that there was a missing comma here in spec
     'name': "Chris liked 'Minimal ActivityPub update client'",
     'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub'
     // 'to': ['https://dustycloud.org/followers', 'https://rhiaro.co.uk/followers/'],
