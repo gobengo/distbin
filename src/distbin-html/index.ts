@@ -10,7 +10,7 @@ import {IncomingMessage, ServerResponse} from "http"
 import { createLogger } from "../logger"
 const logger = createLogger(__filename)
 
-exports.createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) => {
+export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) => {
   const routes = new Map<RoutePattern, RouteResponderFactory>([
     [new RegExp("^/$"), () => home.createHandler({ apiUrl, externalUrl })],
     [new RegExp("^/about$"), () => about.createHandler({ externalUrl })],
