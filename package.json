@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "^8.0.46",
+    "@types/node-fetch": "^2.1.1",
     "copyfiles": "^1.2.0",
     "eslint": "^3.7.1",
     "eslint-config-standard": "^6.2.0",
@@ -37,6 +38,8 @@
     "eslint-plugin-promise": "^3.0.0",
     "eslint-plugin-standard": "^2.0.1",
     "ts-node": "^3.3.0",
+    "tsc-watch": "^1.0.22",
+    "tslint": "^5.10.0",
     "typescript-eslint-parser": "^8.0.1"
   },
   "config": {
@@ -46,9 +49,10 @@
     "lint": "eslint --fix 'src/**/*.ts' 'test/**/*.ts' 'bin/**/*.ts'",
     "test": "ts-node --harmony test",
     "start": "node ./dist/bin/server",
-    "start-dev": "ts-node --harmony bin/server",
+    "start-dev": "tsc-watch --onSuccess 'npm start'",
     "tsc": "tsc",
-    "ts.build": "tsc && copyfiles './src/**/*.json' dist/"
+    "build": "tsc && npm run build.copyfiles",
+    "build.copyfiles": "copyfiles './src/**/*.json' dist/"
   },
   "author": "",
   "license": "ISC"

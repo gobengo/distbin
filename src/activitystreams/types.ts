@@ -1,41 +1,41 @@
-type ISO8601 = string
-type xsdAnyUri = string
+type ISO8601 = string;
+type xsdAnyUri = string;
 
-type OneOrMore<T> = T | T[]
+type OneOrMore<T> = T | T[];
 
 // ASLinked Data
-type LDIdentifier = xsdAnyUri
-export type LDValue<T> = (LDIdentifier | T)
-export type LDValues<T> = T | T[]
+type LDIdentifier = xsdAnyUri;
+export type LDValue<T> = (LDIdentifier | T);
+export type LDValues<T> = T | T[];
 export type LDObject<T> = {
     [P in keyof T]?: LDValues<T[P]>;
-}
+};
 type JSONLDContext = OneOrMore<string | {
-    '@vocab'?: string
-    '@language'?: string
-    [key:string]: string | {[key:string]: string}
-}>
+    "@vocab"?: string
+    "@language"?: string
+    [key: string]: string | {[key: string]: string},
+}>;
 export class JSONLD {
-  '@id': string
+  public "@id": string;
 }
 
 class ASBase {
-  '@context'?: JSONLDContext
+  public "@context"?: JSONLDContext;
 }
 
 // @TODO (bengo): enumerate known values?
-type LinkRelation = string
+type LinkRelation = string;
 
 export class ASLink {
-  type: ASObjectType<'Link'>
-  href: string
-  mediaType?: string
-  rel?: LinkRelation
+  public type: ASObjectType<"Link">;
+  public href: string;
+  public mediaType?: string;
+  public rel?: LinkRelation;
 }
 export const Link = ASLink
 
 export const isASLink = (obj: any): obj is ASLink => {
-  return obj.type === 'Link'
+  return obj.type === "Link";
 }
 
 // @TODO (bengo)
@@ -73,23 +73,23 @@ export class ASObject extends ASBase {
 }
 
 export const isASObject = (obj: any): obj is ASObject => {
-  return typeof obj === 'object'
+  return typeof obj === "object"
 }
 
 class ASImage extends ASObject {}
 
 // https://www.w3.org/TR/activitystreams-vocabulary/#activity-types
 export const activitySubtypes = [
-  'Accept', 'Add', 'Announce', 'Arrive', 'Block', 'Create', 'Delete',
-  'Dislike', 'Flag', 'Follow', 'Ignore', 'Invite', 'Join', 'Leave', 'Like',
-  'Listen', 'Move', 'Offer', 'Question', 'Reject', 'Read', 'Remove',
-  'TentativeReject', 'TentativeAccept', 'Travel', 'Undo', 'Update', 'View'
+  "Accept", "Add", "Announce", "Arrive", "Block", "Create", "Delete",
+  "Dislike", "Flag", "Follow", "Ignore", "Invite", "Join", "Leave", "Like",
+  "Listen", "Move", "Offer", "Question", "Reject", "Read", "Remove",
+  "TentativeReject", "TentativeAccept", "Travel", "Undo", "Update", "View"
 ]
 const ActivitySubtypes = strEnum(activitySubtypes)
 type ActivitySubtype = keyof typeof ActivitySubtypes
 
 export class Activity extends ASObject {
-  type: ASObjectType<'Activity' | ActivitySubtype>
+  type: ASObjectType<"Activity" | ActivitySubtype>
   actor?: ASValue
   object?: LDValue<ASObject>
   target?: ASValue
@@ -101,7 +101,7 @@ export class Activity extends ASObject {
 }
 
 export const isActivity = (activity: any): activity is Activity => {
-  if (typeof activity === 'object') {
+  if (typeof activity === "object") {
     return activitySubtypes.includes(activity.type)
   }
   return false
@@ -113,7 +113,7 @@ export class Collection<T> extends ASObject {
 }
 
 export class Note extends ASObject {
-  type: ASObjectType<'Note'>
+  type: ASObjectType<"Note">
 }
 
 export class Place extends ASObject {
@@ -122,7 +122,7 @@ export class Place extends ASObject {
   longitude?: number
   altitude?: number
   radius?: number
-  units?: 'cm' | 'feet' | 'inches' | 'km' | 'm' | 'miles' | xsdAnyUri
+  units?: "cm" | "feet" | "inches" | "km" | "m" | "miles" | xsdAnyUri
 }
 
 function strEnum<T extends string> (o: Array<T>): {[K in T]: K} {

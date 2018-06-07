@@ -7,7 +7,7 @@ export const createLogger = function getLogger (name: string) {
   const logger = new (winston.Logger)({
     transports: [
       new (winston.transports.Console)({
-        label: [defaultName, name].filter(Boolean).join('.')
+        label: [defaultName, name].filter(Boolean).join('.'),
       })
     ]
   })

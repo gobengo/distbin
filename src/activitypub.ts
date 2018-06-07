@@ -15,6 +15,7 @@ import {Activity, ASObject, Extendable, JSONLD, LDValue, isActivity} from './typ
 import { get } from 'lodash'
 
 import { createLogger } from '../src/logger'
+import fetch from 'node-fetch';
 const logger = createLogger('activitypub')
 
 exports.publicCollectionId = 'https://www.w3.org/ns/activitystreams#Public'
@@ -60,7 +61,7 @@ export const objectTargets = async (o:ASObject, recursionLimit: number, fetch : 
                 })
       ))
     : []
-  // debuglog('objectTargets', { audience, recursedAudience, recursionLimit, activity })
+  // logger.debug('objectTargets', { audience, recursedAudience, recursionLimit, activity })
   const targets = [...audience, ...recursedAudience]
   const deduped = Array.from(new Set(targets))
   return deduped
@@ -102,7 +103,7 @@ export const objectTargetsNoRecurse = async (
       }
     })))
     if (res.statusCode !== 200) {
-      console.warn('got non-200 response when fetching ${obj} as part of activityAudience()')
+      logger.warn('got non-200 response when fetching ${obj} as part of activityAudience()')
       return
     }
     const body = await readableToString(res)
@@ -113,11 +114,11 @@ export const objectTargetsNoRecurse = async (
         try {
           return JSON.parse(body)
         } catch (error) {
-          console.error("Couldn't parse fetched response body as JSON when determining activity audience", {body}, error)
+          logger.error("Couldn't parse fetched response body as JSON when determining activity audience", {body}, error)
           return
         }
       default:
-        console.warn(`Unexpected contentType=${resContentType} of response when fetching ${audienceUrl} to determine activityAudience`)
+        logger.warn(`Unexpected contentType=${resContentType} of response when fetching ${audienceUrl} to determine activityAudience`)
         return
     }
   }))).filter(Boolean)
@@ -204,13 +205,13 @@ const fetchProfile = exports.fetchProfile = async (target: string) => {
       accept: `${ASJsonLdProfileContentType},text/html`
     }
   }))
-  debuglog('fetchProfile ' + target)
+  logger.debug('fetchProfile ' + target)
   try {
     var targetProfileResponse = await sendRequest(targetProfileRequest)
   } catch (e) {
     throw new deliveryErrors.TargetRequestFailed(e.message)
   }
-  debuglog(`res ${targetProfileResponse.statusCode} fetchProfile for ${target}`)
+  logger.debug(`res ${targetProfileResponse.statusCode} fetchProfile for ${target}`)
 
   switch (targetProfileResponse.statusCode) {
     case 200:
@@ -251,18 +252,18 @@ async function outboxFromResponse (res: IncomingMessage) {
 // deliver an activity to a target
 const deliverActivity = async function (activity: Activity, target: string, { deliverToLocalhost } : { deliverToLocalhost: Boolean }) {
   // discover inbox
-  debuglog('req inbox discovery ' + target)
+  logger.debug('req inbox discovery ' + target)
   try {
     var targetProfileResponse = await followRedirects(Object.assign(url.parse(target), {
       headers: {
         accept: `${ASJsonLdProfileContentType}, text/html`
       }
     }))
-  } catch (e) {
-    logger.error("Error delivering activity to target. This is normal if the target doesnt speak great ActivityPub.", e)
-    throw new deliveryErrors.TargetRequestFailed(e.message)
+  } catch (error) {
+    logger.error(`Error delivering activity to target=${target}. This is normal if the target doesnt speak great ActivityPub.`, error)
+    throw new deliveryErrors.TargetRequestFailed(error.message)
   }
-  debuglog(`res ${targetProfileResponse.statusCode} inbox discovery for ${target}`)
+  logger.debug(`res ${targetProfileResponse.statusCode} inbox discovery for ${target}`)
 
   switch (targetProfileResponse.statusCode) {
     case 200:
@@ -272,90 +273,13 @@ const deliverActivity = async function (activity: Activity, target: string, { de
       throw new deliveryErrors.TargetRequestFailed(`Got unexpected status code ${targetProfileResponse.statusCode} when requesting ${target} to determine inbox URL`)
   }
 
-  debuglog(`deliverActivity to target ${target}`)
+  logger.debug(`deliverActivity to target ${target}`)
   const body = await readableToString(targetProfileResponse)
   const contentType = ensureArray(targetProfileResponse.headers['content-type']).map((contentTypeValue: string) => contentTypeValue.split(';')[0]).filter(Boolean)[0]  
   let inbox: string = inboxFromHeaders(targetProfileResponse) || await inboxFromBody(body, contentType)
-
-  function inboxFromHeaders (res: IncomingMessage) {
-    let inbox
-    // look in res Link header
-    const linkHeaders = ensureArray(res.headers.link)
-    const inboxLinks = linkHeaders
-      .map(parseLinkHeader)
-      .filter(Boolean)
-      .map((parsed: any) => {
-        return parsed['http://www.w3.org/ns/ldp#inbox']
-      })
-      .filter(Boolean)
-    let inboxLink
-    if (Array.isArray(inboxLinks)) {
-      if (inboxLinks.length > 1) {
-        console.warn('More than 1 LDN inbox found, but only using 1 for now', inboxLinks)
-        inboxLink = inboxLinks[0]
-      }
-    } else {
-      inboxLink = inboxLinks
-    }
-
-    if (inboxLink) {
-      inbox = url.resolve(target, inboxLink.url)
-    }
-    return inbox
+  if (inbox) {
+    inbox = url.resolve(target, inbox)
   }
-
-  async function inboxFromBody (body: string, contentType: string) {
-    let inboxes
-    debuglog(`inboxFromBody got response contentType=${contentType}`)
-    switch (contentType) {
-      case 'application/json':
-        try {
-          var targetProfile = JSON.parse(body)
-        } catch (e) {
-          throw new deliveryErrors.TargetParseFailed(e.message)
-        }
-        inboxes = ensureArray(targetProfile.inbox).map(inbox => url.resolve(target, inbox))
-        break
-      case 'text/html':
-        let ld: Extendable<JSONLD>[] = await rdfaToJsonLd(body)
-        let targetSubject = ld.find((x) => x['@id'] === 'http://localhost/')
-        if ( ! targetSubject) {
-          debuglog('no targetSubject so no ldb:inbox after checking text/html for ld. got ld', ld)
-          inboxes = []
-        } else {
-          inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox'].map((i: JSONLD) => i['@id'])          
-        }
-        break;
-      case 'application/ld+json':
-        const obj = JSON.parse(body)
-        const compacted = await jsonld.compact(obj, {
-          '@context': [
-            'https://www.w3.org/ns/activitystreams',
-            {
-              'distbin:inbox': {
-                '@id': 'ldp:inbox',
-                '@container': '@set'
-              }
-            }
-          ]
-        })
-        const compactedInbox = (compacted['distbin:inbox'] || []).map((o: {id: string}) => typeof o === 'object' ? o.id : o)
-        inboxes = compactedInbox.length ? compactedInbox : ensureArray(obj.inbox)
-        break;
-      default:
-        throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
-    }
-    if (!inboxes || !inboxes.length) {
-      debuglog(`Could not determine ActivityPub inbox from ${contentType} response`)
-      return
-    }
-    if (inboxes.length > 1) {
-      console.warn(`Using only first inbox, but there were ${inboxes.length}: ${inboxes}`)
-    }
-    const inbox: string = inboxes[0]
-    return inbox
-  }
-
   if (!inbox) throw new deliveryErrors.InboxDiscoveryFailed('No .inbox found for target ' + target)
 
   // post to inbox
@@ -368,7 +292,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
 
   const deliveryRequest = request(Object.assign(parsedInboxUrl, {
     headers: {
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
+      'content-type': ASJsonLdProfileContentType
     },
     method: 'post'
   }))
@@ -381,7 +305,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
     throw new deliveryErrors.DeliveryRequestFailed(e.message)
   }
   const deliveryResponseBody = await readableToString(deliveryResponse)
-  debuglog(`ldn notify res ${deliveryResponse.statusCode} ${inbox} ${deliveryResponseBody.slice(0, 100)}`)
+  logger.debug(`ldn notify res ${deliveryResponse.statusCode} ${inbox} ${deliveryResponseBody.slice(0, 100)}`)
   if (deliveryResponse.statusCode >= 400 && deliveryResponse.statusCode <= 599) {
     // client or server error
     throw new deliveryErrors.DeliveryErrorResponse(`${deliveryResponse.statusCode} response from ${inbox}\nResponse Body:\n${deliveryResponseBody}`)
@@ -398,11 +322,11 @@ exports.targetAndDeliver = async function (activity: Activity,
   targets = targets ||  (await objectTargets(activity, 0))
     .map(t => {
       const url = getASId(t)
-      if ( ! url) debuglog('Cant determine URL to deliver to for target, so skipping', t)
+      if ( ! url) logger.debug('Cant determine URL to deliver to for target, so skipping', t)
       return url
     })
     .filter(Boolean)
-  debuglog('targetAndDeliver targets', targets)
+  logger.debug('targetAndDeliver targets', targets)
   let deliveries: string[] = []
   let failures: Error[] = []
   await Promise.all(
@@ -417,10 +341,183 @@ exports.targetAndDeliver = async function (activity: Activity,
           .catch(e => failures.push(e))
       })
   )
-  debuglog('finished targetAndDeliver', { failures, deliveries })
+  logger.debug('finished targetAndDeliver', { failures, deliveries })
   if (failures.length) {
-    debuglog('failures delivering ' + failures.map(e => e.stack))
+    logger.debug('failures delivering ' + failures.map(e => e.stack))
     throw new deliveryErrors.SomeDeliveriesFailed('SomeDeliveriesFailed', failures, deliveries)
   }
   return deliveries
+}
+
+export const inboxUrl = async (subjectUrl: string) => {
+  const subjectResponse = await fetch(subjectUrl)
+  const subject = await subjectResponse.json()
+  const inbox = subject.inbox
+  if ( ! inbox) return inbox
+  const inboxUrl = url.resolve(subjectUrl, inbox)
+  return inboxUrl
+}
+
+
+function inboxFromHeaders (res: IncomingMessage) {
+  let inbox
+  // look in res Link header
+  const linkHeaders = ensureArray(res.headers.link)
+  const inboxLinks = linkHeaders
+    .map(parseLinkHeader)
+    .filter(Boolean)
+    .map((parsed: any) => {
+      return parsed['http://www.w3.org/ns/ldp#inbox']
+    })
+    .filter(Boolean)
+  let inboxLink
+  if (Array.isArray(inboxLinks)) {
+    if (inboxLinks.length > 1) {
+      logger.warn('More than 1 LDN inbox found, but only using 1 for now', inboxLinks)
+      inboxLink = inboxLinks[0]
+    }
+  } else {
+    inboxLink = inboxLinks
+  }
+  return inbox
+}
+
+/**
+ * Determine the ActivityPub Inbox of a fetched resource
+ * @param body - The fetched resource
+ * @param contentType - HTTP Content Type header of fetched resource
+ * 
+ * This will look for the following kinds of inboxes, and return the first one it finds:
+ * * a 'direct' inbox
+ * * an actor, which is a separate resource, that has an inbox for activities related to objects that actor is related to
+ * 
+ * @TODO (bengo): Allow returning all inboxes we can find
+ */
+async function inboxFromBody (body: string, contentType: string) {
+  try {
+    const directInbox = await directInboxFromBody(body, contentType)
+    if (directInbox) return directInbox
+  } catch (error) {
+    logger.debug("Error looking for directInbox (Moving on).", error)
+  }
+  const actorInboxes = await actorInboxesFromBody(body, contentType);
+  if (actorInboxes.length > 1) {
+    logger.warn("Got more than one actorInboxes. Only using first.", actorInboxes)
+  }
+  if (actorInboxes.length) {
+    return actorInboxes[0]
+  }
+}
+
+
+
+/**
+ * Given a resource as a string, determine the inboxes for any actors of the resource
+ */
+async function actorInboxesFromBody (body: string, contentType: string): Promise<Array<string>> {
+  const bodyData = bodyToJsonLd(body, contentType)
+  const compacted = await jsonld.compact(bodyData, {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+  })
+  const actorUrls = flatten(ensureArray(bodyData.actor).filter(Boolean).map(actor => {
+    if (typeof actor === 'string') return [actor]
+    else if (actor.url) return ensureArray(actor.url)
+    else {
+      logger.debug("Could not determine url from actor", { actor })
+      return []
+    }
+  }))
+  logger.debug("Actor URLs", actorUrls)
+  const actorInboxes = flatten(await Promise.all(actorUrls.map(async actorUrl => {
+    try {
+      const res = await fetch(actorUrl, {
+        headers: {
+          accept: ASJsonLdProfileContentType
+        }
+      });
+      const actor = await res.json();
+      const inbox = actor.inbox
+      logger.debug('Actor inbox', inbox)
+      return ensureArray(inbox).map(inboxUrl => url.resolve(actorUrl, inboxUrl))
+    } catch (error) {
+      logger.warn("Error fetching actor to lookup inbox", error)
+    }
+  })))
+  return actorInboxes
+}
+
+const UnexpectedContentTypeError = makeErrorClass('UnexpectedContentTypeError')
+
+/**
+ * Given a resource as a string + contentType, return a representation of it's linked data as a JSON-LD Object
+ */
+function bodyToJsonLd (body: string, contentType: string) {
+  logger.debug('bodyToJsonLd', { contentType })
+  switch (contentType) {
+    case "application/json":
+    case 'application/ld+json':
+    case 'application/activity+json':
+      const data = JSON.parse(body)
+      return data
+    default:
+      logger.warn("Unable to bodyToJsonLd due to unexpected contentType", { contentType })
+      throw new UnexpectedContentTypeError(`Dont know how to parse contentType=${contentType}`)
+  }
+}
+
+/**
+ * Given a resource as a string, return it's ActivityPub inbox URL (if any)
+ */
+async function directInboxFromBody (body: string, contentType: string) {
+  let inboxes
+  logger.debug(`inboxFromBody got response contentType=${contentType}`)
+  switch (contentType) {
+    case 'application/json':
+      try {
+        var object = JSON.parse(body)
+      } catch (e) {
+        throw new deliveryErrors.TargetParseFailed(e.message)
+      }
+      logger.debug("object", object)
+      inboxes = ensureArray(object.inbox).filter(Boolean)
+      break
+    case 'text/html':
+      let ld: Extendable<JSONLD>[] = await rdfaToJsonLd(body)
+      let targetSubject = ld.find((x) => x['@id'] === 'http://localhost/')
+      if ( ! targetSubject) {
+        logger.debug('no targetSubject so no ldb:inbox after checking text/html for ld. got ld', ld)
+        inboxes = []
+      } else {
+        inboxes = targetSubject['http://www.w3.org/ns/ldp#inbox'].map((i: JSONLD) => i['@id'])          
+      }
+      break;
+    case 'application/ld+json':
+    case 'application/activity+json':
+      const obj = JSON.parse(body)
+      const compacted = await jsonld.compact(obj, {
+        '@context': [
+          'https://www.w3.org/ns/activitystreams',
+          {
+            'distbin:inbox': {
+              '@id': 'ldp:inbox',
+              '@container': '@set'
+            }
+          }
+        ]
+      })
+      const compactedInbox = (compacted['distbin:inbox'] || []).map((o: {id: string}) => typeof o === 'object' ? o.id : o)
+      inboxes = compactedInbox.length ? compactedInbox : ensureArray(obj.inbox)
+      break;
+    default:
+      throw new Error(`Don't know how to parse ${contentType} to determine inbox URL`)
+  }
+  if (!inboxes || !inboxes.length) {
+    logger.debug(`Could not determine ActivityPub inbox from ${contentType} response`)
+    return
+  }
+  if (inboxes.length > 1) {
+    logger.warn(`Using only first inbox, but there were ${inboxes.length}: ${inboxes}`)
+  }
+  const inbox: string = inboxes[0]
+  return inbox
 }

@@ -8,7 +8,7 @@ const http = require('http')
 const { isProbablyAbsoluteUrl } = require('./util')
 const { listen } = require('./util')
 const { readableToString } = require('../src/util')
-const { requestForListener } = require('./util')
+const { requestForListener, postActivity } = require('./util')
 const { linkToHref } = require('../src/util')
 const { ensureArray, sendRequest } = require('../src/util')
 import * as url from 'url'
@@ -406,23 +406,6 @@ tests['GET {activity.id}.json always sends json response, even if html if prefer
   assert.equal(activityResponse.statusCode, 200)
   const fetchedActivity = JSON.parse(await readableToString(activityResponse))
   assert.ok(fetchedActivity)
-}
-
-// post an activity to a distbin, and return its absolute url
-async function postActivity (distbinListener: HttpRequestResponder, activity: LDObject<ASObject>) {
-  const distbinUrl = await listen(http.createServer(distbinListener))
-  const req = http.request(Object.assign(url.parse(distbinUrl), {
-    headers: activitypub.clientHeaders({
-      'content-type': ASJsonLdProfileContentType
-    }),
-    method: 'post',
-    path: '/activitypub/outbox'
-  }))
-  req.write(JSON.stringify(activity))
-  const res = await sendRequest(req)
-  assert.equal(res.statusCode, 201)
-  const activityUrl = url.resolve(distbinUrl, res.headers.location)
-  return activityUrl
 }
 
 if (require.main === module) {
