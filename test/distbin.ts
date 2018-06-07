@@ -409,7 +409,7 @@ tests['GET {activity.id}.json always sends json response, even if html if prefer
 }
 
 // post an activity to a distbin, and return its absolute url
-async function postActivity (distbinListener: HttpRequestResponder, activity: LDObject<ASObject>) {
+export async function postActivity (distbinListener: HttpRequestResponder, activity: LDObject<ASObject>) {
   const distbinUrl = await listen(http.createServer(distbinListener))
   const req = http.request(Object.assign(url.parse(distbinUrl), {
     headers: activitypub.clientHeaders({

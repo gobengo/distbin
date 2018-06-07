@@ -4,6 +4,7 @@ if (require.main === module) {
     require('./ldn'),
     require('./activitypub'),
     require('./distbin'),
+    require('./federation'),
     require('./filemap'),
     require('./distbin-html'),
     require('./http-utils')
