@@ -24,7 +24,7 @@ export const publicCollectionId = "https://www.w3.org/ns/activitystreams#Public"
 // as required for https://w3c.github.io/activitypub/#object-without-create
 // #TODO - What if it's an extension activity that describes itself via
 //   rdfs as a subtype of Activity?
-exports.as2ObjectIsActivity = (obj: ASObject) => {
+export const as2ObjectIsActivity = (obj: ASObject) => {
   return ensureArray(obj.type).some((t) => activitySubtypes.includes(t))
 }
 
@@ -177,7 +177,7 @@ export const clientAddressedActivity = async (
 }
 
 // Create a headers map for http.request() incl. any specced requirements for ActivityPub Client requests
-exports.clientHeaders = (headers = {}) => {
+export const clientHeaders = (headers = {}) => {
   const requirements = {
     // The client MUST specify an Accept header with the
     // application/ld+json; profile="https://www.w3.org/ns/activitystreams" media type
@@ -347,9 +347,11 @@ const deliverActivity = async (
 
 // Given an activity, determine its targets and deliver to the inbox of each
 // target
-exports.targetAndDeliver = async (activity: Activity,
-                                  targets?: string[],
-                                  deliverToLocalhost: boolean = true) => {
+export const targetAndDeliver = async (
+  activity: Activity,
+  targets?: string[],
+  deliverToLocalhost: boolean = true,
+) => {
   targets = targets ||  (await objectTargets(activity, 0))
     .map((t) => {
       const targetUrl = getASId(t)

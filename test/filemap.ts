@@ -1,14 +1,14 @@
 import * as assert from "assert"
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
+import { JSONFileMap, JSONFileMapAsync } from "../src/filemap"
+import { denodeify } from "../src/util"
 import { testCli } from "./"
-const { denodeify } = require("../src/util")
-const fs = require("fs")
-const { JSONFileMap, JSONFileMapAsync } = require("../src/filemap")
-const path = require("path")
-const os = require("os")
 
 const tests = module.exports
 
-tests["has() works"] = withdir(async function(dir: string) {
+tests["has() works"] = withdir(async (dir: string) => {
   const filemap = new JSONFileMap(dir)
   filemap.set("key", "value")
   const url = "http://localhost:8000/activities/a79926ce-72da-4b69-9b4b-97fbb0509f2b"
@@ -17,7 +17,7 @@ tests["has() works"] = withdir(async function(dir: string) {
   assert.equal(await filemap.has(url), true)
 })
 
-tests["JSONFileMap can load old files"] = withdir(async function(dir: string) {
+tests["JSONFileMap can load old files"] = withdir(async (dir: string) => {
   const oldKey = "CF3F8888-30DD-42B6-9FF8-472292502FC1"
   const oldPath = path.join(dir, oldKey)
   const value = { id: oldKey, old: true }
@@ -33,7 +33,7 @@ tests["JSONFileMap can load old files"] = withdir(async function(dir: string) {
   assert.equal(fs.readdirSync(dir).length, 1)
 })
 
-tests["JSONFileMapAsync can load old files"] = withdir(async function(dir: string) {
+tests["JSONFileMapAsync can load old files"] = withdir(async (dir: string) => {
   const oldKey = "758F0F18-FD22-4F9A-BD2B-17F344F85ED2"
   const oldPath = path.join(dir, oldKey)
   const value = { id: oldKey, old: true }
@@ -60,7 +60,7 @@ tests["saves keys as files in dir, and values as file contents"] = withdir((dir:
 
 const timer = (ms: number) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 
-tests["iterates in insertion order (helped by fs created timestamp)"] = withdir(async function(dir: string) {
+tests["iterates in insertion order (helped by fs created timestamp)"] = withdir(async (dir: string) => {
   const filemap = new JSONFileMap(dir)
   const insertionOrder = [1, 2, 10].map(String)
   for (const k of insertionOrder) {
@@ -76,8 +76,8 @@ tests["iterates in insertion order (helped by fs created timestamp)"] = withdir(
 
 // create a temporary directory and pass its path to the provided function
 // no matter what happens, remove the folder
-function withdir(doWork: Function) {
-  return async function() {
+function withdir(doWork: (dir: string) => any) {
+  return async () => {
     const dir = await denodeify(fs.mkdtemp)(path.join(os.tmpdir(), "distbin-test-withdir-"))
     try {
       return await Promise.resolve(doWork(dir))
@@ -90,7 +90,7 @@ function withdir(doWork: Function) {
 // rm -rf
 function deleteFolderRecursive(dir: string) {
   if (fs.existsSync(dir)) {
-    fs.readdirSync(dir).forEach(function(file: string) {
+    fs.readdirSync(dir).forEach((file: string) => {
       const curPath = path.join(dir, file)
       if (fs.lstatSync(curPath).isDirectory()) { // recurse
         deleteFolderRecursive(curPath)

@@ -22,7 +22,7 @@ const filenameEncoder = {
 // TODO: Write tests
 
 // Like a Map, but keys are files in a dir, and object values are written as file contents
-exports.JSONFileMap = class JSONFileMap<V> extends Map<string, V> {
+export const JSONFileMap = class <V> extends Map<string, V> {
   constructor(private dir: string) {
     super()
   }

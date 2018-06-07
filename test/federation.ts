@@ -7,10 +7,10 @@ import { ASJsonLdProfileContentType } from "../src/activitystreams";
 import { linkToHref } from "../src/util";
 import { ensureArray, sendRequest } from "../src/util";
 import { readableToString } from "../src/util";
+import { isProbablyAbsoluteUrl } from "../src/util";
 import { Activity, ASObject, DistbinActivity, Extendable, HttpRequestResponder,
   isActivity, JSONLD, LDObject, LDValue, LDValues } from "./types";
 import { postActivity } from "./util";
-import { isProbablyAbsoluteUrl } from "./util";
 import { listen } from "./util";
 import { requestForListener } from "./util";
 

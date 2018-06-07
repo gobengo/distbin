@@ -45,7 +45,7 @@ interface INaturalLanguageValue {
     [key: string]: string
 }
 
-type ASObjectType<T> = T | [T]
+type ASObjectType<T> = T | T[]
 export type ASValue = string | ASObject | ASLink
 // W3C ActivityStreams 2.0
 export class ASObject extends ASBase {

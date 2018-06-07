@@ -1,25 +1,22 @@
 // tests for distbin-specific stuff (arbitrary, non-protocol things)
 
-const activitypub = require("../src/activitypub")
-const assert = require("assert")
-import { testCli } from "."
-import distbin from "../"
-const http = require("http")
-const { isProbablyAbsoluteUrl } = require("./util")
-const { listen } = require("./util")
-const { readableToString } = require("../src/util")
-const { requestForListener, postActivity } = require("./util")
-const { linkToHref } = require("../src/util")
-const { ensureArray, sendRequest } = require("../src/util")
+import * as assert from "assert"
+import * as http from "http"
 import { get } from "lodash"
 import * as url from "url"
+import { testCli } from "."
+import distbin from "../"
 import { discoverOutbox } from "../src/activitypub"
+import * as activitypub from "../src/activitypub"
 import { ASJsonLdProfileContentType } from "../src/activitystreams"
-import { Activity, ASObject, DistbinActivity, Extendable, HttpRequestResponder, isActivity, JSONLD, LDObject, LDValue, LDValues } from "./types"
+import { Activity, ASObject, DistbinActivity, Extendable, HttpRequestResponder, isActivity, JSONLD,
+  LDObject, LDValue, LDValues } from "../src/types"
+import { ensureArray, first, isProbablyAbsoluteUrl, linkToHref, readableToString, sendRequest } from "../src/util"
+import { listen, postActivity, requestForListener } from "./util"
 
 const tests = module.exports
 
-tests.discoverOutbox = async function() {
+tests.discoverOutbox = async () => {
   const distbinUrl = await listen(http.createServer(distbin()))
   const outbox = await discoverOutbox(distbinUrl)
   assert.equal(outbox, `${distbinUrl}/activitypub/outbox`)
@@ -33,12 +30,12 @@ tests["can create a distbin"] = () => {
   distbin()
 }
 
-tests["can send http requests to a distbin.Server"] = async function() {
+tests["can send http requests to a distbin.Server"] = async () => {
   const res = await sendRequest(await requestForListener(distbin()))
   assert.equal(res.statusCode, 200)
 }
 
-tests["/ route can be fetched as JSONLD and includes pointers to things like outbox"] = async function() {
+tests["/ route can be fetched as JSONLD and includes pointers to things like outbox"] = async () => {
   const res = await sendRequest(await requestForListener(distbin(), {
     headers: {
       accept: "application/ld+json",
@@ -53,12 +50,12 @@ tests["/ route can be fetched as JSONLD and includes pointers to things like out
   assert(Object.keys(rootResource).includes("inbox"), "/ points to inbox")
 }
 
-tests["can fetch /recent to see what's been going on"] = async function() {
+tests["can fetch /recent to see what's been going on"] = async () => {
   const res = await sendRequest(await requestForListener(distbin(), {
-    path: "/recent",
     headers: {
       accept: "application/ld+json",
     },
+    path: "/recent",
   }))
   assert.equal(res.statusCode, 200)
   const resBody = await readableToString(res)
@@ -67,7 +64,7 @@ tests["can fetch /recent to see what's been going on"] = async function() {
   assert(Array.isArray(recentCollection.items), ".items is an Array")
 }
 
-tests["can page through /public collection.current"] = async function() {
+tests["can page through /public collection.current"] = async () => {
   const d = distbin()
   const toCreate = [
     { name: "first!" },
@@ -78,8 +75,8 @@ tests["can page through /public collection.current"] = async function() {
     cc: ["https://www.w3.org/ns/activitystreams#Public"],
   }))
   const created: string[] = []
-  for (let i = 0; i < toCreate.length; i++) {
-    created.push(await postActivity(d, toCreate[i]))
+  for (const a of toCreate) {
+    created.push(await postActivity(d, a))
   }
   // const createdFull = await Promise.all(created.map(async function (url) {
   //   return JSON.parse(await readableToString(await sendRequest(http.request(url))))
@@ -88,11 +85,11 @@ tests["can page through /public collection.current"] = async function() {
   assert.equal(created.length, 4)
   const collectionUrl = "/activitypub/public"
   const collectionRes = await sendRequest(await requestForListener(d, {
-    path: collectionUrl,
     headers: {
-      accept: "application/ld+json",
       Prefer: 'return=representation; max-member-count="1"',
+      accept: "application/ld+json",
     },
+    path: collectionUrl,
   }))
   const collection = JSON.parse(await readableToString(collectionRes))
   assert.equal(collection.type, "Collection")
@@ -108,12 +105,12 @@ tests["can page through /public collection.current"] = async function() {
   const page1Url = url.resolve(collectionUrl, linkToHref(collection.current))
   // page 1
   const page1Res = await sendRequest(await requestForListener(d, {
-    path: page1Url,
     headers: {
-      accept: "application/ld+json",
       // NOTE! getting 2 this time
       Prefer: 'return=representation; max-member-count="1"',
+      accept: "application/ld+json",
     },
+    path: page1Url,
   }))
   assert.equal(page1Res.statusCode, 200)
   const page1 = JSON.parse(await readableToString(page1Res))
@@ -125,12 +122,12 @@ tests["can page through /public collection.current"] = async function() {
   // page 2 (get 2 items, not 1)
   const page2Url = url.resolve(page1Url, page1.next)
   const page2Res = await sendRequest(await requestForListener(d, {
-    path: page2Url,
     headers: {
-      accept: "application/ld+json",
       // NOTE! getting 2 this time
       Prefer: 'return=representation; max-member-count="2"',
+      accept: "application/ld+json",
     },
+    path: page2Url,
   }))
   assert.equal(page2Res.statusCode, 200)
   const page2 = JSON.parse(await readableToString(page2Res))
@@ -152,22 +149,22 @@ tests["can page through /public collection.current"] = async function() {
   }
   created.push(await postActivity(d, fifth))
   const page2AfterFifthRes = await sendRequest(await requestForListener(d, {
-    path: page2Url,
     headers: {
-      accept: "application/ld+json",
       Prefer: 'return=representation; max-member-count="2"',
+      accept: "application/ld+json",
     },
+    path: page2Url,
   }))
   const page2AfterFifth = JSON.parse(await readableToString(page2AfterFifthRes))
   assert.equal(page2AfterFifth.startIndex, 2)
   // page 3
   const page3Url = url.resolve(page2Url, page2.next)
   const page3Res = await sendRequest(await requestForListener(d, {
-    path: page3Url,
     headers: {
-      accept: "application/ld+json",
       Prefer: 'return=representation; max-member-count="2"',
+      accept: "application/ld+json",
     },
+    path: page3Url,
   }))
   assert.equal(page3Res.statusCode, 200)
   const page3 = JSON.parse(await readableToString(page3Res))
@@ -183,11 +180,11 @@ tests["can page through /public collection.current"] = async function() {
   if (page3.next) {
     const page4Url = url.resolve(page3Url, page3.next)
     const page4Res = await sendRequest(await requestForListener(d, {
-      path: page4Url,
       headers: {
-        accept: "application/ld+json",
         Prefer: 'return=representation; max-member-count="2"',
+        accept: "application/ld+json",
       },
+      path: page4Url,
     }))
     assert.equal(page4Res.statusCode, 200)
     const page4 = JSON.parse(await readableToString(page4Res))
@@ -197,7 +194,7 @@ tests["can page through /public collection.current"] = async function() {
 }
 
 // Example 8,9: Submitting an Activity to the Outbox
-tests["posted activities have an .inbox (e.g. to receive replies in)"] = async function() {
+tests["posted activities have an .inbox (e.g. to receive replies in)"] = async () => {
   // Create an Activity by POSTing to outbox
   const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
@@ -209,13 +206,13 @@ tests["posted activities have an .inbox (e.g. to receive replies in)"] = async f
   })
   req.write(JSON.stringify({
     "@context": "https://www.w3.org/ns/activitypub",
-    "type": "Article",
     "content": "Hello, world",
+    "type": "Article",
   }))
   const postActivityRequest = await sendRequest(req)
   assert.equal(postActivityRequest.statusCode, 201)
   // Determine Location of new Activity
-  const location = postActivityRequest.headers.location
+  const location = first(postActivityRequest.headers.location)
   assert(location, "Location header is present in response")
   // Now get the new Activity
 
@@ -232,21 +229,21 @@ tests["posted activities have an .inbox (e.g. to receive replies in)"] = async f
 }
 
 // #TODO is notifying the .inReplyTo inbox even encouraged/allowed by activitypub?
-tests["Posting a reply will notify the inReplyTo inbox (even if another distbin)"] = async function() {
+tests["Posting a reply will notify the inReplyTo inbox (even if another distbin)"] = async () => {
   // ok so we're going to make two distbins, A and B, and test that A delivers to B
   const distbinA = distbin()
   const distbinB = distbin({ deliverToLocalhost: true })
   // post a parent to distbinA
   const parentUrl = await postActivity(distbinA, {
-    type: "Note",
     content: "Reply to this if you think FSW could happen",
+    type: "Note",
   })
   // ok now to post the reply to distbinB
   const replyUrl = await postActivity(distbinB, {
-    type: "Note",
+    cc: [parentUrl],
     content: "Dear Anonymous, I believe in FSW",
     inReplyTo: parentUrl,
-    cc: [parentUrl],
+    type: "Note",
   })
   // then verify that it is in distbinA's inbox
   const replyId = JSON.parse(await readableToString(await sendRequest(http.request(replyUrl)))).id
@@ -258,8 +255,7 @@ tests["Posting a reply will notify the inReplyTo inbox (even if another distbin)
     const wasDerivedFrom = a["http://www.w3.org/ns/prov#wasDerivedFrom"]
     if ( ! wasDerivedFrom) { return false }
     function nodeWasDerivedFrom(o: ASObject|string, nodeId: string): boolean {
-      if (typeof o === "object") { return o.id === nodeId }
-      else if (typeof o === "string") { return o === nodeId }
+      if (typeof o === "object") { return o.id === nodeId } else if (typeof o === "string") { return o === nodeId }
       return false
     }
     const matchesReplyId = (o: DistbinActivity|string): boolean => nodeWasDerivedFrom(o, replyId)
@@ -274,7 +270,7 @@ tests["Posting a reply will notify the inReplyTo inbox (even if another distbin)
       }
       return false
     } else {
-      const _exhaustiveCheck: never = wasDerivedFrom;
+      const exhaustiveCheck: never = wasDerivedFrom;
     }
   })
   assert(replyFromDistbinAInbox, "distbinA inbox contains reply")
@@ -291,7 +287,8 @@ tests["Posting a reply will notify the inReplyTo inbox (even if another distbin)
 }
 
 // #TODO is notifying the .inReplyTo inbox even encouraged/allowed by activitypub?
-tests["can configure spam checking for inbox to reject some things (server:security-considerations:filter-incoming-content)"] = async function() {
+tests["can configure spam checking for inbox to reject some things" +
+      "(server:security-considerations:filter-incoming-content)"] = async () => {
   // ok so we're going to make two distbins, A and B, and test that A delivers to B
   const distbinA = distbin({
     inboxFilter: async (obj: ASObject) => {
@@ -307,15 +304,15 @@ tests["can configure spam checking for inbox to reject some things (server:secur
   })
   // post a parent to distbinA
   const parentUrl = await postActivity(distbinA, {
-    type: "Note",
     content: "Spam me",
+    type: "Note",
   })
   // ok now to post the reply to distbinB
   const replyUrl = await postActivity(distbinB, {
-    type: "Note",
+    cc: [parentUrl],
     content: "Click here for free Viagra",
     inReplyTo: parentUrl,
-    cc: [parentUrl],
+    type: "Note",
   })
   // then verify that it is NOT in distbinA's inbox
   const reply = JSON.parse(await readableToString(await sendRequest(http.request(replyUrl))))
@@ -329,20 +326,20 @@ tests["can configure spam checking for inbox to reject some things (server:secur
   assert.equal(distbinAInbox.totalItems, 0, "distbinA inbox does NOT contain spam reply")
 }
 
-tests["When GET an activity, it has information about any replies it may have"] = async function() {
+tests["When GET an activity, it has information about any replies it may have"] = async () => {
   // ok so we're going to make to distbins, A and B, and test that A delivers to B
   const distbinA = distbin()
   // post a parent to distbinA
   const parentUrl = await postActivity(distbinA, {
-    type: "Note",
     content: "Reply to this if you think FSW could happen",
+    type: "Note",
   })
   // ok now to post the reply
   const replyUrl = await postActivity(distbinA, {
-    type: "Note",
+    cc: [parentUrl],
     content: "Dear Anonymous, I believe in FSW",
     inReplyTo: parentUrl,
-    cc: [parentUrl],
+    type: "Note",
   })
   const reply = JSON.parse(await readableToString(await sendRequest(http.get(replyUrl))))
   const parent = JSON.parse(await readableToString(await sendRequest(http.get(parentUrl))))
@@ -356,16 +353,16 @@ tests["When GET an activity, it has information about any replies it may have"] 
   assert.equal(repliesCollection.items[0].id, reply.id, ".items contains the reply")
 }
 
-tests["Activities can have a .generator"] = async function() {
+tests["Activities can have a .generator"] = async () => {
   const distbinA = distbin()
   const activityToPost = {
-    type: "Note",
     content: "this has a generator",
     generator: {
-      type: "Application",
       name: "distbin-html",
+      type: "Application",
       url: "http://distbin.com",
     },
+    type: "Note",
   }
   const activityUrl = await postActivity(distbinA, activityToPost)
   const activity = JSON.parse(await readableToString(await sendRequest(http.get(activityUrl))))
@@ -373,10 +370,10 @@ tests["Activities can have a .generator"] = async function() {
   assert(activity.object.generator, "has a generator")
 }
 
-tests["GET an activity has a .url that resolves"] = async function() {
+tests["GET an activity has a .url that resolves"] = async () => {
   const activityUrl = await postActivity(distbin(), {
-    type: "Note",
     content: "you can read this without knowing wtf JSON is!",
+    type: "Note",
   })
   const activityResponse = await sendRequest(http.request(Object.assign(url.parse(activityUrl), {
     headers: {
@@ -392,10 +389,10 @@ tests["GET an activity has a .url that resolves"] = async function() {
   }))
 }
 
-tests["GET {activity.id}.json always sends json response, even if html if preferred by user-agent"] = async function() {
+tests["GET {activity.id}.json always sends json response, even if html if preferred by user-agent"] = async () => {
   const activityUrl = await postActivity(distbin(), {
-    type: "Note",
     content: "Hi",
+    type: "Note",
   })
   const activityResponse = await sendRequest(http.request(Object.assign(url.parse(activityUrl + ".json"), {
     headers: {

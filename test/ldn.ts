@@ -1,12 +1,12 @@
-const assert = require("assert")
-const fetch = require("node-fetch")
-const { listen } = require("./util")
-import distbin from "../"
-const http = require("http")
-const uuid = require("uuid")
-const { jsonld } = require("../src/util")
+import * as assert from "assert"
+import * as http from "http"
+import fetch from "node-fetch"
+import { v4 as uuid } from "node-uuid"
 import * as url from "url"
+import distbin from "../"
+import { jsonld } from "../src/util"
 import { testCli } from "./"
+import { listen } from "./util"
 
 const tests = module.exports
 
@@ -15,7 +15,10 @@ tests["can OPTIONS inbox"] = async () => {
   const res = await fetch(`${distbinUrl}/activitypub/inbox`, { method: "OPTIONS" })
   assert.equal(res.status, 200)
   const acceptPost = res.headers.get("accept-post").split(",").map((m: string) => m.trim())
-  const shouldAcceptPostOf = ["application/ld+json", "application/activity+json", "application/json", 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"']
+  const shouldAcceptPostOf = [
+    "application/ld+json", "application/activity+json", "application/json",
+    'application/ld+json; profile="https://www.w3.org/ns/activitystreams"',
+  ]
   shouldAcceptPostOf.forEach((m) => {
     assert(acceptPost.includes(m), `Accept-Post header includes ${m}`)
   })
@@ -26,8 +29,8 @@ tests["can GET inbox"] = async () => {
   const notification = createNotification()
   // post first
   await fetch(`${distbinUrl}/activitypub/inbox`, {
-    method: "POST",
     body: JSON.stringify(notification, null, 2),
+    method: "POST",
   })
   // get
   const res = await fetch(`${distbinUrl}/activitypub/inbox`, {
@@ -43,8 +46,8 @@ tests["can GET inbox"] = async () => {
       "https://www.w3.org/ns/activitystreams",
       {
         "ldp:contains": {
-          "@id": "ldp:contains",
           "@container": "@set",
+          "@id": "ldp:contains",
         },
       },
     ],
@@ -66,8 +69,8 @@ tests["can POST notifications to inbox"] = async () => {
   // post
   const inboxUrl = `${distbinUrl}/activitypub/inbox`
   const res = await fetch(inboxUrl, {
-    method: "POST",
     body: JSON.stringify(notification, null, 2),
+    method: "POST",
   })
   assert([201, 202].includes(res.status), "status is either 200 or 201")
   // response has a Location header
@@ -81,7 +84,11 @@ tests["can POST notifications to inbox"] = async () => {
     },
   })
   assert.equal(notificationRes.status, 200, "can GET inbox notification URI")
-  assert.equal(notificationRes.headers.get("content-type").split(";")[0], "application/ld+json", "notification GET responds with ld+json content-type")
+  assert.equal(
+    notificationRes.headers.get("content-type").split(";")[0],
+    "application/ld+json",
+    "notification GET responds with ld+json content-type",
+  )
   const gotNotification = await notificationRes.json()
   // new id is provisioned
   assert.notEqual(gotNotification.id, notification.id)
@@ -103,8 +110,8 @@ tests["fails gracefully on unexpected data in POST notifications to inbox"] = as
   }
   // post
   const res = await fetch(`${distbinUrl}/activitypub/inbox`, {
-    method: "POST",
     body: JSON.stringify(notification, null, 2),
+    method: "POST",
   })
   assert([201, 202].includes(res.status), "status is either 200 or 201")
 }
@@ -118,11 +125,11 @@ tests["Inbox handles notifications with ambiguous @id URIs by ignoring the id"] 
   // post
   const inboxUrl = `${distbinUrl}/activitypub/inbox`
   const res = await fetch(inboxUrl, {
-    method: "POST",
     body: JSON.stringify(notification, null, 2),
     headers: {
       "content-type": "application/ld+json",
     },
+    method: "POST",
   })
   const location = url.resolve(inboxUrl, res.headers.get("location"))
   const notificationRes = await fetch(location, {headers: {accept: "application/ld+json"}})
@@ -159,15 +166,15 @@ tests["Inbox handles notifications with ambiguous @id URIs by ignoring the id"] 
 function createNotification(props = {}) {
   return Object.assign({
     "@context": "https://www.w3.org/ns/activitystreams",
-    "id": `urn:uuid:${uuid()}`,
     "actor": {
       name: "Ben",
     },
-    "type": "Create",
+    "id": `urn:uuid:${uuid()}`,
     "object": {
-      type: "Note",
       content: "<p>Hello, world!</p>",
+      type: "Note",
     },
+    "type": "Create",
   }, props)
 }
 

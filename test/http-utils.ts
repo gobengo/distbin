@@ -1,11 +1,9 @@
-const assert = require("assert")
-const fetch = require("node-fetch")
-
+import * as assert from "assert"
 import {ClientRequest, ClientRequestArgs, ClientResponse} from "http"
-import distbin from "../"
-
-const { sendRequest, request, makeErrorClass, followRedirects } = require("../src/util")
+import fetch from "node-fetch"
 import * as url from "url"
+import distbin from "../"
+import { followRedirects, makeErrorClass, request, sendRequest } from "../src/util"
 import { testCli } from "./"
 
 const tests = module.exports
