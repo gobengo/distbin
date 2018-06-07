@@ -1,58 +1,58 @@
-const activitypub = require('../src/activitypub')
-const assert = require('assert')
-import distbin from '../'
-import * as http from 'http'
-const { ensureArray, readableToString, sendRequest } = require('../src/util')
-const { listen, requestForListener } = require('./util')
-const { isProbablyAbsoluteUrl } = require('./util')
-import { Activity, LDValue, ASObject } from './types'
-import { testCli } from '.'
-import { objectTargets, targetedAudience, getASId, clientAddressedActivity, objectTargetsNoRecurse } from '../src/activitypub'
-import { ASJsonLdProfileContentType } from '../src/activitystreams'
+const activitypub = require("../src/activitypub")
+const assert = require("assert")
+import * as http from "http"
+import distbin from "../"
+const { ensureArray, readableToString, sendRequest } = require("../src/util")
+const { listen, requestForListener } = require("./util")
+const { isProbablyAbsoluteUrl } = require("./util")
+import { testCli } from "."
+import { clientAddressedActivity, getASId, objectTargets, objectTargetsNoRecurse, targetedAudience } from "../src/activitypub"
+import { ASJsonLdProfileContentType } from "../src/activitystreams"
+import { Activity, ASObject, LDValue } from "./types"
 
 const tests = module.exports
 
-const setsAreEqual = (s1: Set<any>, s2: Set<any>) => (s1.size === s2.size) && Array.from(s1).every(i => s2.has(i))
+const setsAreEqual = (s1: Set<any>, s2: Set<any>) => (s1.size === s2.size) && Array.from(s1).every((i) => s2.has(i))
 
-tests['objectTargets'] = async () => {
+tests.objectTargets = async () => {
   const activity: Activity = {
-    '@context': ['https://www.w3.org/ns/activitystreams',
-                 {'@language': 'en-GB'}],
-    'type': 'Like',
-    'object': {
-      'id': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
-      'type': 'Article',
-      'name': 'Minimal ActivityPub update client',
-      'content': 'Today I finished morph, a client for posting ActivityStreams2...',
-      'attributedTo': {
-        'id': 'https://rhiaro.co.uk/#amy',
-        'attributedTo': {
-          'id': 'https://rhario.co.uk/attributedTo',
-          'attributedTo': {
-            'id': 'https://rhiaro.co.uk/attributedTo/attributedTo',
-            'cc': [{
-              'id': 'https://rhiaro.co.uk/attributedTo/attributedTo/cc/0'
-            }]
-          }
-        }
+    "@context": ["https://www.w3.org/ns/activitystreams",
+                 {"@language": "en-GB"}],
+    "type": "Like",
+    "object": {
+      id: "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+      type: "Article",
+      name: "Minimal ActivityPub update client",
+      content: "Today I finished morph, a client for posting ActivityStreams2...",
+      attributedTo: {
+        id: "https://rhiaro.co.uk/#amy",
+        attributedTo: {
+          id: "https://rhario.co.uk/attributedTo",
+          attributedTo: {
+            id: "https://rhiaro.co.uk/attributedTo/attributedTo",
+            cc: [{
+              id: "https://rhiaro.co.uk/attributedTo/attributedTo/cc/0",
+            }],
+          },
+        },
       },
-      'to': 'https://rhiaro.co.uk/followers/',
-      'cc': 'https://e14n.com/evan'
-    }
+      to: "https://rhiaro.co.uk/followers/",
+      cc: "https://e14n.com/evan",
+    },
   }
-  const levels: Set<string>[] = [
-    ['https://rhiaro.co.uk/#amy', 'https://rhiaro.co.uk/followers/', 'https://e14n.com/evan'],
-    ['https://rhario.co.uk/attributedTo'],
-    ['https://rhiaro.co.uk/attributedTo/attributedTo'],
-    ['https://rhiaro.co.uk/attributedTo/attributedTo/cc/0']
+  const levels: Array<Set<string>> = [
+    ["https://rhiaro.co.uk/#amy", "https://rhiaro.co.uk/followers/", "https://e14n.com/evan"],
+    ["https://rhario.co.uk/attributedTo"],
+    ["https://rhiaro.co.uk/attributedTo/attributedTo"],
+    ["https://rhiaro.co.uk/attributedTo/attributedTo/cc/0"],
   ].map((a: string[]) => new Set(a))
   const targetsShouldBeForLevel = (level: number) => {
-    const theseLevels = levels.slice(0, level+1)
+    const theseLevels = levels.slice(0, level + 1)
     const targetsShouldBe = theseLevels.reduce((targets, levelTargetSet) => new Set([...levelTargetSet, ...targets]), new Set())
     return new Set(targetsShouldBe)
   }
 
-  for (let [index, level] of enumerate(levels)) {
+  for (const [index, level] of enumerate(levels)) {
     const targets = (await objectTargets(activity, index)).map(getASId)
     const targetsShouldBe = targetsShouldBeForLevel(index)
     // console.log({ level: index, targets, targetsShouldBe })
@@ -60,7 +60,7 @@ tests['objectTargets'] = async () => {
   }
 }
 
-function* enumerate (iterable: Iterable<any>) {
+function* enumerate(iterable: Iterable<any>) {
   let i = 0
 
   for (const x of iterable) {
@@ -69,41 +69,41 @@ function* enumerate (iterable: Iterable<any>) {
   }
 }
 
-tests['targetedAudience'] = async () => {
+tests.targetedAudience = async () => {
   const asObject: ASObject = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'id': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
-    'type': 'Article',
-    'name': 'Minimal ActivityPub update client',
-    'content': 'Today I finished morph, a client for posting ActivityStreams2...',
-    'attributedTo': 'https://rhiaro.co.uk/#amy',
-    'to': 'https://rhiaro.co.uk/followers/',
-    'cc': 'https://e14n.com/evan'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "id": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+    "type": "Article",
+    "name": "Minimal ActivityPub update client",
+    "content": "Today I finished morph, a client for posting ActivityStreams2...",
+    "attributedTo": "https://rhiaro.co.uk/#amy",
+    "to": "https://rhiaro.co.uk/followers/",
+    "cc": "https://e14n.com/evan",
   }
   const audience = targetedAudience(asObject)
   // console.log('audience', audience)
-  assert.deepEqual(audience, ['https://rhiaro.co.uk/followers/', 'https://e14n.com/evan'])
+  assert.deepEqual(audience, ["https://rhiaro.co.uk/followers/", "https://e14n.com/evan"])
 }
 
-tests['clientAddressedActivity'] = async () => {
-  const attributedToId = 'https://bengo.is/clientAddressedActivityTest'
+tests.clientAddressedActivity = async () => {
+  const attributedToId = "https://bengo.is/clientAddressedActivityTest"
   const parentUrl = await listen(http.createServer((req, res) => {
-    res.writeHead(200, {'content-type': ASJsonLdProfileContentType})
+    res.writeHead(200, {"content-type": ASJsonLdProfileContentType})
     res.end(JSON.stringify({
-      type: 'Note',
+      type: "Note",
       attributedTo: {
-        id: attributedToId
-      }
+        id: attributedToId,
+      },
     }, null, 2))
   }))
 
   const activityToAddress = {
-    type: 'Create',
+    type: "Create",
     object: {
-      type: 'Note',
-      content: 'i reply to u ok',
-      inReplyTo: parentUrl
-    }
+      type: "Note",
+      content: "i reply to u ok",
+      inReplyTo: parentUrl,
+    },
   }
   const addressed = await clientAddressedActivity(activityToAddress, 0, true)
   assert(ensureArray(addressed.cc).includes(attributedToId))
@@ -133,8 +133,8 @@ The object's unique global identifier
 type
 The type of the object
 */
-activitypub.objectHasRequiredProperties = (obj: {[key:string]: any}) => {
-  const requiredProperties = ['id', 'type']
+activitypub.objectHasRequiredProperties = (obj: {[key: string]: any}) => {
+  const requiredProperties = ["id", "type"]
   const missingProperties = requiredProperties.filter((p: string) => obj[p])
   return Boolean(!missingProperties.length)
 }
@@ -153,10 +153,10 @@ activitypub.objectHasRequiredProperties = (obj: {[key:string]: any}) => {
 // The outbox must be an OrderedCollection.
 // #critique - another part of spec says "The outbox accepts HTTP POST requests". Does it also accept GET? If yet, clarify in other section; If not, what does it mean to 'be an OrderedCollection' (see isOrderedCollection function)
 // #assumption - interpretation is that outbox MUST accept GET requests, so I'll test
-tests['The outbox must be an OrderedCollection'] = async function () {
+tests["The outbox must be an OrderedCollection"] = async function() {
   const res = await sendRequest(await requestForListener(distbin(), {
-    path: '/activitypub/outbox',
-    headers: activitypub.clientHeaders()
+    path: "/activitypub/outbox",
+    headers: activitypub.clientHeaders(),
   }))
   assert.equal(res.statusCode, 200)
   const resBody = await readableToString(res)
@@ -177,43 +177,43 @@ tests['The outbox must be an OrderedCollection'] = async function () {
 /*
 5.6 Public Addressing - https://w3c.github.io/activitypub/#public-addressing
 */
-tests['can request the public Collection'] = async function () {
-  const res = await sendRequest(await requestForListener(distbin(), '/activitypub/public'))
+tests["can request the public Collection"] = async function() {
+  const res = await sendRequest(await requestForListener(distbin(), "/activitypub/public"))
   assert.equal(res.statusCode, 200)
 }
 
 // In addition to [ActivityStreams] collections and objects, Activities may additionally be addressed to the special "public" collection, with the identifier https://www.w3.org/ns/activitystreams#Public. For example:
 // #critique: It would be helpful to show an example activity that is 'addressed to the public collection', as there aren't any currently in the spec
 //  Like... should the public collection id bein the 'to' or 'cc' or 'bcc' fields or does it matter?
-tests['can address activities to the public Collection when sending to outbox, and they show up in the public Collection'] = async function () {
+tests["can address activities to the public Collection when sending to outbox, and they show up in the public Collection"] = async function() {
   const distbinListener = distbin()
 
   // post an activity addressed to public collection to outbox
   const activityToPublic = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Like',
-    'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub',
-    'cc': ['https://www.w3.org/ns/activitystreams#Public']
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "type": "Like",
+    "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
+    "cc": ["https://www.w3.org/ns/activitystreams#Public"],
   }
   const postActivityRequest = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
-      'content-type': ASJsonLdProfileContentType
+      "content-type": ASJsonLdProfileContentType,
     }),
-    method: 'post',
-    path: '/activitypub/outbox'
+    method: "post",
+    path: "/activitypub/outbox",
   })
   postActivityRequest.write(JSON.stringify(activityToPublic))
   const postActivityResponse = await sendRequest(postActivityRequest)
   assert.equal(postActivityResponse.statusCode, 201)
 
   // k it's been POSTed to outbox. Verify it's in the public collection
-  const publicCollectionResponse = await sendRequest(await requestForListener(distbinListener, '/activitypub/public'))
+  const publicCollectionResponse = await sendRequest(await requestForListener(distbinListener, "/activitypub/public"))
   const publicCollection = JSON.parse(await readableToString(publicCollectionResponse))
   // #critique ... ok so this is an example of where it's hard to know whether its in the Collection
   // because of id generation and such
-  assert(publicCollection.totalItems > 0, 'publicCollection has at least one item')
-  assert(publicCollection.items.filter((a: Activity) => a.type === 'Like' && a.object === 'https://rhiaro.co.uk/2016/05/minimal-activitypub').length === 1,
-    'publicCollection contains the activity that targeted it')
+  assert(publicCollection.totalItems > 0, "publicCollection has at least one item")
+  assert(publicCollection.items.filter((a: Activity) => a.type === "Like" && a.object === "https://rhiaro.co.uk/2016/05/minimal-activitypub").length === 1,
+    "publicCollection contains the activity that targeted it")
 }
 
 /*
@@ -224,22 +224,22 @@ The inbox is discovered through the inbox property of an actor's profile.
 */
 
 // The inbox must be an OrderedCollection.
-tests['The inbox must be an OrderedCollection'] = async function () {
+tests["The inbox must be an OrderedCollection"] = async function() {
   const res = await sendRequest(await requestForListener(distbin(), {
-    path: '/activitypub/inbox',
-    headers: activitypub.clientHeaders()
+    path: "/activitypub/inbox",
+    headers: activitypub.clientHeaders(),
   }))
   assert.equal(res.statusCode, 200)
   const resBody = await readableToString(res)
   assert(isOrderedCollection(resBody))
 }
 
-function isOrderedCollection (something: string|object) {
-  const obj = typeof something === 'string' ? JSON.parse(something) : something
+function isOrderedCollection(something: string|object) {
+  const obj = typeof something === "string" ? JSON.parse(something) : something
   // #TODO: Assert that this is valid AS2. Ostensible 'must be an OrderedCollection' implies that
   let type = obj.type
-  if (!Array.isArray(type)) type = [type]
-  assert(type.includes('OrderedCollection'))
+  if (!Array.isArray(type)) { type = [type] }
+  assert(type.includes("OrderedCollection"))
   return true
 }
 /*
@@ -297,21 +297,21 @@ The body of the POST request must contain a single Activity (which may contain e
 */
 
 // Example 8,9: Submitting an Activity to the Outbox
-tests['can submit an Activity to the Outbox'] = async function () {
+tests["can submit an Activity to the Outbox"] = async function() {
   const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
-      'content-type': ASJsonLdProfileContentType
+      "content-type": ASJsonLdProfileContentType,
     }),
-    method: 'post',
-    path: '/activitypub/outbox'
+    method: "post",
+    path: "/activitypub/outbox",
   })
   req.write(JSON.stringify({
-    '@context': 'https://www.w3.org/ns/activitypub',
-    'type': 'Like',
-    'actor': 'https://bengo.is/proxy/dustycloud.org/chris/', // #TODO fix that there was a missing comma here in spec
-    'name': "Chris liked 'Minimal ActivityPub update client'",
-    'object': 'https://rhiaro.co.uk/2016/05/minimal-activitypub'
+    "@context": "https://www.w3.org/ns/activitypub",
+    "type": "Like",
+    "actor": "https://bengo.is/proxy/dustycloud.org/chris/", // #TODO fix that there was a missing comma here in spec
+    "name": "Chris liked 'Minimal ActivityPub update client'",
+    "object": "https://rhiaro.co.uk/2016/05/minimal-activitypub",
     // 'to': ['https://dustycloud.org/followers', 'https://rhiaro.co.uk/followers/'],
     // 'cc': 'https://e14n.com/evan'
   }))
@@ -320,7 +320,7 @@ tests['can submit an Activity to the Outbox'] = async function () {
   assert.equal(postActivityRequest.statusCode, 201)
   // ...with the new URL in the Location header.
   const location = postActivityRequest.headers.location
-  assert(location, 'Location header is present in response')
+  assert(location, "Location header is present in response")
   // #TODO assert its a URL
 
   // #question - Does this imply any requirements about what happens when GET that URL?
@@ -358,29 +358,29 @@ tests['can submit an Activity to the Outbox'] = async function () {
     # urgh, see #critique on previous line. Small little copying adjustments are weird and not-very REST because they're changing what the client sent without telling it instead of just being strict about accepting what the client sends. Can lead to ambiguity in client representation.
   */
 
-tests['can submit a Create Activity to the Outbox'] = async function () {
+tests["can submit a Create Activity to the Outbox"] = async function() {
   const req = await requestForListener(distbin(), {
     headers: activitypub.clientHeaders({
-      'content-type': ASJsonLdProfileContentType
+      "content-type": ASJsonLdProfileContentType,
     }),
-    method: 'post',
-    path: '/activitypub/outbox'
+    method: "post",
+    path: "/activitypub/outbox",
   })
   req.write(JSON.stringify({
-    '@context': 'https://www.w3.org/ns/activitypub',
-    'type': 'Create', // #TODO: comma was missing here, fix in spec
-    'id': 'https://example.net/~mallory/87374', // #TODO: comma was missing here, fix in spec
-    'actor': 'https://example.net/~mallory',
-    'object': {
-      'id': 'https://example.com/~mallory/note/72',
-      'type': 'Note',
-      'attributedTo': 'https://example.net/~mallory',
-      'content': 'This is a note',
-      'published': '2015-02-10T15:04:55Z'
+    "@context": "https://www.w3.org/ns/activitypub",
+    "type": "Create", // #TODO: comma was missing here, fix in spec
+    "id": "https://example.net/~mallory/87374", // #TODO: comma was missing here, fix in spec
+    "actor": "https://example.net/~mallory",
+    "object": {
+      id: "https://example.com/~mallory/note/72",
+      type: "Note",
+      attributedTo: "https://example.net/~mallory",
+      content: "This is a note",
+      published: "2015-02-10T15:04:55Z",
       // 'to': ['https://example.org/~john/'],
       // 'cc': ['https://example.com/~erik/followers']
     },
-    'published': '2015-02-10T15:04:55Z'
+    "published": "2015-02-10T15:04:55Z",
     // 'to': ['https://example.org/~john/'],
     // 'cc': ['https://example.com/~erik/followers']
   }))
@@ -397,24 +397,24 @@ The server must accept a valid [ActivityStreams] object
   that isn't a subtype of Activity in the POST request to the outbox.
     #critique: Does this mean it should reject subtypes of Activities? No, right, because Activities are normal to send to outbox. Maybe then you're just saying that, if it's not an Activity subtype, initiate this 'Create-wrapping' algorithm.
 */
-tests['can submit a non-Activity to the Outbox, and it is converted to a Create'] = async function () {
+tests["can submit a non-Activity to the Outbox, and it is converted to a Create"] = async function() {
   const distbinListener = distbin()
   const req = await requestForListener(distbinListener, {
     headers: activitypub.clientHeaders({
-      'content-type': ASJsonLdProfileContentType
+      "content-type": ASJsonLdProfileContentType,
     }),
-    method: 'post',
-    path: '/activitypub/outbox'
+    method: "post",
+    path: "/activitypub/outbox",
   })
   // Example 10: Object with audience targeting
   const example10 = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Note',
-    'content': 'This is a note',
-    'published': '2015-02-10T15:04:55Z',
-    'to': [activitypub.publicCollectionId],
-    'cc': ['https://bengo.is/cc'],
-    'bcc': ['https://bengo.is/bcc']
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "type": "Note",
+    "content": "This is a note",
+    "published": "2015-02-10T15:04:55Z",
+    "to": [activitypub.publicCollectionId],
+    "cc": ["https://bengo.is/cc"],
+    "bcc": ["https://bengo.is/bcc"],
   }
   req.write(JSON.stringify(example10))
   const res = await sendRequest(req)
@@ -425,17 +425,17 @@ tests['can submit a non-Activity to the Outbox, and it is converted to a Create'
   assert.equal(newCreateActivityResponse.statusCode, 200)
   const newCreateActivity = JSON.parse(await readableToString(newCreateActivityResponse))
   // The server then must attach this object as the object of a Create Activity.
-  assert.equal(newCreateActivity.type, 'Create')
-  assert.ok('id' in newCreateActivity.object, 'object.id was provisioned')
+  assert.equal(newCreateActivity.type, "Create")
+  assert.ok("id" in newCreateActivity.object, "object.id was provisioned")
   assert.notEqual(newCreateActivity.id, newCreateActivity.object.id)
   const withoutProperties = (obj: Object, withoutProps: string[]) => {
     const lesserObj = Array.from(Object.entries(obj)).reduce((obj, [prop, val]) => {
-      if (!withoutProps.includes(prop)) obj[prop] = val
+      if (!withoutProps.includes(prop)) { obj[prop] = val }
       return obj
     }, {} as {[key: string]: any})
     return lesserObj
   }
-  assert.deepEqual(withoutProperties(newCreateActivity.object, ['id']), example10)
+  assert.deepEqual(withoutProperties(newCreateActivity.object, ["id"]), example10)
   // The audience specified on the object must be copied over to the new Create activity by the server.
   assert.deepEqual(newCreateActivity.to, example10.to)
   assert.deepEqual(newCreateActivity.cc, example10.cc)
@@ -460,74 +460,74 @@ The to, cc or bcc fields if their values are individuals, or Collections owned b
 These fields will have been populated appropriately by the client which posted the Activity to the outbox.
 */
 
-tests['targets and delivers targeted activities sent to Outbox'] = async function () {
+tests["targets and delivers targeted activities sent to Outbox"] = async function() {
   // ok so we're going to make to distbins, A and B, and test that A delivers to B
   const distbinA = distbin({ deliverToLocalhost: true })
   const distbinB = distbin()
   const distbinBUrl = await listen(http.createServer(distbinB))
   // post an Activity to distbinA that has cc distbinB
   const a = {
-    type: 'Note',
-    content: 'Man, distbinB is really killing it today.',
-    cc: distbinBUrl
+    type: "Note",
+    content: "Man, distbinB is really killing it today.",
+    cc: distbinBUrl,
   }
   const postNoteRequest = await requestForListener(distbinA, {
     headers: activitypub.clientHeaders({
-      'content-type': ASJsonLdProfileContentType
+      "content-type": ASJsonLdProfileContentType,
     }),
-    method: 'post',
-    path: '/activitypub/outbox'
+    method: "post",
+    path: "/activitypub/outbox",
   })
   postNoteRequest.write(JSON.stringify(a))
   const postNoteResponse = await sendRequest(postNoteRequest)
   assert.equal(postNoteResponse.statusCode, 201)
   // then verify that it is in distbinB's inbox
-  const distbinBInboxResponse = await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))
+  const distbinBInboxResponse = await sendRequest(http.get(distbinBUrl + "/activitypub/inbox"))
   assert.equal(distbinBInboxResponse.statusCode, 200)
   const distbinBInbox = JSON.parse(await readableToString(distbinBInboxResponse))
-  assert.equal(distbinBInbox.items.length, 1, 'there is 1 item in distbin B inbox')
+  assert.equal(distbinBInbox.items.length, 1, "there is 1 item in distbin B inbox")
   // Ensure that the activity has a URL that is absolute
   // #todo this tests what comes out of the inbox but probably it's a more accurate test to verify what the /inbox *receives from distbinA (the receiver doesn't strictly need to be a distbinB, but any endpoint)
   // #todo resolvable via @context.@base (https://www.w3.org/TR/json-ld/#base-iri) would also be fine, but not using right now. can check later.
-  assert(isProbablyAbsoluteUrl(distbinBInbox.items[0].url), '.url should be an absolute url')
+  assert(isProbablyAbsoluteUrl(distbinBInbox.items[0].url), ".url should be an absolute url")
 }
 
-tests['does not deliver to localhost'] = async function () {
+tests["does not deliver to localhost"] = async function() {
   // ok so we're going to make to distbins, A and B, and test that A delivers to B
   const distbinA = distbin({ deliverToLocalhost: false })
   const distbinB = distbin({ deliverToLocalhost: false })
   const distbinBUrl = await listen(http.createServer(distbinB))
   // post an Activity to distbinA that has cc distbinB
   const a = {
-    type: 'Note',
-    content: 'Man, distbinB is really killing it today.',
-    cc: distbinBUrl
+    type: "Note",
+    content: "Man, distbinB is really killing it today.",
+    cc: distbinBUrl,
   }
   const postNoteRequest = await requestForListener(distbinA, {
     headers: activitypub.clientHeaders({
-      'content-type': ASJsonLdProfileContentType
+      "content-type": ASJsonLdProfileContentType,
     }),
-    method: 'post',
-    path: '/activitypub/outbox'
+    method: "post",
+    path: "/activitypub/outbox",
   })
   postNoteRequest.write(JSON.stringify(a))
   const postNoteResponse = await sendRequest(postNoteRequest)
   assert.equal(postNoteResponse.statusCode, 201)
 
   const noteResponse = await sendRequest(await requestForListener(distbinA, {
-    path: postNoteResponse.headers.location
+    path: postNoteResponse.headers.location,
   }))
   const noteActivity = JSON.parse(await readableToString(noteResponse))
-  const inboxDeliveryFailures = noteActivity['distbin:activityPubDeliveryFailures']
+  const inboxDeliveryFailures = noteActivity["distbin:activityPubDeliveryFailures"]
   assert(inboxDeliveryFailures.length >= 1)
   // 'distbin:activityPubDeliveryFailures': [ { name: 'Error', message: 'I will not deliver to localhost' } ],
-  assert(inboxDeliveryFailures.some((failure: { name: String, message: String }) => failure.message.includes('server:security-considerations:do-not-post-to-localhost')))
+  assert(inboxDeliveryFailures.some((failure: { name: String, message: String }) => failure.message.includes("server:security-considerations:do-not-post-to-localhost")))
 
   // then verify that it is in distbinB's inbox
-  const distbinBInboxResponse = await sendRequest(http.get(distbinBUrl + '/activitypub/inbox'))
+  const distbinBInboxResponse = await sendRequest(http.get(distbinBUrl + "/activitypub/inbox"))
   assert.equal(distbinBInboxResponse.statusCode, 200)
   const distbinBInbox = JSON.parse(await readableToString(distbinBInboxResponse))
-  assert.equal(distbinBInbox.items.length, 0, 'there is 0 item in distbin B inbox')
+  assert.equal(distbinBInbox.items.length, 0, "there is 0 item in distbin B inbox")
 }
 
 /*

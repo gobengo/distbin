@@ -1,50 +1,56 @@
-const http = require('http')
-import {IncomingMessage, ServerResponse} from 'http'
-const { publicCollectionId } = require('../activitypub')
-import { clientAddressedActivity } from '../activitypub'
-import { discoverOutbox } from '../activitypub'
-import { Activity, ASObject } from '../activitystreams'
-const querystring = require('querystring')
-const url = require('url')
-const { encodeHtmlEntities, readableToString, sendRequest } = require('../util')
-const { distbinBodyTemplate } = require('./partials')
-import { requestUrl } from '../util'
-const { isProbablyAbsoluteUrl } = require('../util')
-const { createHttpOrHttpsRequest } = require('../util')
-import { debuglog } from '../util'
-import { ASLink, LinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchSuccess, HasLinkPrefetchResult } from '../types'
-import { ASJsonLdProfileContentType } from '../activitystreams'
 
-exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externalUrl:string}) {
-  return async function (req: IncomingMessage, res:ServerResponse) {
+import * as http from "http"
+import {IncomingMessage, ServerResponse} from "http"
+import * as querystring from "querystring"
+import * as url from "url"
+import { publicCollectionId } from "../activitypub"
+import { clientAddressedActivity } from "../activitypub"
+import { discoverOutbox } from "../activitypub"
+import { ASJsonLdProfileContentType } from "../activitystreams"
+import { Activity, ASObject } from "../activitystreams"
+import { ASLink, HasLinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchResult, LinkPrefetchSuccess } from "../types"
+import { encodeHtmlEntities, readableToString, sendRequest } from "../util"
+import { requestUrl } from "../util"
+import { isProbablyAbsoluteUrl } from "../util"
+import { createHttpOrHttpsRequest } from "../util"
+import { debuglog, first } from "../util"
+import { distbinBodyTemplate } from "./partials"
+
+import { createLogger } from "../logger"
+const logger = createLogger(__filename)
+
+export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) => {
+  return async (req: IncomingMessage, res: ServerResponse) => {
     switch (req.method.toLowerCase()) {
       // POST is form submission to create a new post
-      case 'post':
+      case "post":
         const submission = await readableToString(req)
         // assuming application/x-www-form-urlencoded
         const formFields = querystring.parse(submission)
-        const { content, inReplyTo, attachment } = formFields
-        if (attachment && !isProbablyAbsoluteUrl(attachment)) {
-          throw new Error('attachment must be a URL, but got ' + attachment)
+        const { attachment } = formFields
+        const inReplyTo = first(formFields.inReplyTo)
+        const firstAttachment = first(attachment)
+        if (firstAttachment && !isProbablyAbsoluteUrl(firstAttachment)) {
+          throw new Error("attachment must be a URL, but got " + firstAttachment)
         }
-        const attachmentLink = await getAttachmentLinkForUrl(attachment)
+        const attachmentLink = await getAttachmentLinkForUrl(firstAttachment)
 
         let location
         try {
           location = parseLocationFormFields(formFields)
         } catch (error) {
-          console.error(error)
-          throw new Error('Error parsing location form fields')
+          logger.error(error)
+          throw new Error("Error parsing location form fields")
         }
 
-        let attributedTo = <any>{}
-        if (formFields['attributedTo.name']) {
-          attributedTo.name = formFields['attributedTo.name']
+        let attributedTo = {} as any
+        if (formFields["attributedTo.name"]) {
+          attributedTo.name = formFields["attributedTo.name"]
         }
-        const attributedToUrl = formFields['attributedTo.url']
+        const attributedToUrl = first(formFields["attributedTo.url"])
         if (attributedToUrl) {
           if (!isProbablyAbsoluteUrl(attributedToUrl)) {
-            throw new Error('Invalid non-URL value for attributedTo.url: ' + attributedToUrl)
+            throw new Error("Invalid non-URL value for attributedTo.url: " + attributedToUrl)
           }
           attributedTo.url = attributedToUrl
         }
@@ -53,49 +59,48 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
         }
 
         let tag
-        if (formFields['tag_csv']) {
-          tag = formFields['tag_csv'].split(',').map((n: string) => {
+        if (formFields.tag_csv) {
+          tag = first(formFields.tag_csv).split(",").map((n: string) => {
             return {
-              name: n.trim()
+              name: n.trim(),
             }
           })
         }
 
-        let note: ASObject = Object.assign(
+        const note: ASObject = Object.assign(
           {
-            'type': 'Note',
-            'content': content,
+            attachment: attachmentLink ? [attachmentLink] : undefined,
+            content: first(formFields.content),
             generator: {
-              type: 'Application',
-              name: 'distbin-html',
-              url: externalUrl
+              name: "distbin-html",
+              type: "Application",
+              url: externalUrl,
               // @todo add .url of externalUrl
             },
-            attachment: attachmentLink ? [attachmentLink] : undefined,
-            tag
+            tag,
+            type: "Note",
           },
-          inReplyTo ? { inReplyTo } : {}
+          inReplyTo ? { inReplyTo } : {},
         )
         const unaddressedActivity: Activity = {
-          '@context': 'https://www.w3.org/ns/activitystreams',
-          type: 'Create',
-          object: note,
+          "@context": "https://www.w3.org/ns/activitystreams",
+          attributedTo,
+          "cc": [publicCollectionId, inReplyTo].filter(Boolean),
           location,
-          cc: [publicCollectionId, inReplyTo].filter(Boolean),
-          attributedTo
+          "object": note,
+          "type": "Create",
         }
 
-        
         const addressedActivity = await clientAddressedActivity(unaddressedActivity, 0, true)
-        debuglog('addressedActivity', addressedActivity)
+        debuglog("addressedActivity", addressedActivity)
         // submit to outbox
         // #TODO discover outbox URL
         const outboxUrl = await discoverOutbox(apiUrl)
         const postToOutboxRequest = http.request(Object.assign(url.parse(outboxUrl), {
           headers: {
-            'content-type': ASJsonLdProfileContentType
+            "content-type": ASJsonLdProfileContentType,
           },
-          method: 'post',
+          method: "post",
         }))
         postToOutboxRequest.write(JSON.stringify(addressedActivity))
         const postToOutboxResponse = await sendRequest(postToOutboxRequest)
@@ -111,18 +116,19 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
             postToOutboxResponse.pipe(res)
             break
           default:
-            throw new Error('unexpected upstream response')
+            throw new Error("unexpected upstream response")
         }
         break
       // GET renders home page will all kinds of stuff
-      case 'get':
+      case "get":
         const query = url.parse(req.url, true).query // todo sanitize
-        const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || '')
-        const safeTitleDefault = encodeHtmlEntities(query.title || '')
-        const safeAttachmentUrl = encodeHtmlEntities(query.attachment || '')
+        const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || "")
+        const safeTitleDefault = encodeHtmlEntities(query.title || "")
+        const safeAttachmentUrl = encodeHtmlEntities(query.attachment || "")
         res.writeHead(200, {
-          'content-type': 'text/html'
+          "content-type": "text/html",
         })
+        /* tslint:disable:max-line-length */
         res.write(distbinBodyTemplate(`
           ${(`
             <style>
@@ -172,7 +178,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
               navigator.geolocation.getCurrentPosition(success, failure);
               function success(position) {
                 var coords= position.coords || {};
-                console.log('Your position', position)
+                logger.log('Your position', position)
                 var coordPropsToFormFields = {
                   'altitude': 'location.altitude',
                   'latitude': 'location.latitude',
@@ -197,7 +203,7 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
 
                 // update the form with hidden fields for this info
                 hiddenInputsToCreate.forEach(insertOrReplaceInput);
-                
+
                 // replace loading indicator with 'undo'
                 var undoElement = createUndoElement([
                   'Clicking post will save your coordinates',
@@ -237,13 +243,13 @@ exports.createHandler = function ({ apiUrl, externalUrl }:{apiUrl:string,externa
 
               }
               function failure(error) {
-                console.error("Error getting current position", error)
+                logger.error("Error getting current position", error)
                 var failureElement = document.createElement('a');
                 failureElement.style.cursor = 'pointer';
                 failureElement.innerHTML = ['Error getting geolocation', error.message].filter(Boolean).join(': ')
                 failureElement.onclick = function (e) {
                   currentlyInsertedEl.parentNode.replaceChild(addLocationEl, currentlyInsertedEl);
-                  currentlyInsertedEl = addLocationEl                  
+                  currentlyInsertedEl = addLocationEl
                 }
                 currentlyInsertedEl.parentNode.replaceChild(failureElement, currentlyInsertedEl);
                 currentlyInsertedEl = failureElement
@@ -292,13 +298,14 @@ EOF`)}
             </pre>
           </details>
         `))
+        /* tslint:enable:max-line-length */
         res.end()
     }
   }
 }
 
-function parseLocationFormFields (formFields: {[key:string]:string}) {
-  interface Location {
+function parseLocationFormFields(formFields: {[key: string]: string|string[]}) {
+  interface ILocation {
     type: string
     name: string
     units: string
@@ -308,25 +315,25 @@ function parseLocationFormFields (formFields: {[key:string]:string}) {
     accuracy: number
     radius: number
   }
-  let location = <Location>{ type: 'Place' }
-  const formFieldPrefix = 'location.'
-  const prefixed = (name:string) => `${formFieldPrefix}${name}`
-  const floatFieldNames: (keyof Location)[] = [
-    'latitude',
-    'longitude',
-    'altitude',
-    'accuracy',
-    'radius'
+  const location = { type: "Place" } as ILocation
+  const formFieldPrefix = "location."
+  const prefixed = (name: string) => `${formFieldPrefix}${name}`
+  const floatFieldNames: Array<keyof ILocation> = [
+    "latitude",
+    "longitude",
+    "altitude",
+    "accuracy",
+    "radius",
   ]
-  if (formFields[prefixed('name')]) {
-    location.name = formFields['location.name']
+  if (formFields[prefixed("name")]) {
+    location.name = first(formFields["location.name"])
   }
-  if (formFields[prefixed('units')]) {
-    location.units = formFields['location.units']
+  if (formFields[prefixed("units")]) {
+    location.units = first(formFields["location.units"])
   }
-  floatFieldNames.forEach((k:keyof Location) => {
-    let fieldVal = formFields[prefixed(k)]
-    if (!fieldVal) return
+  floatFieldNames.forEach((k: keyof ILocation) => {
+    const fieldVal = first(formFields[prefixed(k)])
+    if (!fieldVal) { return }
     location[k] = parseFloat(fieldVal)
   })
   if (Object.keys(location).length === 1) {
@@ -336,10 +343,10 @@ function parseLocationFormFields (formFields: {[key:string]:string}) {
   return location
 }
 
-async function getAttachmentLinkForUrl (attachment: string) {
-  let attachmentLink: ASLink & HasLinkPrefetchResult = attachment && {
-    type: 'Link',
-    href: attachment
+async function getAttachmentLinkForUrl(attachment: string) {
+  const attachmentLink: ASLink & HasLinkPrefetchResult = attachment && {
+    href: attachment,
+    type: "Link",
   }
   let linkPrefetchResult: LinkPrefetchResult
   if (attachment && attachmentLink) {
@@ -351,32 +358,32 @@ async function getAttachmentLinkForUrl (attachment: string) {
       attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))
     } catch (error) {
       connectionError = error
-      console.warn('Error prefetching attachment URL ' + attachment)
-      console.error(error)
+      logger.warn("Error prefetching attachment URL " + attachment)
+      logger.error(error)
     }
     if (connectionError) {
       linkPrefetchResult = new LinkPrefetchFailure({
         error: {
-          message: connectionError.message
-        }
+          message: connectionError.message,
+        },
       })
     } else if (attachmentResponse.statusCode === 200) {
-      const contentType = attachmentResponse.headers['content-type']
+      const contentType = attachmentResponse.headers["content-type"]
       if (contentType) {
         linkPrefetchResult = new LinkPrefetchSuccess({
           published: new Date().toISOString(),
-          supportedMediaTypes: [contentType]
+          supportedMediaTypes: [contentType],
         })
       }
     } else {
       // no connection error, not 200, must be another
       linkPrefetchResult = new LinkPrefetchFailure({
         error: {
-          status: attachmentResponse.statusCode
-        }
+          status: attachmentResponse.statusCode,
+        },
       })
     }
-    attachmentLink['https://distbin.com/ns/linkPrefetch'] = linkPrefetchResult    
+    attachmentLink["https://distbin.com/ns/linkPrefetch"] = linkPrefetchResult
   }
   return attachmentLink
 }

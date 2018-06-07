@@ -40,7 +40,7 @@ export const isASLink = (obj: any): obj is ASLink => {
 
 // @TODO (bengo)
 type RdfLangString = string
-type NaturalLanguageValue = {
+interface INaturalLanguageValue {
     // @TODO (bengo) this could be more specific about keys than just string
     [key: string]: string
 }
@@ -49,27 +49,27 @@ type ASObjectType<T> = T | [T]
 export type ASValue = string | ASObject | ASLink
 // W3C ActivityStreams 2.0
 export class ASObject extends ASBase {
-  attachment?: OneOrMore<ASObject|ASLink>
-  attributedTo?: LDValue<ASObject>
-  bcc?: LDValue<ASObject>
-  cc?: OneOrMore<LDValue<ASObject>>
-  content?: string
-  generator?: LDValue<ASObject>
-  id?: string
-  image?: OneOrMore<string|ASLink|ASImage>
-  inReplyTo?: LDValue<ASObject>
-  location?: ASObject
-  name?: string
-  nameMap?: NaturalLanguageValue
-  preview?: ASValue
-  published?: ISO8601
-  replies?: LDValue<Collection<ASObject>>
-  summary?: string|RdfLangString
-  tag?: ASObject|ASLink
-  to?: LDValue<ASObject>
-  bto?: LDValue<ASObject>
-  type?: ASObjectType<string>
-  url?: OneOrMore<ASValue>
+  public attachment?: OneOrMore<ASObject|ASLink>
+  public attributedTo?: LDValue<ASObject>
+  public bcc?: LDValue<ASObject>
+  public cc?: OneOrMore<LDValue<ASObject>>
+  public content?: string
+  public generator?: LDValue<ASObject>
+  public id?: string
+  public image?: OneOrMore<string|ASLink|ASImage>
+  public inReplyTo?: LDValue<ASObject>
+  public location?: ASObject
+  public name?: string
+  public nameMap?: INaturalLanguageValue
+  public preview?: ASValue
+  public published?: ISO8601
+  public replies?: LDValue<Collection<ASObject>>
+  public summary?: string|RdfLangString
+  public tag?: ASObject|ASLink
+  public to?: LDValue<ASObject>
+  public bto?: LDValue<ASObject>
+  public type?: ASObjectType<string>
+  public url?: OneOrMore<xsdAnyUri|ASLink>
 }
 
 export const isASObject = (obj: any): obj is ASObject => {
@@ -83,17 +83,17 @@ export const activitySubtypes = [
   "Accept", "Add", "Announce", "Arrive", "Block", "Create", "Delete",
   "Dislike", "Flag", "Follow", "Ignore", "Invite", "Join", "Leave", "Like",
   "Listen", "Move", "Offer", "Question", "Reject", "Read", "Remove",
-  "TentativeReject", "TentativeAccept", "Travel", "Undo", "Update", "View"
+  "TentativeReject", "TentativeAccept", "Travel", "Undo", "Update", "View",
 ]
 const ActivitySubtypes = strEnum(activitySubtypes)
 type ActivitySubtype = keyof typeof ActivitySubtypes
 
 export class Activity extends ASObject {
-  type: ASObjectType<"Activity" | ActivitySubtype>
-  actor?: ASValue
-  object?: LDValue<ASObject>
-  target?: ASValue
-  constructor (props:any) {
+  public type: ASObjectType<"Activity" | ActivitySubtype>
+  public actor?: ASValue
+  public object?: LDValue<ASObject>
+  public target?: ASValue
+  constructor(props: any) {
     super()
     this.type = this.constructor.name
     Object.assign(this, props)
@@ -108,24 +108,24 @@ export const isActivity = (activity: any): activity is Activity => {
 }
 
 export class Collection<T> extends ASObject {
-  items?: T[]
-  totalItems?: number
+  public items?: T[]
+  public totalItems?: number
 }
 
 export class Note extends ASObject {
-  type: ASObjectType<"Note">
+  public type: ASObjectType<"Note">
 }
 
 export class Place extends ASObject {
-  accuracy?: number
-  latitude?: number
-  longitude?: number
-  altitude?: number
-  radius?: number
-  units?: "cm" | "feet" | "inches" | "km" | "m" | "miles" | xsdAnyUri
+  public accuracy?: number
+  public latitude?: number
+  public longitude?: number
+  public altitude?: number
+  public radius?: number
+  public units?: "cm" | "feet" | "inches" | "km" | "m" | "miles" | xsdAnyUri
 }
 
-function strEnum<T extends string> (o: Array<T>): {[K in T]: K} {
+function strEnum<T extends string>(o: T[]): {[K in T]: K} {
   return o.reduce((res, key) => {
     res[key] = key
     return res

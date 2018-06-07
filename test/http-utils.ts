@@ -1,21 +1,21 @@
-const assert = require('assert')
-const fetch = require('node-fetch')
+const assert = require("assert")
+const fetch = require("node-fetch")
 
-import distbin from '../'
-import {ClientRequestArgs, ClientResponse, ClientRequest} from 'http'
+import {ClientRequest, ClientRequestArgs, ClientResponse} from "http"
+import distbin from "../"
 
-const { sendRequest, request, makeErrorClass, followRedirects } = require('../src/util')
-import * as url from 'url'
-import { testCli } from './'
+const { sendRequest, request, makeErrorClass, followRedirects } = require("../src/util")
+import * as url from "url"
+import { testCli } from "./"
 
-let tests = module.exports
+const tests = module.exports
 
-tests['can follow redirects'] = async () => {
-  const urlThatWillRedirect = 'http://distbin.com/about'
+tests["can follow redirects"] = async () => {
+  const urlThatWillRedirect = "http://distbin.com/about"
   const response = await followRedirects(Object.assign(url.parse(urlThatWillRedirect), {
     headers: {
-      accept: `application/json`
-    }
+      accept: `application/json`,
+    },
   }))
   assert.equal(response.statusCode, 200)
 }
