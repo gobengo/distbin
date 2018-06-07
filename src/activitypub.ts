@@ -292,7 +292,7 @@ const deliverActivity = async function (activity: Activity, target: string, { de
 
   const deliveryRequest = request(Object.assign(parsedInboxUrl, {
     headers: {
-      'content-type': 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
+      'content-type': ASJsonLdProfileContentType
     },
     method: 'post'
   }))
@@ -398,7 +398,7 @@ async function inboxFromBody (body: string, contentType: string) {
     const directInbox = await directInboxFromBody(body, contentType)
     if (directInbox) return directInbox
   } catch (error) {
-    logger.debug("Error looking for directInbox", error)
+    logger.debug("Error looking for directInbox (Moving on).", error)
   }
   const actorInboxes = await actorInboxesFromBody(body, contentType);
   if (actorInboxes.length > 1) {
@@ -427,11 +427,18 @@ async function actorInboxesFromBody (body: string, contentType: string): Promise
       return []
     }
   }))
+  logger.warn("Actor URLs", actorUrls)
   const actorInboxes = flatten(await Promise.all(actorUrls.map(async actorUrl => {
     try {
-      const res = await fetch(actorUrl);
+      const res = await fetch(actorUrl, {
+        headers: {
+          accept: ASJsonLdProfileContentType
+        }
+      });
       const actor = await res.json();
-      return ensureArray(actor.inbox).map(inboxUrl => url.resolve(actorUrl, inboxUrl))
+      const inbox = actor.inbox
+      logger.debug('Actor inbox', inbox)
+      return ensureArray(inbox).map(inboxUrl => url.resolve(actorUrl, inboxUrl))
     } catch (error) {
       logger.warn("Error fetching actor to lookup inbox", error)
     }
@@ -449,10 +456,11 @@ function bodyToJsonLd (body: string, contentType: string) {
   switch (contentType) {
     case "application/json":
     case 'application/ld+json':
+    case 'application/activity+json':
       const data = JSON.parse(body)
       return data
     default:
-      logger.warn("Unable due bodyToJsonLd due to unexpected contentType", { contentType })
+      logger.warn("Unable to bodyToJsonLd due to unexpected contentType", { contentType })
       throw new UnexpectedContentTypeError(`Dont know how to parse contentType=${contentType}`)
   }
 }
@@ -484,6 +492,7 @@ async function directInboxFromBody (body: string, contentType: string) {
       }
       break;
     case 'application/ld+json':
+    case 'application/activity+json':
       const obj = JSON.parse(body)
       const compacted = await jsonld.compact(obj, {
         '@context': [
