@@ -46,6 +46,9 @@
     "tslint": "^5.10.0",
     "typescript-eslint-parser": "^8.0.1"
   },
+  "peerDependencies": {
+    "hoek": "^4.2.1"
+  },
   "config": {
     "port": 8000
   },
