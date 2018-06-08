@@ -122,9 +122,9 @@ export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, external
       // GET renders home page will all kinds of stuff
       case "get":
         const query = url.parse(req.url, true).query // todo sanitize
-        const safeInReplyToDefault = encodeHtmlEntities(query.inReplyTo || "")
-        const safeTitleDefault = encodeHtmlEntities(query.title || "")
-        const safeAttachmentUrl = encodeHtmlEntities(query.attachment || "")
+        const safeInReplyToDefault = encodeHtmlEntities(first(query.inReplyTo) || "")
+        const safeTitleDefault = encodeHtmlEntities(first(query.title) || "")
+        const safeAttachmentUrl = encodeHtmlEntities(first(query.attachment) || "")
         res.writeHead(200, {
           "content-type": "text/html",
         })

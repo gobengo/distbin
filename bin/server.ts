@@ -14,7 +14,7 @@ import createDistbinConfig from "../config"
 import * as distbinHtml from "../src/distbin-html"
 import { JSONFileMapAsync } from "../src/filemap"
 import { createLogger } from "../src/logger"
-import { debuglog, denodeify, readableToString, sendRequest } from "../src/util"
+import { debuglog, denodeify, first, readableToString, sendRequest } from "../src/util"
 
 const logger = createLogger("bin/server")
 
@@ -88,15 +88,10 @@ async function runServer() {
   // But not sure best way to do that without making the api part depend on the html part
   const mainServer = http.createServer((req, res) => {
     // htmlHandler only supports '/' right now (#TODO)
-    let acceptHeader: string
-    if (req.headers.accept instanceof Array) {
-      acceptHeader = req.headers.accept[0]
-    } else if (typeof req.headers.accept === "string") {
-      acceptHeader = req.headers.accept as string
-    }
+    const acceptHeader = first(req.headers.accept)
     const preference = (acceptHeader
       ? acceptHeader.split(",")
-      : []).find((mime) => ["text/html", "application/json"].includes(mime)) // TODO wtf?
+      : []).find((mime: string) => ["text/html", "application/json"].includes(mime)) // TODO wtf?
     // Depending on 'Accept' header, try candidate backends in a certain order (e.g. html first)
     let prioritizedBackends: string[];
     switch (preference) {

@@ -169,7 +169,7 @@ export const requestMaxMemberCount = (req: http.ServerRequest) => {
     .filter(Boolean)[0]
   if (headerMatch) { return parseInt(headerMatch[1], 10) }
   // check querystring
-  return parseInt(url.parse(req.url, true).query["max-member-count"], 10)
+  return parseInt(first(url.parse(req.url, true).query["max-member-count"]), 10)
 }
 
 export const createHttpOrHttpsRequest = (urlOrObj: string|UrlObject) => {

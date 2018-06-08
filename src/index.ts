@@ -10,11 +10,12 @@ import {
   targetAndDeliver,
 } from "./activitypub"
 import { createLogger } from "./logger"
-import { Activity, ActivityMap, ASObject, Extendable, HttpRequestResponder,
-         JSONLD, LDObject, LDValue, LDValues } from "./types"
+import { Activity, ActivityMap, ASObject, Extendable,
+         JSONLD, LDValue } from "./types"
 import {
   debuglog,
   ensureArray,
+  first,
   flatten,
   jsonld, jsonldAppend, readableToString,
   requestMaxMemberCount,
@@ -300,7 +301,7 @@ function inboxHandler({ activities, externalUrl, inbox, inboxFilter }: {
         res.end()
         return
       case "get":
-        const idQuery = url.parse(req.url, true).query.id
+        const idQuery = first(url.parse(req.url, true).query.id)
         let responseBody
         if (idQuery) {
           // trying to just get one notification
@@ -721,7 +722,7 @@ function publicCollectionPageHandler({ activities, externalUrl }: {
     let matchesCursor = (a: Activity) => true
     if (parsedUrl.query.cursor) {
       try {
-        cursor = JSON.parse(parsedUrl.query.cursor)
+        cursor = JSON.parse(first(parsedUrl.query.cursor))
       } catch (error) {
         res.writeHead(400)
         res.end(JSON.stringify({ message: "Invalid cursor in querystring" }))

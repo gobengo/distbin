@@ -3,6 +3,7 @@ import * as querystring from "querystring"
 import * as url from "url"
 import { sendRequest } from "../util";
 import { encodeHtmlEntities } from "../util"
+import { first } from "../util"
 import { readableToString } from "../util"
 import { requestMaxMemberCount } from "../util"
 import { createHttpOrHttpsRequest } from "../util"
@@ -27,7 +28,7 @@ async function createPublicBody(req: IncomingMessage, { apiUrl }: {apiUrl: strin
     throw new Error("max-member-count must be a number")
   }
   const query = url.parse(req.url, true).query
-  let pageUrl = query.page
+  let pageUrl = first(query.page)
   let pageMediaType = query.pageMediaType || "application/json"
   if (!pageUrl) {
     const publicCollectionUrl = apiUrl + "/activitypub/public"
