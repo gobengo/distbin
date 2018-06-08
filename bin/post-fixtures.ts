@@ -1,4 +1,4 @@
-#!/usr/bin/env node --harmony
+#!/usr/bin/env node
 /*
 This script is meant to populate a distbin server with useful fixtures.
 ./post-fixtures <url-of-distbin>
