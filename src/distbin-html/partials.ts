@@ -8,7 +8,7 @@ export const everyPageHead = () => `
     max-width: 42em;
     padding: 1em;
   }
-  .distbin-main {  
+  .distbin-main {
   }
   .distbin-above-fold {
     height: calc(100vh - 3em); /* magic number; height of header */
@@ -26,14 +26,14 @@ export const everyPageHead = () => `
   </style>
 `
 
-export const aboveFold = (html:string) => `
+export const aboveFold = (html: string) => `
   <div class="distbin-above-fold">
    ${html}
   </div>
 `
 
 // wrap page with common body template for distbin-html (e.g. header/footer)
-export const distbinBodyTemplate = (page:string) => `
+export const distbinBodyTemplate = (page: string) => `
   <head>
     ${everyPageHead()}
   </head>
@@ -43,11 +43,11 @@ export const distbinBodyTemplate = (page:string) => `
   </div>
 `
 
-function header () {
+function header() {
   // todo
   return `
     <style>
-    html { 
+    html {
       box-sizing: border-box;
     }
     .distbin-header {

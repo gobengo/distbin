@@ -1,325 +1,326 @@
-import { Activity, ASObject, Collection, Note, Place } from '../../src/activitystreams/types'
-import * as AS2 from '../../src/activitystreams'
-import { Extendable } from '../../src/types'
-import * as assert from 'assert'
-import { testCli } from '../'
+import * as assert from "assert"
+import { testCli } from "../"
+import * as AS2 from "../../src/activitystreams"
+import { Activity, ASObject, Collection, Note, Place } from "../../src/activitystreams/types"
+import { Extendable } from "../../src/types"
 
 const tests = module.exports
 
-tests['has types'] = () => {
+tests["has types"] = () => {
   const example1: Activity = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'summary': 'A note',
-    'type': 'Note',
-    'content': 'My dog has fleas.'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "content": "My dog has fleas.",
+    "summary": "A note",
+    "type": "Note",
   }
   const example2: Extendable<Activity> = {
-    '@context': {
-      '@vocab': 'https://www.w3.org/ns/activitystreams',
-      'ext': 'https://canine-extension.example/terms/',
-      '@language': 'en'
+    "@context": {
+      "@language": "en",
+      "@vocab": "https://www.w3.org/ns/activitystreams",
+      "ext": "https://canine-extension.example/terms/",
     },
-    'summary': 'A note',
-    'type': 'Note',
-    'content': 'My dog has fleas.',
-    'ext:nose': 0,
-    'ext:smell': 'terrible'
+    "content": "My dog has fleas.",
+    "ext:nose": 0,
+    "ext:smell": "terrible",
+    "summary": "A note",
+    "type": "Note",
   }
   const example3: Extendable<Activity> = {
-    '@context': [
-      'https://www.w3.org/ns/activitystreams',
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
       {
-        'css': 'http://www.w3.org/ns/oa#styledBy'
-      }
+        css: "http://www.w3.org/ns/oa#styledBy",
+      },
     ],
-    'summary': 'A note',
-    'type': 'Note',
-    'content': 'My dog has fleas.',
-    'css': 'http://www.csszengarden.com/217/217.css?v=8may2013'
+    "content": "My dog has fleas.",
+    "css": "http://www.csszengarden.com/217/217.css?v=8may2013",
+    "summary": "A note",
+    "type": "Note",
   }
   const example4: Activity = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'summary': 'Martin created an image',
-    'type': 'Create',
-    'actor': 'http://www.test.example/martin',
-    'object': 'http://example.org/foo.jpg'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "actor": "http://www.test.example/martin",
+    "object": "http://example.org/foo.jpg",
+    "summary": "Martin created an image",
+    "type": "Create",
   }
   const example5: Activity = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'summary': 'Martin added an article to his blog',
-    'type': 'Add',
-    'published': '2015-02-10T15:04:55Z',
-    'actor': {
-      'type': 'Person',
-      'id': 'http://www.test.example/martin',
-      'name': 'Martin Smith',
-      'url': 'http://example.org/martin',
-      'image': {
-        'type': 'Link',
-        'href': 'http://example.org/martin/image.jpg',
-        'mediaType': 'image/jpeg'
-      }
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "actor": {
+      id: "http://www.test.example/martin",
+      image: {
+        href: "http://example.org/martin/image.jpg",
+        mediaType: "image/jpeg",
+        type: "Link",
+      },
+      name: "Martin Smith",
+      type: "Person",
+      url: "http://example.org/martin",
     },
-    'object': {
-      'id': 'http://www.test.example/blog/abc123/xyz',
-      'type': 'Article',
-      'url': 'http://example.org/blog/2011/02/entry',
-      'name': 'Why I love Activity Streams'
+    "object": {
+      id: "http://www.test.example/blog/abc123/xyz",
+      name: "Why I love Activity Streams",
+      type: "Article",
+      url: "http://example.org/blog/2011/02/entry",
     },
-    'target': {
-      'id': 'http://example.org/blog/',
-      'type': 'OrderedCollection',
-      'name': 'Martin\'s Blog'
-    }
+    "published": "2015-02-10T15:04:55Z",
+    "summary": "Martin added an article to his blog",
+    "target": {
+      id: "http://example.org/blog/",
+      name: "Martin's Blog",
+      type: "OrderedCollection",
+    },
+    "type": "Add",
   }
   const example6: Collection<Activity> = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'summary': 'Martin\'s recent activities',
-    'type': 'Collection',
-    'totalItems': 1,
-    'items': [
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "items": [
       {
-        'type': 'Add',
-        'published': '2011-02-10T15:04:55Z',
-        'generator': 'http://example.org/activities-app',
-        'nameMap': {
-          'en': 'Martin added a new image to his album.',
-          'ga': 'Martin phost le fisean nua a albam.'
-        },
-        'actor': {
-          'type': 'Person',
-          'id': 'http://www.test.example/martin',
-          'name': 'Martin Smith',
-          'url': 'http://example.org/martin',
-          'image': {
-            'type': 'Link',
-            'href': 'http://example.org/martin/image',
-            'mediaType': 'image/jpeg',
-            'width': 250,
-            'height': 250
-          }
-        },
-        'object': {
-          'name': 'My fluffy cat',
-          'type': 'Image',
-          'id': 'http://example.org/album/máiréad.jpg',
-          'preview': {
-            'type': 'Link',
-            'href': 'http://example.org/album/máiréad.jpg',
-            'mediaType': 'image/jpeg'
+        actor: {
+          id: "http://www.test.example/martin",
+          image: {
+            height: 250,
+            href: "http://example.org/martin/image",
+            mediaType: "image/jpeg",
+            type: "Link",
+            width: 250,
           },
-          'url': [
+          name: "Martin Smith",
+          type: "Person",
+          url: "http://example.org/martin",
+        },
+        generator: "http://example.org/activities-app",
+        nameMap: {
+          en: "Martin added a new image to his album.",
+          ga: "Martin phost le fisean nua a albam.",
+        },
+        object: {
+          id: "http://example.org/album/máiréad.jpg",
+          name: "My fluffy cat",
+          preview: {
+            href: "http://example.org/album/máiréad.jpg",
+            mediaType: "image/jpeg",
+            type: "Link",
+          },
+          type: "Image",
+          url: [
             {
-              'type': 'Link',
-              'href': 'http://example.org/album/máiréad.jpg',
-              'mediaType': 'image/jpeg'
+              href: "http://example.org/album/máiréad.jpg",
+              mediaType: "image/jpeg",
+              type: "Link",
             },
             {
-              'type': 'Link',
-              'href': 'http://example.org/album/máiréad.png',
-              'mediaType': 'image/png'
-            }
-          ]
+              href: "http://example.org/album/máiréad.png",
+              mediaType: "image/png",
+              type: "Link",
+            },
+          ],
         },
-        'target': {
-          'type': 'Collection',
-          'id': 'http://example.org/album/',
-          'nameMap': {
-            'en': 'Martin\'s Photo Album',
-            'ga': 'Grianghraif Mairtin'
+        published: "2011-02-10T15:04:55Z",
+        target: {
+          id: "http://example.org/album/",
+          image: {
+            href: "http://example.org/album/thumbnail.jpg",
+            mediaType: "image/jpeg",
+            type: "Link",
           },
-          'image': {
-            'type': 'Link',
-            'href': 'http://example.org/album/thumbnail.jpg',
-            'mediaType': 'image/jpeg'
-          }
-        }
-      }
-    ]
+          nameMap: {
+            en: "Martin's Photo Album",
+            ga: "Grianghraif Mairtin",
+          },
+          type: "Collection",
+        },
+        type: "Add",
+      },
+    ],
+    "summary": "Martin's recent activities",
+    "totalItems": 1,
+    "type": "Collection",
   }
   const example7: Activity = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'id': 'http://example.org/foo',
-    'type': 'Note',
-    'name': 'My favourite stew recipe',
-    'attributedTo': {
-      'id': 'http://joe.website.example/',
-      'type': 'Person',
-      'name': 'Joe Smith'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "attributedTo": {
+      id: "http://joe.website.example/",
+      name: "Joe Smith",
+      type: "Person",
     },
-    'published': '2014-08-21T12:34:56Z'
+    "id": "http://example.org/foo",
+    "name": "My favourite stew recipe",
+    "published": "2014-08-21T12:34:56Z",
+    "type": "Note",
   }
   const example8: Extendable<Place> = {
-    '@context': [
-      'https://www.w3.org/ns/activitystreams',
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
       {
-        'gr': 'http://purl.org/goodrelations/v1#'
-      }
+        gr: "http://purl.org/goodrelations/v1#",
+      },
     ],
-    'type': ['Place', 'gr:Location'],
-    'name': 'Sally\'s Restaurant',
-    'longitude': 12.34,
-    'latitude': 56.78,
-    'gr:category': 'restaurants/french_restaurants'
+    "gr:category": "restaurants/french_restaurants",
+    "latitude": 56.78,
+    "longitude": 12.34,
+    "name": "Sally's Restaurant",
+    "type": ["Place", "gr:Location"],
   }
   const example9: Note = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Note',
-    'id': 'http://example.org/note/123',
-    'name': 'Our Weather Is Fine',
-    'content': 'I feel that the weather is appropriate to our season and location.'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "content": "I feel that the weather is appropriate to our season and location.",
+    "id": "http://example.org/note/123",
+    "name": "Our Weather Is Fine",
+    "type": "Note",
   }
   const example10: Note = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Note',
-    'id': 'http://example.org/note/124',
-    'summary': 'A note by Sally',
-    'content': 'Everything is OK here.'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "content": "Everything is OK here.",
+    "id": "http://example.org/note/124",
+    "summary": "A note by Sally",
+    "type": "Note",
   }
   const example11: ASObject = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Application',
-    'id': 'http://example.org/application/123',
-    'name': 'Exampletron 3000',
-    'image': 'http://example.org/application/123.png'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "id": "http://example.org/application/123",
+    "image": "http://example.org/application/123.png",
+    "name": "Exampletron 3000",
+    "type": "Application",
   }
   const example12: ASObject = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Application',
-    'id': 'http://example.org/application/123',
-    'name': 'Exampletron 3000',
-    'image': {
-      'type': 'Link',
-      'href': 'http://example.org/application/123.png',
-      'mediaType': 'image/png'
-    }
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "id": "http://example.org/application/123",
+    "image": {
+      href: "http://example.org/application/123.png",
+      mediaType: "image/png",
+      type: "Link",
+    },
+    "name": "Exampletron 3000",
+    "type": "Application",
   }
   const example13: ASObject = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Application',
-    'id': 'http://example.org/application/123',
-    'name': 'Exampletron 3000',
-    'image': [
-      'http://example.org/application/abc.gif',
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "id": "http://example.org/application/123",
+    "image": [
+      "http://example.org/application/abc.gif",
       {
-        'type': 'Link',
-        'href': 'http://example.org/application/123.png',
-        'mediaType': 'image/png'
-      }
-    ]
+        href: "http://example.org/application/123.png",
+        mediaType: "image/png",
+        type: "Link",
+      },
+    ],
+    "name": "Exampletron 3000",
+    "type": "Application",
   }
   const example14: ASObject = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'type': 'Application',
-    'id': 'http://example.org/application/123',
-    'name': 'Exampletron 3000',
-    'image': [
-      'http://example.org/application/abc.gif',
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "id": "http://example.org/application/123",
+    "image": [
+      "http://example.org/application/abc.gif",
       {
-        'type': 'Link',
-        'href': 'http://example.org/application/123.png',
-        'mediaType': 'image/png',
-        'rel': 'thumbnail'
-      }
-    ]
+        href: "http://example.org/application/123.png",
+        mediaType: "image/png",
+        rel: "thumbnail",
+        type: "Link",
+      },
+    ],
+    "name": "Exampletron 3000",
+    "type": "Application",
   }
   const example15: Extendable<Activity> = {
-    '@context': [
-      'https://www.w3.org/ns/activitystreams',
-      {'vcard': 'http://www.w3.org/2006/vcard/ns#'}
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
+      {vcard: "http://www.w3.org/2006/vcard/ns#"},
     ],
-    'summary': 'Sally created a note',
-    'type': 'Create',
-    'actor': {
-      'type': ['Person', 'vcard:Individual'],
-      'id': 'http://sally.example.org',
-      'name': 'Sally Smith',
-      'vcard:given-name': 'Sally',
-      'vcard:family-name': 'Smith'
+    "actor": {
+      "id": "http://sally.example.org",
+      "name": "Sally Smith",
+      "type": ["Person", "vcard:Individual"],
+      "vcard:family-name": "Smith",
+      "vcard:given-name": "Sally",
     },
-    'object': {
-      'type': 'Note',
-      'content': 'This is a simple note'
-    }
+    "object": {
+      content: "This is a simple note",
+      type: "Note",
+    },
+    "summary": "Sally created a note",
+    "type": "Create",
   }
   const example16: Activity = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'summary': 'Joe liked a note',
-    'type': 'Like',
-    'id': 'http://www.test.example/activity/1',
-    'actor': 'http://example.org/profiles/joe',
-    'object': 'http://example.com/notes/1',
-    'published': '2014-09-30T12:34:56Z'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "actor": "http://example.org/profiles/joe",
+    "id": "http://www.test.example/activity/1",
+    "object": "http://example.com/notes/1",
+    "published": "2014-09-30T12:34:56Z",
+    "summary": "Joe liked a note",
+    "type": "Like",
   }
   const example17: Activity = {
-    '@context': 'https://www.w3.org/ns/activitystreams',
-    'summary': 'Joe liked a note',
-    'type': ['Like', 'http://schema.org/LikeAction'],
-    'id': 'http://www.test.example/activity/1',
-    'actor': 'http://example.org/profiles/joe',
-    'object': 'http://example.com/notes/1',
-    'published': '2014-09-30T12:34:56Z'
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "actor": "http://example.org/profiles/joe",
+    "id": "http://www.test.example/activity/1",
+    "object": "http://example.com/notes/1",
+    "published": "2014-09-30T12:34:56Z",
+    "summary": "Joe liked a note",
+    "type": ["Like", "http://schema.org/LikeAction"],
   }
 
   const example32: Collection<Extendable<Activity>> = {
-    '@context': [
-      'https://www.w3.org/ns/activitystreams',
+    "@context": [
+      "https://www.w3.org/ns/activitystreams",
       {
-        'oa': 'http://www.w3.org/ns/oa#',
-        'prov': 'http://www.w3.org/ns/prov#',
-        'dcterms': 'http://purl.org/dc/terms/',
-        'dcterms:created': {
-          '@id': 'dcterms:created',
-          '@type': 'xsd:dateTime'
-        }
-      }
+        "dcterms": "http://purl.org/dc/terms/",
+        "dcterms:created": {
+          "@id": "dcterms:created",
+          "@type": "xsd:dateTime",
+        },
+        "oa": "http://www.w3.org/ns/oa#",
+        "prov": "http://www.w3.org/ns/prov#",
+      },
     ],
-    'summary': 'Editing history of a note',
-    'type': 'Collection',
-    'items': [
+    "items": [
       {
-        'id': 'http://example.org/activity/20150101000000',
-        'type': [ 'Create', 'prov:Activity' ],
-        'actor': {
-          'id': 'http://example.org/#eric',
-          'name': 'Eric'
+        actor: {
+          id: "http://example.org/#eric",
+          name: "Eric",
         },
-        'summary': 'Eric wrote a note.',
-        'object': {
-          'id': 'http://example.org/entry/20150101000000',
-          'type': [ 'Note', 'prov:Entity' ],
-          'attributedTo': 'http://example.org/#eric',
-          'content': 'Remember... all I\'m offering is the trooth. Nothing more.'
+        id: "http://example.org/activity/20150101000000",
+        object: {
+          attributedTo: "http://example.org/#eric",
+          content: "Remember... all I'm offering is the trooth. Nothing more.",
+          id: "http://example.org/entry/20150101000000",
+          type: [ "Note", "prov:Entity" ],
         },
-        'published': '2015-01-01T00:00:00Z'
+        published: "2015-01-01T00:00:00Z",
+        summary: "Eric wrote a note.",
+        type: [ "Create", "prov:Activity" ],
       },
       {
-        'id': 'http://example.org/activity/20150101000059',
-        'type': [ 'Update', 'prov:Activity', 'oa:Annotation' ],
-        'summary': 'Eric edited a note.',
-        'dcterms:created': '2015-01-01T00:00:59Z',
-        'dcterms:creator': { '@id': 'http://example.org/#eric' },
-        'oa:hasBody': {
-          'id': 'http://example.org/entry/20150101000059',
-          'type': [ 'Note', 'prov:Entity' ],
-          'content': 'Remember... all I\'m offering is the truth. Nothing more.',
-          'prov:wasAttributedTo': { '@id': 'http://example.org/#eric' },
-          'prov:wasRevisionOf': { '@id': 'http://example.org/entry/20150101000000' }
+        "dcterms:created": "2015-01-01T00:00:59Z",
+        "dcterms:creator": { "@id": "http://example.org/#eric" },
+        "id": "http://example.org/activity/20150101000059",
+        "oa:hasBody": {
+          "content": "Remember... all I'm offering is the truth. Nothing more.",
+          "id": "http://example.org/entry/20150101000059",
+          "prov:wasAttributedTo": { "@id": "http://example.org/#eric" },
+          "prov:wasRevisionOf": { "@id": "http://example.org/entry/20150101000000" },
+          "type": [ "Note", "prov:Entity" ],
         },
-        'oa:hasTarget': { '@id': 'http://example.org/entry/20150101000000' },
-        'oa:motivatedBy': { '@id': 'oa:editing' },
-        'prov:generated': { '@id': 'http://example.org/entry/20150101000059' },
-        'prov:wasInformedBy': { '@id': 'http://example.org/activity/20150101000000' }
+        "oa:hasTarget": { "@id": "http://example.org/entry/20150101000000" },
+        "oa:motivatedBy": { "@id": "oa:editing" },
+        "prov:generated": { "@id": "http://example.org/entry/20150101000059" },
+        "prov:wasInformedBy": { "@id": "http://example.org/activity/20150101000000" },
+        "summary": "Eric edited a note.",
+        "type": [ "Update", "prov:Activity", "oa:Annotation" ],
       },
       {
-        'id': 'http://example.org/activity/20150101010101',
-        'type': [ 'Delete', 'prov:Activity' ],
-        'actor': 'http://example.org/#eric',
-        'summary': 'Eric deleted a note.',
-        'object': 'http://example.org/entry/20150101000059',
-        'published': '2015-01-01T01:01:01Z'
-      }
-    ]
+        actor: "http://example.org/#eric",
+        id: "http://example.org/activity/20150101010101",
+        object: "http://example.org/entry/20150101000059",
+        published: "2015-01-01T01:01:01Z",
+        summary: "Eric deleted a note.",
+        type: [ "Delete", "prov:Activity" ],
+      },
+    ],
+    "summary": "Editing history of a note",
+    "type": "Collection",
+
   }
 }
 
