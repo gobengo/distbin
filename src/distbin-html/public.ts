@@ -13,7 +13,9 @@ import { distbinBodyTemplate } from "./partials"
 
 export const createHandler = ({ apiUrl }: {apiUrl: string}) => {
   return async (req: IncomingMessage, res: ServerResponse) => {
-    res.writeHead(200)
+    res.writeHead(200, {
+      "content-type": "text/html",
+    })
     res.end(distbinBodyTemplate(`
       ${await createPublicBody(req, {
         apiUrl,
