@@ -19,3 +19,7 @@ A networked place to store posted web documents. This is meant to allow for dist
 ### Interacting with a running distbin
 
 Create a Post `./bin/create-post`
+
+## Demo
+
+* [Official demo](https://distbin.com/)
