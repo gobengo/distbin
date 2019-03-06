@@ -104,7 +104,7 @@ function createAboutMessage() {
         you create online and the way you consume and socialize around them. distbin is
         the first tool anyone (especially non-programmers!) can use to communicate in this way.
       </p>
-      <p>Sound interesting? Post your thoughts below to try it out.</p>
+      <p>Sound interesting? Post your thoughts below to try it out or come to see the <a href="https://github.com/gobengo/distbin">source</a>.</p>
     <details>
       <summary>
         Technical Info, Planned Features, and Progress
