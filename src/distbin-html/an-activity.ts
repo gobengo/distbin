@@ -512,6 +512,7 @@ async function fetchReplyAncestors(baseUrl: string, activity: Activity): Promise
     switch (err.code) {
       case "ECONNREFUSED":
       case "ENOTFOUND":
+      case "ENETUNREACH":
         // don't recurse since we can't fetch the parent
         return [new LinkPrefetchFailure({
           error: err,
