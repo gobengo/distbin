@@ -1,0 +1,17 @@
+version: "3.4"
+
+networks:
+  public: {}
+
+volumes:
+  distbin-db: {}
+
+services:
+  distbin:
+    build: .
+    networks:
+    - public
+    ports:
+    - 8000:80
+    volumes:
+    - distbin-db:/distbin-db:rw
