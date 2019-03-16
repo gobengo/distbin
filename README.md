@@ -12,11 +12,17 @@ A networked place to store posted web documents. This is meant to allow for dist
 
 ## Usage
 
+### Quickstart using docker without cloning
+
+```
+docker run -p 8000:80 gobengo/distbin
+```
+
+`open http://localhost:8000`
+
 ### Quickstart using docker-compose
 
 `docker-compose run -p 8000:80 distbin`
-
-`open http://localhost:8000`
 
 ### Run the server to develop
 
