@@ -12,6 +12,6 @@ services:
     networks:
     - public
     ports:
-    - 8000:80
+    - 80
     volumes:
     - distbin-db:/distbin-db:rw
