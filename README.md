@@ -12,9 +12,15 @@ A networked place to store posted web documents. This is meant to allow for dist
 
 ## Usage
 
-### Starting the Process
+### Quickstart using docker-compose
 
-`./bin/server`
+`docker-compose run -p 8000:80 distbin`
+
+`open http://localhost:8000`
+
+### Run the server to develop
+
+`npm run start-dev`
 
 ### Interacting with a running distbin
 
