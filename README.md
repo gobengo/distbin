@@ -35,3 +35,14 @@ Create a Post `./bin/create-post`
 ## Demo
 
 * [Official demo](https://distbin.com/)
+
+
+## Configuration
+
+Configure distbin with the following environment variables:
+
+* `DB_DIR` - path to a directory in which distbin should read/write data
+* `PORT` - HTTP Port for distbin to listen on
+* `EXTERNAL_URL` - The public-facing base URL that distbin is deployed at, e.g. `http://yourdomain.com/distbin/`
+* `INTERNAL_URL` - If distbin is running with a network configuration such that it cannot make requests to the `EXTERNAL_URL`, all outgoing requests to the `EXTERNAL_URL` will be replaced with this `INTERNAL_URL`. See [./etc/distbin-nginx-subpath/docker-compose.yml](./etc/distbin-nginx-subpath/docker-compose.yml) for an example.
+* `DISTBIN_DELIVER_TO_LOCALHOST` - default: false in production - Whether or not to allow distbin to make requests to `localhost` URLs. This is discouraged in [the security considerations of the ActivityPub spec](https://www.w3.org/TR/activitypub/#security-localhost)
