@@ -1,3 +1,5 @@
+import { resolve as urlResolve } from "url";
+
 // HTML fragment that should appear in every page's <head> element
 export const everyPageHead = () => `
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,26 +26,30 @@ export const everyPageHead = () => `
     max-width: 100%;
   }
   </style>
-`
+`;
 
 export const aboveFold = (html: string) => `
   <div class="distbin-above-fold">
    ${html}
   </div>
-`
+`;
 
 // wrap page with common body template for distbin-html (e.g. header/footer)
-export const distbinBodyTemplate = (page: string) => `
+export const distbinBodyTemplate = ({
+  externalUrl,
+}: {
+  externalUrl: string;
+}) => (page: string) => `
   <head>
     ${everyPageHead()}
   </head>
-  ${header()}
+  ${header({ externalUrl })}
   <div class="distbin-main">
     ${page}
   </div>
-`
+`;
 
-function header() {
+function header({ externalUrl }: { externalUrl: string }) {
   // todo
   return `
     <style>
@@ -81,13 +87,19 @@ function header() {
     <header class="distbin-header">
       <div class="distbin-header-inner">
         <div class="distbin-header-section left">
-          <a href="/" class="distbin-header-item name">distbin</a>
+          <a href="${externalUrl}" class="distbin-header-item name">distbin</a>
         </div>
         <div class="distbin-header-section right">
-          <a href="/public" class="distbin-header-item public">public</a>
-          <a href="/about" class="distbin-header-item about">about</a>
+          <a href="${urlResolve(
+            externalUrl,
+            "./public",
+          )}" class="distbin-header-item public">public</a>
+          <a href="${urlResolve(
+            externalUrl,
+            "./about",
+          )}" class="distbin-header-item about">about</a>
         </div>
       </div>
     </header>
-  `
+  `;
 }

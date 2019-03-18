@@ -9,11 +9,13 @@ import distbin from "../"
 import { discoverOutbox } from "../src/activitypub"
 import * as activitypub from "../src/activitypub"
 import { ASJsonLdProfileContentType } from "../src/activitystreams"
+import { createLogger } from "../src/logger"
 import { Activity, ASObject, DistbinActivity, Extendable, HttpRequestResponder, isActivity, JSONLD,
   LDObject, LDValue, LDValues } from "../src/types"
 import { ensureArray, first, isProbablyAbsoluteUrl, linkToHref, readableToString, sendRequest } from "../src/util"
 import { listen, postActivity, requestForListener } from "./util"
 
+const logger = createLogger("test/distbin")
 const tests = module.exports
 
 tests.discoverOutbox = async () => {
@@ -384,7 +386,9 @@ tests["GET an activity has a .url that resolves"] = async () => {
   const fetchedActivity = JSON.parse(await readableToString(activityResponse))
   assert(fetchedActivity.url, "has .url property")
   await Promise.all(ensureArray(fetchedActivity.url).map(async (fetchedActivityUrl: string) => {
-    const urlResponse = await sendRequest(http.request(url.resolve(activityUrl, fetchedActivityUrl)))
+    const resolvedUrl = url.resolve(activityUrl, fetchedActivityUrl)
+    logger.debug("resolvedUrl", JSON.stringify({ fetchedActivityUrl, resolvedUrl, activityUrl, fetchedActivity }, null, 2))
+    const urlResponse = await sendRequest(http.request(resolvedUrl))
     assert.equal(urlResponse.statusCode, 200)
   }))
 }

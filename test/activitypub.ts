@@ -57,7 +57,7 @@ tests.objectTargets = async () => {
   }
 
   for (const [index, level] of enumerate(levels)) {
-    const targets = (await objectTargets(activity, index)).map(getASId)
+    const targets = (await objectTargets(activity, index, false, (u: string) => u)).map(getASId)
     const targetsShouldBe = targetsShouldBeForLevel(index)
     // console.log({ level: index, targets, targetsShouldBe })
     assert(setsAreEqual(targetsShouldBe, new Set(targets)))
@@ -109,7 +109,7 @@ tests.clientAddressedActivity = async () => {
     },
     type: "Create",
   }
-  const addressed = await clientAddressedActivity(activityToAddress, 0, true)
+  const addressed = await clientAddressedActivity(activityToAddress, 0, true, (u: string) => u)
   assert(ensureArray(addressed.cc).includes(attributedToId))
 }
 

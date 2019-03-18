@@ -12,6 +12,7 @@ interface IDistbinConfig {
     activities: IAsyncMap<string, any>
     deliverToLocalhost: Boolean
     externalUrl?: string
+    internalUrl?: string
     inbox: IAsyncMap<string, any>
     inboxFilter: InboxFilter
     port?: number
@@ -26,6 +27,7 @@ export default async (): Promise<IDistbinConfig> => {
             ? JSON.parse(process.env.DISTBIN_DELIVER_TO_LOCALHOST)
             : process.env.NODE_ENV !== 'production',
         externalUrl: process.env.EXTERNAL_URL,
+        internalUrl: process.env.INTERNAL_URL,
         inbox: new JSONFileMapAsync(path.join(dbDir, 'inbox/')),
         inboxFilter: objectContentFilter(['viagra']),
         port: parsePort(process.env.PORT || process.env.npm_package_config_port),

@@ -40,9 +40,13 @@
     "eslint-plugin-no-only-tests": "^2.0.0",
     "eslint-plugin-promise": "^3.0.0",
     "eslint-plugin-standard": "^2.0.1",
+    "prettier": "^1.16.4",
     "ts-node": "^6.1.0",
     "tsc-watch": "^1.0.22",
     "tslint": "^5.10.0",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-eslint-rules": "^5.4.0",
+    "tslint-microsoft-contrib": "^6.1.0",
     "typescript": "^2.9.1",
     "typescript-eslint-parser": "^8.0.1"
   },
@@ -52,12 +56,17 @@
   "config": {
     "port": 8000
   },
+  "prettier": {
+    "trailingComma": "all"
+  },
   "scripts": {
     "lint": "tslint -c tslint.json 'src/**/*.ts' 'test/**/*.ts' 'bin/**/*.ts'",
     "lint-fix": "tslint --fix -c tslint.json 'src/**/*.ts' 'test/**/*.ts' 'bin/**/*.ts'",
+    "prettier": "prettier '{package.json,tsconfig.json,src/**/*.{ts,tsx}}' --write",
     "test": "ts-node test",
     "start": "node ./dist/bin/server",
     "start-dev": "tsc-watch --onSuccess 'npm start'",
+    "start:ts-node": "ts-node bin/server.ts",
     "tsc": "tsc",
     "build": "tsc && npm run build.copyfiles",
     "build.copyfiles": "copyfiles './src/**/*.json' dist/"

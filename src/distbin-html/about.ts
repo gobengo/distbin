@@ -1,21 +1,33 @@
-import { requestUrl } from "../util"
-import { distbinBodyTemplate } from "./partials"
+import { requestUrl } from "../util";
+import { distbinBodyTemplate } from "./partials";
 
-import {IncomingMessage, ServerResponse} from "http"
+import { IncomingMessage, ServerResponse } from "http";
+import { resolve as urlResolve } from "url";
 
-export const createHandler = ({ externalUrl }: {externalUrl: string}) => {
+export const createHandler = ({ externalUrl }: { externalUrl: string }) => {
   return (req: IncomingMessage, res: ServerResponse) => {
     res.writeHead(200, {
       "content-type": "text/html",
-    })
-    res.end(distbinBodyTemplate(`
+    });
+    res.end(
+      distbinBodyTemplate({ externalUrl })(`
       ${createAboutMessage()}
-      ${createReplySection({ inReplyTo: requestUrl(req) })}
-    `))
-  }
-}
+      ${createReplySection({
+        externalUrl,
+        inReplyTo: urlResolve(externalUrl, `.${req.url}`),
+      })}
+    `),
+    );
+  };
+};
 
-function createReplySection({ inReplyTo }: {inReplyTo: string}) {
+function createReplySection({
+  inReplyTo,
+  externalUrl,
+}: {
+  inReplyTo: string;
+  externalUrl: string;
+}) {
   return `
     <style>
     .distbin-reply-section header {
@@ -27,12 +39,18 @@ function createReplySection({ inReplyTo }: {inReplyTo: string}) {
       <header>
         <strong>reply</strong>
       </header>
-      ${createReplyForm({ inReplyTo })}
+      ${createReplyForm({ inReplyTo, externalUrl })}
     </div>
-  `
+  `;
 }
 
-function createReplyForm({ inReplyTo }: {inReplyTo: string}) {
+function createReplyForm({
+  inReplyTo,
+  externalUrl,
+}: {
+  inReplyTo: string;
+  externalUrl: string;
+}) {
   return `
     <style>
     .post-form textarea {
@@ -56,19 +74,19 @@ function createReplyForm({ inReplyTo }: {inReplyTo: string}) {
       margin: 1em 0;
     }
     </style>
-    <form class="post-form" method="post" action="/">
+    <form class="post-form" method="post" action="${externalUrl}">
       <input name="name" type="text" placeholder="Title (optional)"></input>
       <textarea name="content" placeholder="Share your reaction, get feedback"></textarea>
       <input name="inReplyTo" type="hidden" value="${inReplyTo}"></input>
       <input type="submit" value="post" />
     </form>
-  `
+  `;
 }
 
 const htmlEntities = {
   checked: "&#x2611;",
   unchecked: "&#x2610;",
-}
+};
 
 function createAboutMessage() {
   const msg = `
@@ -134,21 +152,29 @@ function createAboutMessage() {
                 <li>${htmlEntities.checked} Retrieval of recent items in
                 <a href="https://www.w3.org/TR/activitypub/#public-addressing">Public Collection</a>
                   <ul>
-                    <li>${htmlEntities.checked} Respect 'max-member-count' param in
+                    <li>${
+                      htmlEntities.checked
+                    } Respect 'max-member-count' param in
                     <a href="https://tools.ietf.org/html/rfc7240">RFC7240</a> HTTP Prefer
                     request header (or querystring for URIs)</li>
                   </ul>
                 </li>
                 <li>
-                  ${htmlEntities.checked} when activities are received in the outbox,
+                  ${
+                    htmlEntities.checked
+                  } when activities are received in the outbox,
                   <a href="https://www.w3.org/TR/activitypub/#server-to-server-interactions">
                   notify/deliver</a> to other targeted servers
                 </li>
                 <li>
-                  ${htmlEntities.checked} receive activities from other parts of the web
+                  ${
+                    htmlEntities.checked
+                  } receive activities from other parts of the web
                   according to <a href="https://www.w3.org/TR/activitypub/#inbox-delivery">Inbox Delivery</a>
                   <ul>
-                    <li>${htmlEntities.checked} Render these related activities on the target's html representation</li>
+                    <li>${
+                      htmlEntities.checked
+                    } Render these related activities on the target's html representation</li>
                   </ul>
                 </li>
               </ul>
@@ -166,9 +192,13 @@ function createAboutMessage() {
             <li>
               <a href="https://www.w3.org/TR/webmention/">Webmention</a>
               <ul>
-                <li>${htmlEntities.unchecked} when posts are created that refer to other web resources,
+                <li>${
+                  htmlEntities.unchecked
+                } when posts are created that refer to other web resources,
                 notify those other resources using Webmention</li>
-                <li>${htmlEntities.unchecked} Receive/render webmentions when other parts of the web
+                <li>${
+                  htmlEntities.unchecked
+                } Receive/render webmentions when other parts of the web
                 mention distbin resources</li>
               </ul>
             </li>
@@ -190,13 +220,15 @@ function createAboutMessage() {
           <ul>
             <li>${htmlEntities.checked} This homepage</li>
             <li>${htmlEntities.checked} shareable pages for each activity</li>
-            <li>${htmlEntities.unchecked} activities and Posts are different things.
+            <li>${
+              htmlEntities.unchecked
+            } activities and Posts are different things.
               Sometimes activities create posts; sometimes not. Differentiate between how these
               are rendered (or defensibly decide not to).</li>
           </ul>
         </li>
       </ul>
     </details>
-  `
-  return msg
+  `;
+  return msg;
 }

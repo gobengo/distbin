@@ -1,70 +1,90 @@
+import * as http from "http";
+import { IncomingMessage, ServerResponse } from "http";
+import * as querystring from "querystring";
+import * as url from "url";
+import { publicCollectionId } from "../activitypub";
+import { clientAddressedActivity } from "../activitypub";
+import { discoverOutbox } from "../activitypub";
+import { ASJsonLdProfileContentType } from "../activitystreams";
+import { Activity, ASObject } from "../activitystreams";
+import {
+  ASLink,
+  HasLinkPrefetchResult,
+  LinkPrefetchFailure,
+  LinkPrefetchResult,
+  LinkPrefetchSuccess,
+} from "../types";
+import { encodeHtmlEntities, readableToString, sendRequest } from "../util";
+import { requestUrl } from "../util";
+import { isProbablyAbsoluteUrl } from "../util";
+import { createHttpOrHttpsRequest } from "../util";
+import { debuglog, first } from "../util";
+import { distbinBodyTemplate } from "./partials";
+import { internalUrlRewriter } from "./url-rewriter";
 
-import * as http from "http"
-import {IncomingMessage, ServerResponse} from "http"
-import * as querystring from "querystring"
-import * as url from "url"
-import { publicCollectionId } from "../activitypub"
-import { clientAddressedActivity } from "../activitypub"
-import { discoverOutbox } from "../activitypub"
-import { ASJsonLdProfileContentType } from "../activitystreams"
-import { Activity, ASObject } from "../activitystreams"
-import { ASLink, HasLinkPrefetchResult, LinkPrefetchFailure, LinkPrefetchResult, LinkPrefetchSuccess } from "../types"
-import { encodeHtmlEntities, readableToString, sendRequest } from "../util"
-import { requestUrl } from "../util"
-import { isProbablyAbsoluteUrl } from "../util"
-import { createHttpOrHttpsRequest } from "../util"
-import { debuglog, first } from "../util"
-import { distbinBodyTemplate } from "./partials"
+import { createLogger } from "../logger";
+const logger = createLogger(__filename);
 
-import { createLogger } from "../logger"
-const logger = createLogger(__filename)
-
-export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) => {
+export const createHandler = ({
+  apiUrl,
+  externalUrl,
+  internalUrl,
+}: {
+  apiUrl: string;
+  externalUrl: string;
+  internalUrl: string;
+}) => {
   return async (req: IncomingMessage, res: ServerResponse) => {
     switch (req.method.toLowerCase()) {
       // POST is form submission to create a new post
       case "post":
-        const submission = await readableToString(req)
+        const submission = await readableToString(req);
         // assuming application/x-www-form-urlencoded
-        const formFields = querystring.parse(submission)
-        const { attachment } = formFields
-        const inReplyTo = first(formFields.inReplyTo)
-        const firstAttachment = first(attachment)
+        const formFields = querystring.parse(submission);
+        const { attachment } = formFields;
+        const inReplyTo = first(formFields.inReplyTo);
+        const firstAttachment = first(attachment);
         if (firstAttachment && !isProbablyAbsoluteUrl(firstAttachment)) {
-          throw new Error("attachment must be a URL, but got " + firstAttachment)
+          throw new Error(
+            "attachment must be a URL, but got " + firstAttachment,
+          );
         }
-        const attachmentLink = await getAttachmentLinkForUrl(firstAttachment)
+        const attachmentLink = await getAttachmentLinkForUrl(firstAttachment);
 
-        let location
+        let location;
         try {
-          location = parseLocationFormFields(formFields)
+          location = parseLocationFormFields(formFields);
         } catch (error) {
-          logger.error(error)
-          throw new Error("Error parsing location form fields")
+          logger.error(error);
+          throw new Error("Error parsing location form fields");
         }
 
-        let attributedTo = {} as any
+        let attributedTo = {} as any;
         if (formFields["attributedTo.name"]) {
-          attributedTo.name = formFields["attributedTo.name"]
+          attributedTo.name = formFields["attributedTo.name"];
         }
-        const attributedToUrl = first(formFields["attributedTo.url"])
+        const attributedToUrl = first(formFields["attributedTo.url"]);
         if (attributedToUrl) {
           if (!isProbablyAbsoluteUrl(attributedToUrl)) {
-            throw new Error("Invalid non-URL value for attributedTo.url: " + attributedToUrl)
+            throw new Error(
+              "Invalid non-URL value for attributedTo.url: " + attributedToUrl,
+            );
           }
-          attributedTo.url = attributedToUrl
+          attributedTo.url = attributedToUrl;
         }
         if (Object.keys(attributedTo).length === 0) {
-          attributedTo = undefined
+          attributedTo = undefined;
         }
 
-        let tag
+        let tag;
         if (formFields.tag_csv) {
-          tag = first(formFields.tag_csv).split(",").map((n: string) => {
-            return {
-              name: n.trim(),
-            }
-          })
+          tag = first(formFields.tag_csv)
+            .split(",")
+            .map((n: string) => {
+              return {
+                name: n.trim(),
+              };
+            });
         }
 
         const note: ASObject = Object.assign(
@@ -81,56 +101,78 @@ export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, external
             type: "Note",
           },
           inReplyTo ? { inReplyTo } : {},
-        )
+        );
         const unaddressedActivity: Activity = {
           "@context": "https://www.w3.org/ns/activitystreams",
           attributedTo,
-          "cc": [publicCollectionId, inReplyTo].filter(Boolean),
+          cc: [publicCollectionId, inReplyTo].filter(Boolean),
           location,
-          "object": note,
-          "type": "Create",
-        }
-
-        const addressedActivity = await clientAddressedActivity(unaddressedActivity, 0, true)
-        debuglog("addressedActivity", addressedActivity)
+          object: note,
+          type: "Create",
+        };
+        debuglog("about to await clientAddressedActivity", {
+          unaddressedActivity,
+        });
+        const addressedActivity = await clientAddressedActivity(
+          unaddressedActivity,
+          0,
+          true,
+          internalUrlRewriter(internalUrl, externalUrl),
+        );
+        debuglog("addressedActivity", addressedActivity);
         // submit to outbox
         // #TODO discover outbox URL
-        const outboxUrl = await discoverOutbox(apiUrl)
-        const postToOutboxRequest = http.request(Object.assign(url.parse(outboxUrl), {
-          headers: {
-            "content-type": ASJsonLdProfileContentType,
-          },
-          method: "post",
-        }))
-        postToOutboxRequest.write(JSON.stringify(addressedActivity))
-        const postToOutboxResponse = await sendRequest(postToOutboxRequest)
+        debuglog("about to discoverOutbox", { apiUrl });
+        const outboxUrl = await discoverOutbox(apiUrl);
+        debuglog("distbin-html/home is posting to outbox", {
+          apiUrl,
+          outboxUrl,
+        });
+        const postToOutboxRequest = http.request(
+          Object.assign(
+            url.parse(internalUrlRewriter(internalUrl, externalUrl)(outboxUrl)),
+            {
+              headers: {
+                "content-type": ASJsonLdProfileContentType,
+              },
+              method: "post",
+            },
+          ),
+        );
+        postToOutboxRequest.write(JSON.stringify(addressedActivity));
+        const postToOutboxResponse = await sendRequest(postToOutboxRequest);
         switch (postToOutboxResponse.statusCode) {
           case 201:
-            const postedLocation = postToOutboxResponse.headers.location
+            const postedLocation = postToOutboxResponse.headers.location;
             // handle form submission by posting to outbox
-            res.writeHead(302, { location: postedLocation })
-            res.end()
-            break
+            res.writeHead(302, { location: postedLocation });
+            res.end();
+            break;
           case 500:
-            res.writeHead(500)
-            postToOutboxResponse.pipe(res)
-            break
+            res.writeHead(500);
+            postToOutboxResponse.pipe(res);
+            break;
           default:
-            throw new Error("unexpected upstream response")
+            throw new Error("unexpected upstream response");
         }
-        break
+        break;
       // GET renders home page will all kinds of stuff
       case "get":
-        const query = url.parse(req.url, true).query // todo sanitize
-        const safeInReplyToDefault = encodeHtmlEntities(first(query.inReplyTo) || "")
-        const safeTitleDefault = encodeHtmlEntities(first(query.title) || "")
-        const safeAttachmentUrl = encodeHtmlEntities(first(query.attachment) || "")
+        const query = url.parse(req.url, true).query; // todo sanitize
+        const safeInReplyToDefault = encodeHtmlEntities(
+          first(query.inReplyTo) || "",
+        );
+        const safeTitleDefault = encodeHtmlEntities(first(query.title) || "");
+        const safeAttachmentUrl = encodeHtmlEntities(
+          first(query.attachment) || "",
+        );
         res.writeHead(200, {
           "content-type": "text/html",
-        })
+        });
         /* tslint:disable:max-line-length */
-        res.write(distbinBodyTemplate(`
-          ${(`
+        res.write(
+          distbinBodyTemplate({ externalUrl })(`
+          ${`
             <style>
             .post-form textarea {
               height: calc(100% - 14em - 8px); /* everything except the rest of this form */
@@ -282,7 +324,7 @@ export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, external
               contentInput.focus();
             }())
             </script>
-          `)}
+          `}
           <details>
             <summary>or POST via API</summary>
             <pre>${encodeHtmlEntities(`
@@ -297,83 +339,90 @@ curl -XPOST "${requestUrl(req)}activitypub/outbox" -d @- <<EOF
 EOF`)}
             </pre>
           </details>
-        `))
+        `),
+        );
         /* tslint:enable:max-line-length */
-        res.end()
+        res.end();
     }
-  }
-}
+  };
+};
 
-function parseLocationFormFields(formFields: {[key: string]: string|string[]}) {
+function parseLocationFormFields(formFields: {
+  [key: string]: string | string[];
+}) {
   interface ILocation {
-    type: string
-    name: string
-    units: string
-    altitude: number
-    latitude: number
-    longitude: number
-    accuracy: number
-    radius: number
+    type: string;
+    name: string;
+    units: string;
+    altitude: number;
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    radius: number;
   }
-  const location = { type: "Place" } as ILocation
-  const formFieldPrefix = "location."
-  const prefixed = (name: string) => `${formFieldPrefix}${name}`
+  const location = { type: "Place" } as ILocation;
+  const formFieldPrefix = "location.";
+  const prefixed = (name: string) => `${formFieldPrefix}${name}`;
   const floatFieldNames: Array<keyof ILocation> = [
     "latitude",
     "longitude",
     "altitude",
     "accuracy",
     "radius",
-  ]
+  ];
   if (formFields[prefixed("name")]) {
-    location.name = first(formFields["location.name"])
+    location.name = first(formFields["location.name"]);
   }
   if (formFields[prefixed("units")]) {
-    location.units = first(formFields["location.units"])
+    location.units = first(formFields["location.units"]);
   }
   floatFieldNames.forEach((k: keyof ILocation) => {
-    const fieldVal = first(formFields[prefixed(k)])
-    if (!fieldVal) { return }
-    location[k] = parseFloat(fieldVal)
-  })
+    const fieldVal = first(formFields[prefixed(k)]);
+    if (!fieldVal) {
+      return;
+    }
+    location[k] = parseFloat(fieldVal);
+  });
   if (Object.keys(location).length === 1) {
     // there were no location formFields
-    return
+    return;
   }
-  return location
+  return location;
 }
 
 async function getAttachmentLinkForUrl(attachment: string) {
   const attachmentLink: ASLink & HasLinkPrefetchResult = attachment && {
     href: attachment,
     type: "Link",
-  }
-  let linkPrefetchResult: LinkPrefetchResult
+  };
+  let linkPrefetchResult: LinkPrefetchResult;
   if (attachment && attachmentLink) {
     // try to request the URL to figure out what kind of media type it responds with
     // then we can store a hint to future clients that render it
-    let connectionError
-    let attachmentResponse
+    let connectionError;
+    let attachmentResponse;
     try {
-      attachmentResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(attachment))))
+      attachmentResponse = await sendRequest(
+        createHttpOrHttpsRequest(Object.assign(url.parse(attachment))),
+      );
     } catch (error) {
-      connectionError = error
-      logger.warn("Error prefetching attachment URL " + attachment)
-      logger.error(error)
+      connectionError = error;
+      logger.warn("Error prefetching attachment URL " + attachment);
+      logger.error(error);
     }
     if (connectionError) {
       linkPrefetchResult = new LinkPrefetchFailure({
         error: {
           message: connectionError.message,
         },
-      })
+      });
     } else if (attachmentResponse.statusCode === 200) {
-      const contentType = attachmentResponse.headers["content-type"]
+      const contentType = attachmentResponse.headers["content-type"];
       if (contentType) {
         linkPrefetchResult = new LinkPrefetchSuccess({
           published: new Date().toISOString(),
           supportedMediaTypes: [contentType],
-        })
+        });
       }
     } else {
       // no connection error, not 200, must be another
@@ -381,11 +430,11 @@ async function getAttachmentLinkForUrl(attachment: string) {
         error: {
           status: attachmentResponse.statusCode,
         },
-      })
+      });
     }
-    attachmentLink["https://distbin.com/ns/linkPrefetch"] = linkPrefetchResult
+    attachmentLink["https://distbin.com/ns/linkPrefetch"] = linkPrefetchResult;
   }
-  return attachmentLink
+  return attachmentLink;
 }
 
 // function createMoreInfo(req, apiUrl) {
