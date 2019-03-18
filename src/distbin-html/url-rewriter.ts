@@ -1,9 +1,10 @@
-import { debuglog } from "../util"
+import { debuglog } from "../util";
 
 export function internalUrlRewriter(internalUrl: string, externalUrl: string) {
-  debuglog("internalUrlRewriter", { internalUrl, externalUrl })
+  debuglog("internalUrlRewriter", { internalUrl, externalUrl });
   if (internalUrl && externalUrl) {
-    return (urlToRewrite: string) => urlToRewrite.replace(externalUrl, internalUrl)
+    return (urlToRewrite: string) =>
+      urlToRewrite.replace(externalUrl, internalUrl);
   }
-  return (urlToRewrite: string) => urlToRewrite
+  return (urlToRewrite: string) => urlToRewrite;
 }

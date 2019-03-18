@@ -8,19 +8,9 @@
     "module": "commonjs",
     "target": "es6",
     "pretty": true,
-    "lib": [
-      "es7",
-      "es2017"
-    ],
+    "lib": ["es7", "es2017"],
     "sourceMap": true
   },
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "bin/**/*.ts",
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts", "bin/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
