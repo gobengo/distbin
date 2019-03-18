@@ -15,11 +15,13 @@ import { isProbablyAbsoluteUrl } from "../util"
 import { createHttpOrHttpsRequest } from "../util"
 import { debuglog, first } from "../util"
 import { distbinBodyTemplate } from "./partials"
+import { internalUrlRewriter } from "./url-rewriter"
 
 import { createLogger } from "../logger"
 const logger = createLogger(__filename)
 
-export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) => {
+export const createHandler = (
+  { apiUrl, externalUrl, internalUrl }: {apiUrl: string, externalUrl: string, internalUrl: string}) => {
   return async (req: IncomingMessage, res: ServerResponse) => {
     switch (req.method.toLowerCase()) {
       // POST is form submission to create a new post
@@ -90,18 +92,23 @@ export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, external
           "object": note,
           "type": "Create",
         }
-
-        const addressedActivity = await clientAddressedActivity(unaddressedActivity, 0, true)
+        debuglog("about to await clientAddressedActivity", {unaddressedActivity});
+        const addressedActivity = await clientAddressedActivity(
+          unaddressedActivity, 0, true, internalUrlRewriter(internalUrl, externalUrl))
         debuglog("addressedActivity", addressedActivity)
         // submit to outbox
         // #TODO discover outbox URL
+        debuglog("about to discoverOutbox", { apiUrl })
         const outboxUrl = await discoverOutbox(apiUrl)
-        const postToOutboxRequest = http.request(Object.assign(url.parse(outboxUrl), {
-          headers: {
-            "content-type": ASJsonLdProfileContentType,
-          },
-          method: "post",
-        }))
+        debuglog("distbin-html/home is posting to outbox", {apiUrl, outboxUrl})
+        const postToOutboxRequest = http.request(
+          Object.assign(url.parse(internalUrlRewriter(internalUrl, externalUrl)(outboxUrl)), {
+            headers: {
+              "content-type": ASJsonLdProfileContentType,
+            },
+            method: "post",
+          }),
+        )
         postToOutboxRequest.write(JSON.stringify(addressedActivity))
         const postToOutboxResponse = await sendRequest(postToOutboxRequest)
         switch (postToOutboxResponse.statusCode) {
@@ -129,7 +136,7 @@ export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, external
           "content-type": "text/html",
         })
         /* tslint:disable:max-line-length */
-        res.write(distbinBodyTemplate(`
+        res.write(distbinBodyTemplate({ externalUrl })(`
           ${(`
             <style>
             .post-form textarea {

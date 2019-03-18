@@ -49,16 +49,21 @@ const flattenAnyArrays = <T= any> (arr: Array<T|T[]>): T[] => {
  * @param shouldFetch - whether to fetch related objects that are only mentioned by URL
  */
 export const objectTargets = async (
-  o: ASObject, recursionLimit: number, shouldFetch: boolean = false): Promise<ASValue[]> => {
-  // console.log('start objectTargets', recursionLimit, activity)
-  const audience = [...(await objectTargetsNoRecurse(o, shouldFetch)),
+  o: ASObject,
+  recursionLimit: number,
+  shouldFetch: boolean = false,
+  urlRewriter: (u: string) => string,
+): Promise<ASValue[]> => {
+  logger.debug("start objectTargets", recursionLimit, o)
+  const audience = [...(await objectTargetsNoRecurse(o, shouldFetch, urlRewriter)),
                     ...objectProvenanceAudience(o),
                     ...targetedAudience(o)]
-  // console.log('objectTargets got audience', audience)
+  logger.debug("objectTargets got audience", audience)
   const recursedAudience = recursionLimit
     ? flattenAnyArrays(await Promise.all(
-        audience.map(async (audienceMemberr: ASObject) => {
-                  const recursedTargets = await objectTargets(audienceMemberr, recursionLimit - 1, shouldFetch)
+        audience.map(async (audienceMember: ASObject) => {
+                  const recursedTargets = await objectTargets(
+                    audienceMember, recursionLimit - 1, shouldFetch, urlRewriter)
                   return recursedTargets
                 }),
       ))
@@ -77,6 +82,7 @@ export const objectTargets = async (
 export const objectTargetsNoRecurse = async (
   o: ASObject,
   shouldFetch: boolean = false,
+  urlRewriter: (u: string) => string,
   // relatedObjectTargetedAudience is a MAY in the spec.
   // And if you leave it on and start replying to long chains,
   // you'll end up having to deliver to every ancestor, which takes a long time in
@@ -87,7 +93,7 @@ export const objectTargetsNoRecurse = async (
   target, inReplyTo and/or tag fields, retrieve their actor or attributedTo properties,
   and MAY also retrieve their addressing properties, and add these
   to the to or cc fields of the new Activity being created. */
-  // console.log('isActivity(o)', isActivity(o), o)
+  // logger.debug('isActivity(o)', isActivity(o), o)
   const related = flattenAnyArrays([
     isActivity(o) && o.object,
     isActivity(o) && o.target,
@@ -96,18 +102,20 @@ export const objectTargetsNoRecurse = async (
     o.inReplyTo,
     o.tag,
   ]).filter(Boolean)
-  // console.log('o.related', related)
+  logger.debug("o.related", related)
   const relatedObjects = (await Promise.all(related.map(async (objOrUrl) => {
     if (typeof objOrUrl === "object") { return objOrUrl; }
     if ( ! shouldFetch) { return }
     // fetch url to get an object
     const audienceUrl: string = objOrUrl
     // need to fetch it by url
-    const res = await sendRequest(request(Object.assign(url.parse(audienceUrl), {
+    logger.debug("about to fetch for audienceUrl", { audienceUrl, rewritten: urlRewriter(audienceUrl)})
+    const res = await sendRequest(request(Object.assign(url.parse(urlRewriter(audienceUrl)), {
       headers: {
         accept: ASJsonLdProfileContentType,
       },
     })))
+    logger.debug("fetched audienceUrl", audienceUrl)
     if (res.statusCode !== 200) {
       logger.warn("got non-200 response when fetching ${obj} as part of activityAudience()")
       return
@@ -129,7 +137,7 @@ export const objectTargetsNoRecurse = async (
         return
     }
   }))).filter(Boolean)
-  // console.log('o.relatedObjects', relatedObjects)
+  // logger.debug('o.relatedObjects', relatedObjects)
 
   const relatedCreators: ASValue[] = flattenAnyArrays(relatedObjects.map(objectProvenanceAudience))
     .filter(Boolean)
@@ -168,8 +176,12 @@ export const targetedAudience = (object: ASObject|Activity) => {
  * @param activity
  */
 export const clientAddressedActivity = async (
-  activity: Activity, recursionLimit: number, shouldFetch: boolean = false): Promise<Activity> => {
-  const audience = await objectTargets(activity, recursionLimit, shouldFetch)
+  activity: Activity,
+  recursionLimit: number,
+  shouldFetch: boolean = false,
+  urlRewriter: (urlToFetch: string) => string,
+): Promise<Activity> => {
+  const audience = await objectTargets(activity, recursionLimit, shouldFetch, urlRewriter)
   const audienceIds = audience.map(getASId)
   return Object.assign({}, activity, {
     cc: Array.from(new Set(jsonldAppend(activity.cc, audienceIds))).filter(Boolean),
@@ -349,10 +361,12 @@ const deliverActivity = async (
 // target
 export const targetAndDeliver = async (
   activity: Activity,
-  targets?: string[],
-  deliverToLocalhost: boolean = true,
+  targets: string[],
+  deliverToLocalhost: boolean,
+  urlRewriter: (u: string) => string,
 ) => {
-  targets = targets ||  (await objectTargets(activity, 0))
+  logger.debug("start targetAndDeliver")
+  targets = targets ||  (await objectTargets(activity, 0, false, urlRewriter))
     .map((t) => {
       const targetUrl = getASId(t)
       if ( ! targetUrl) { logger.debug("Cant determine URL to deliver to for target, so skipping", t) }
@@ -369,7 +383,7 @@ export const targetAndDeliver = async (
         if (target === exports.publicCollectionId) {
           return Promise.resolve(target)
         }
-        return deliverActivity(activity, target, { deliverToLocalhost })
+        return deliverActivity(activity, urlRewriter(target), { deliverToLocalhost })
           .then((d) => deliveries.push(d))
           .catch((e) => failures.push(e))
       }),

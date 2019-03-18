@@ -26,6 +26,6 @@ async function main() {
     )))
   const urlBody = await readableToString(urlResponse)
   const fetchedObject = JSON.parse(urlBody)
-  const targets = objectTargets(fetchedObject, 0)
+  const targets = objectTargets(fetchedObject, 0, false, (u: string) => u)
   logger.info("", { targets })
 }

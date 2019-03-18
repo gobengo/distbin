@@ -2,20 +2,21 @@ import { requestUrl } from "../util"
 import { distbinBodyTemplate } from "./partials"
 
 import {IncomingMessage, ServerResponse} from "http"
+import { resolve as urlResolve } from "url"
 
 export const createHandler = ({ externalUrl }: {externalUrl: string}) => {
   return (req: IncomingMessage, res: ServerResponse) => {
     res.writeHead(200, {
       "content-type": "text/html",
     })
-    res.end(distbinBodyTemplate(`
+    res.end(distbinBodyTemplate({ externalUrl })(`
       ${createAboutMessage()}
-      ${createReplySection({ inReplyTo: requestUrl(req) })}
+      ${createReplySection({ externalUrl, inReplyTo: urlResolve(externalUrl, `.${req.url}`) })}
     `))
   }
 }
 
-function createReplySection({ inReplyTo }: {inReplyTo: string}) {
+function createReplySection({ inReplyTo, externalUrl }: {inReplyTo: string, externalUrl: string}) {
   return `
     <style>
     .distbin-reply-section header {
@@ -27,12 +28,12 @@ function createReplySection({ inReplyTo }: {inReplyTo: string}) {
       <header>
         <strong>reply</strong>
       </header>
-      ${createReplyForm({ inReplyTo })}
+      ${createReplyForm({ inReplyTo, externalUrl })}
     </div>
   `
 }
 
-function createReplyForm({ inReplyTo }: {inReplyTo: string}) {
+function createReplyForm({ inReplyTo, externalUrl }: {inReplyTo: string, externalUrl: string}) {
   return `
     <style>
     .post-form textarea {
@@ -56,7 +57,7 @@ function createReplyForm({ inReplyTo }: {inReplyTo: string}) {
       margin: 1em 0;
     }
     </style>
-    <form class="post-form" method="post" action="/">
+    <form class="post-form" method="post" action="${externalUrl}">
       <input name="name" type="text" placeholder="Title (optional)"></input>
       <textarea name="content" placeholder="Share your reaction, get feedback"></textarea>
       <input name="inReplyTo" type="hidden" value="${inReplyTo}"></input>

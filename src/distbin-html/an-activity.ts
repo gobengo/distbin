@@ -14,6 +14,7 @@ import { flatten } from "../util"
 import { distbinBodyTemplate } from "./partials"
 import { everyPageHead } from "./partials"
 import { sanitize } from "./sanitize"
+import { internalUrlRewriter } from "./url-rewriter"
 
 import { IncomingMessage, ServerResponse } from "http"
 import * as marked from "marked"
@@ -25,8 +26,8 @@ const logger = createLogger(__filename)
 const failedToFetch = Symbol("is this a Link that distbin failed to fetch?")
 
 // create handler to to render a single activity to a useful page
-export const createHandler = ({apiUrl, activityId, externalUrl}:
-  {apiUrl: string, activityId: string, externalUrl: string}) => {
+export const createHandler = ({apiUrl, activityId, externalUrl, internalUrl}:
+  {apiUrl: string, activityId: string, externalUrl: string, internalUrl: string}) => {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const activityUrl = apiUrl + req.url
     const activityRes = await sendRequest(createHttpOrHttpsRequest(activityUrl))
@@ -44,15 +45,21 @@ export const createHandler = ({apiUrl, activityId, externalUrl}:
         return url.resolve(activityUrl, repliesUrl)
       })
 
-    const descendants = flatten(await Promise.all(repliesUrls.map(fetchDescendants)))
+    debuglog("BEN about to fetchDescendants", { repliesUrls })
+    const descendants = flatten(await Promise.all(
+      repliesUrls.map((repliesUrl) => fetchDescendants(repliesUrl, internalUrlRewriter(internalUrl, externalUrl))),
+    ))
+    debuglog("BEN after fetchDescendants")
 
     const activity = Object.assign(activityWithoutDescendants, {
       replies: descendants,
     })
-    const ancestors = await fetchReplyAncestors(externalUrl, activity)
+    debuglog("BEN about to fetchReplyAncestors")
+    const ancestors = await fetchReplyAncestors(externalUrl, activity, internalUrlRewriter(internalUrl, externalUrl))
+    debuglog("BEN after fetchReplyAncestors")
 
-    async function fetchDescendants(repliesUrl: string) {
-      const repliesCollectionResponse = await sendRequest(createHttpOrHttpsRequest(repliesUrl))
+    async function fetchDescendants(repliesUrl: string, urlRewriter: (u: string) => string) {
+      const repliesCollectionResponse = await sendRequest(createHttpOrHttpsRequest(urlRewriter(repliesUrl)))
       if (repliesCollectionResponse.statusCode !== 200) {
         return {
           name: `Failed to fetch replies at ${repliesUrl} (code ${repliesCollectionResponse.statusCode})`,
@@ -71,7 +78,7 @@ export const createHandler = ({apiUrl, activityId, externalUrl}:
             && replies[0]
         return Object.assign(withAbsoluteUrls, {
           replies: (typeof nextRepliesUrl === "string")
-            ? await fetchDescendants(nextRepliesUrl)
+            ? await fetchDescendants(nextRepliesUrl, urlRewriter)
             : replies,
         })
       }))
@@ -100,13 +107,13 @@ export const createHandler = ({apiUrl, activityId, externalUrl}:
         </style>
       </head>
 
-      ${distbinBodyTemplate(`
-        ${renderAncestorsSection(ancestors)}
+      ${distbinBodyTemplate({ externalUrl })(`
+        ${renderAncestorsSection(ancestors, externalUrl)}
 
         <div class="primary-activity">
-          ${renderObject(activity)}
+          ${renderObject(activity, externalUrl)}
         </div>
-        ${renderDescendantsSection(ensureArray(activity.replies)[0])}
+        ${renderDescendantsSection(ensureArray(activity.replies)[0], externalUrl)}
 
         <script>
         (function () {
@@ -151,7 +158,7 @@ export const createHandler = ({apiUrl, activityId, externalUrl}:
         scrolling="no"
       ></iframe>
 */
-export const renderActivity = (activity: Activity) => renderObject(activity)
+export const renderActivity = (activity: Activity, externalUrl: string) => renderObject(activity, externalUrl)
 
 type URLString = string
 const href = (linkable: URLString|ASLink|ASObject): string => {
@@ -161,7 +168,7 @@ const href = (linkable: URLString|ASLink|ASObject): string => {
   return
 }
 
-export function renderObject(activity: ASObject) {
+export function renderObject(activity: ASObject, externalUrl: string) {
   const object = (isActivity(activity) && typeof activity.object === "object") ? activity.object : activity
   const published = object.published
   const generator = formatGenerator(activity)
@@ -255,7 +262,7 @@ export function renderObject(activity: ASObject) {
           </span>
           &nbsp;
           <span>
-            <a href="/?inReplyTo=${encodeHtmlEntities(href(activityUrl))}">reply</a>
+            <a href="${externalUrl}?inReplyTo=${encodeHtmlEntities(href(activityUrl))}">reply</a>
           </span>
           &nbsp;
           <span class="action-show-raw">
@@ -447,7 +454,7 @@ class ASObjectWithFetchedReplies extends ASObject {
   public replies: Collection<ASObjectWithFetchedReplies>
 }
 
-function renderDescendantsSection(replies: Collection<ASObjectWithFetchedReplies>) {
+function renderDescendantsSection(replies: Collection<ASObjectWithFetchedReplies>, externalUrl: string) {
   let inner = ""
   if (replies.totalItems === 0) { return "" }
   if (!replies.items && replies.name) {
@@ -456,8 +463,8 @@ function renderDescendantsSection(replies: Collection<ASObjectWithFetchedReplies
     inner = "uh... totalItems > 0 but no items included. #TODO"
   } else {
     inner = replies.items.map((a: ASObjectWithFetchedReplies) => `
-      ${renderObject(a)}
-      ${renderDescendantsSection(a.replies)}
+      ${renderObject(a, externalUrl)}
+      ${renderDescendantsSection(a.replies, externalUrl)}
     `).join("")
   }
   return `
@@ -468,7 +475,7 @@ function renderDescendantsSection(replies: Collection<ASObjectWithFetchedReplies
 }
 
 // Render a single ancestor activity
-function renderAncestor(ancestor: Activity|LinkPrefetchFailure): string {
+function renderAncestor(ancestor: Activity|LinkPrefetchFailure, externalUrl: string): string {
   if (ancestor.type === "LinkPrefetchFailure") {
     const linkFetchFailure = ancestor as LinkPrefetchFailure
     const linkHref = linkFetchFailure.link.href
@@ -479,35 +486,39 @@ function renderAncestor(ancestor: Activity|LinkPrefetchFailure): string {
       </article>
     `
   }
-  return renderObject(ancestor)
+  return renderObject(ancestor, externalUrl)
 }
 
 // Render an item and its ancestors for each ancestor in the array.
 // This results in a nested structure conducive to indent-styling
-function renderAncestorsSection(ancestors: Array<Activity|LinkPrefetchFailure> = []): string {
+function renderAncestorsSection(ancestors: Array<Activity|LinkPrefetchFailure> = [], externalUrl: string): string {
   if (!ancestors.length) { return "" }
   const [ancestor, ...olderAncestors] = ancestors
   return `
     <div class="ancestors">
-      ${olderAncestors.length ? renderAncestorsSection(olderAncestors) : ""}
-      ${renderAncestor(ancestor)}
+      ${olderAncestors.length ? renderAncestorsSection(olderAncestors, externalUrl) : ""}
+      ${renderAncestor(ancestor, externalUrl)}
     </div>
   `
 }
 
-async function fetchReplyAncestors(baseUrl: string, activity: Activity): Promise<Array<Activity|LinkPrefetchFailure>> {
-
+async function fetchReplyAncestors(
+  baseUrl: string,
+  activity: Activity,
+  urlRewriter: (u: string) => string,
+): Promise<Array<Activity|LinkPrefetchFailure>> {
   const inReplyTo = flatten(ensureArray(activity.object)
     .filter((o: object|string): o is object => typeof o === "object")
     .map((o: Activity) => ensureArray(o.inReplyTo)),
   )[0]
+  debuglog("fetchReplyAncoestors resolving", { baseUrl, href: inReplyTo && href(inReplyTo)})
   const parentUrl = inReplyTo && url.resolve(baseUrl, href(inReplyTo))
   if (!parentUrl) {
     return []
   }
   let parent: Activity
   try {
-    parent = activityWithUrlsRelativeTo(await fetchActivity(parentUrl), parentUrl)
+    parent = activityWithUrlsRelativeTo(await fetchActivity(urlRewriter(parentUrl)), parentUrl)
   } catch (err) {
     switch (err.code) {
       case "ECONNREFUSED":
@@ -525,7 +536,7 @@ async function fetchReplyAncestors(baseUrl: string, activity: Activity): Promise
     throw err
   }
   // #TODO support limiting at some reasonable amount of depth to avoid too big
-  const ancestorsOfParent = await fetchReplyAncestors(baseUrl, parent)
+  const ancestorsOfParent = await fetchReplyAncestors(baseUrl, parent, urlRewriter)
   const ancestorsOrFailures = [parent, ...ancestorsOfParent]
   return ancestorsOrFailures
 }
@@ -598,23 +609,30 @@ const isRelativeUrl = (u: string) => u && ! url.parse(u).host
 // return the activity with them made absolute URLs
 // TODO: use json-ld logic for this incl e.g. @base
 function activityWithUrlsRelativeTo(activity: Activity, relativeTo: string): Activity {
+  debuglog("activityWithUrlsRelativeTo", { activity, relativeTo })
   interface IUrlUpdates {
     replies?: typeof activity.replies,
     url?: typeof activity.url,
   }
   const updates: IUrlUpdates = {}
+  const resolveUrl = (baseUrl: string, relativeUrl: string): string => {
+    // prepend '.' to baseUrl can have subpath and not get dropped
+    const resolved = url.resolve(baseUrl, `.${relativeUrl}`)
+    debuglog("activityWithUrlsRelativeTo", { baseUrl, relativeUrl }, resolved)
+    return resolved;
+  }
   if (activity.replies) {
     updates.replies = ((replies) => {
-      if (typeof replies === "string" && isRelativeUrl(replies)) { return url.resolve(relativeTo, replies) }
+      if (typeof replies === "string" && isRelativeUrl(replies)) { return resolveUrl(relativeTo, replies) }
       return replies
     })(activity.replies)
   }
   if (activity.url) {
     updates.url = ensureArray(activity.url).map((u) => {
-      if (typeof u === "string" && isRelativeUrl(u)) { return url.resolve(relativeTo, u) }
+      if (typeof u === "string" && isRelativeUrl(u)) { return resolveUrl(relativeTo, u) }
       if (isASLink(u) && isRelativeUrl(u.href)) {
         return Object.assign({}, u, {
-          href: url.resolve(relativeTo, u.href),
+          href: resolveUrl(relativeTo, u.href),
         })
       }
       return u

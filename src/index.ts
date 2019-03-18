@@ -9,6 +9,7 @@ import {
   publicCollectionId,
   targetAndDeliver,
 } from "./activitypub"
+import { internalUrlRewriter } from "./distbin-html/url-rewriter";
 import { createLogger } from "./logger"
 import { Activity, ActivityMap, ASObject, Extendable,
          JSONLD, LDValue } from "./types"
@@ -42,21 +43,23 @@ export default function distbin({
   inboxFilter = async () => true,
   // used for delivering to other inboxes so they can find this guy
   externalUrl,
+  internalUrl,
   deliverToLocalhost = false,
 }: {
   activities?: Map<string, object>,
   inbox?: Map<string, object>,
   inboxFilter?: (obj: ASObject) => Promise<boolean>,
   externalUrl?: string,
+  internalUrl?: string,
   deliverToLocalhost?: boolean,
 }= {}) {
   return (req: IncomingMessage, res: ServerResponse) => {
-    externalUrl = externalUrl || `http://${req.headers.host}${req.url}`
+    externalUrl = externalUrl || `http://${req.headers.host}`
     let handler = route(new Map<RoutePattern, RouteResponderFactory>([
       ["/", () => index],
       ["/recent", () => recentHandler({ activities })],
       ["/activitypub/inbox", () => inboxHandler({ activities, inbox, inboxFilter, externalUrl })],
-      ["/activitypub/outbox", () => outboxHandler({ activities, externalUrl, deliverToLocalhost })],
+      ["/activitypub/outbox", () => outboxHandler({ activities, externalUrl, internalUrl, deliverToLocalhost })],
       ["/activitypub/public/page", () => publicCollectionPageHandler({ activities, externalUrl })],
       ["/activitypub/public", () => publicCollectionHandler({ activities, externalUrl })],
       // /activities/{activityUuid}.{format}
@@ -93,7 +96,7 @@ function externalizeActivityId(activityId: UrnUuid, externalUrl: ExternalUrl): E
   const uuidMatch = activityId.match(/^urn:uuid:([^$]+)$/)
   if (!uuidMatch) { throw new Error(`Couldn't determine UUID for activity with id: ${activityId}`) }
   const uuid = uuidMatch[1]
-  const activityUrl = url.resolve(externalUrl, "/activities/" + uuid)
+  const activityUrl = url.resolve(externalUrl, "./activities/" + uuid)
   return activityUrl
 }
 
@@ -110,9 +113,9 @@ const locallyHostedActivity = (activity: Extendable<Activity>, { externalUrl }: 
   const uuid = uuidMatch[1]
   // Each activity should have an ActivityPub/LDN inbox where it can receive notifications.
   // TODO should this be an inbox specific to this activity?
-  const inboxUrl = url.resolve(externalUrl, "/activitypub/inbox")
-  const activityUrl = url.resolve(externalUrl, "/activities/" + uuid)
-  const repliesUrl = url.resolve(externalUrl, "/activities/" + uuid + "/replies")
+  const inboxUrl = url.resolve(externalUrl, "./activitypub/inbox")
+  const activityUrl = url.resolve(externalUrl, "./activities/" + uuid)
+  const repliesUrl = url.resolve(externalUrl, "./activities/" + uuid + "/replies")
   return Object.assign({}, activity, {
     [owlSameAs]: jsonldAppend(activity[owlSameAs], activity.id),
     id: externalizeActivityId(activity.id, externalUrl),
@@ -213,7 +216,9 @@ function activityRepliesHandler({ activities, activityUuid, externalUrl }: {
         ).filter(Boolean)
         return inReplyTos.some((inReplyTo: ParentId) => {
           // TODO .inReplyTo could be a urn, http URL, something else?
-          const isReply = url.parse(inReplyTo).pathname === "/activities/" + activityUuid
+          const pathNameReplyCandidate = url.parse(inReplyTo).pathname
+          const pathNameOfReply = url.parse(url.resolve(externalUrl, `./activities/${activityUuid}`)).pathname
+          const isReply = pathNameReplyCandidate === pathNameOfReply
           return isReply
         })
       })
@@ -452,8 +457,9 @@ function outboxHandler({
   activities,
   // external location of distbin (used for delivery)
   externalUrl,
+  internalUrl,
   deliverToLocalhost,
-}: {activities: ActivityMap, externalUrl: string, deliverToLocalhost: boolean}) {
+}: {activities: ActivityMap, externalUrl: string, internalUrl: string, deliverToLocalhost: boolean}) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     switch (req.method.toLowerCase()) {
       case "get":
@@ -526,7 +532,8 @@ function outboxHandler({
         try {
           // Target and Deliver to other inboxes
           const activityToDeliver = locallyHostedActivity(newActivity, { externalUrl })
-          await targetAndDeliver(activityToDeliver, undefined, deliverToLocalhost)
+          await targetAndDeliver(
+            activityToDeliver, undefined, deliverToLocalhost, internalUrlRewriter(internalUrl, externalUrl))
         } catch (e) {
           debuglog("Error delivering activity other inboxes", e)
           if (e.name === "SomeDeliveriesFailed") {

@@ -1,6 +1,7 @@
 import { IncomingMessage, ServerResponse } from "http"
 import * as querystring from "querystring"
 import * as url from "url"
+import { Activity } from "../types";
 import { sendRequest } from "../util";
 import { encodeHtmlEntities } from "../util"
 import { first } from "../util"
@@ -11,20 +12,21 @@ import { linkToHref } from "../util"
 import { createActivityCss, renderActivity } from "./an-activity"
 import { distbinBodyTemplate } from "./partials"
 
-export const createHandler = ({ apiUrl }: {apiUrl: string}) => {
+export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) => {
   return async (req: IncomingMessage, res: ServerResponse) => {
     res.writeHead(200, {
       "content-type": "text/html",
     })
-    res.end(distbinBodyTemplate(`
+    res.end(distbinBodyTemplate({ externalUrl })(`
       ${await createPublicBody(req, {
         apiUrl,
+        externalUrl,
       })}
     `))
   }
 }
 
-async function createPublicBody(req: IncomingMessage, { apiUrl }: {apiUrl: string}) {
+async function createPublicBody(req: IncomingMessage, { apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) {
   const limit = requestMaxMemberCount(req) || 10
   if (typeof limit !== "number") {
     throw new Error("max-member-count must be a number")
@@ -57,12 +59,13 @@ async function createPublicBody(req: IncomingMessage, { apiUrl }: {apiUrl: strin
     page: page.next && url.resolve(pageUrl, linkToHref(page.next)),
   })
   const nextUrl = nextQuery && `?${querystring.stringify(nextQuery)}`
+  const externalPageUrl = pageUrl.replace(apiUrl, externalUrl)
   const msg = `
     <style>
       ${createActivityCss()}
     </style>
     <h2>Public Activity</h2>
-    <p>Fetched from <a href="${pageUrl}">${pageUrl}</a></p>
+    <p>Fetched from <a href="${externalPageUrl}">${externalPageUrl}</a></p>
     <details>
       <summary>{&hellip;}</summary>
       <pre><code>${
@@ -75,7 +78,9 @@ async function createPublicBody(req: IncomingMessage, { apiUrl }: {apiUrl: strin
 }</code></pre>
     </details>
     <div>
-      ${(page.orderedItems || page.items || []).map(renderActivity).join("\n")}
+      ${(page.orderedItems || page.items || [])
+        .map((activity: Activity) => renderActivity(activity, externalUrl))
+        .join("\n")}
     </div>
     <p>
     ${

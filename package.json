@@ -58,6 +58,7 @@
     "test": "ts-node test",
     "start": "node ./dist/bin/server",
     "start-dev": "tsc-watch --onSuccess 'npm start'",
+    "start:ts-node": "ts-node bin/server.ts",
     "tsc": "tsc",
     "build": "tsc && npm run build.copyfiles",
     "build.copyfiles": "copyfiles './src/**/*.json' dist/"

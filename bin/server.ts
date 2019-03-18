@@ -48,6 +48,7 @@ async function runServer() {
   }
 
   const externalUrl = distbinConfig.externalUrl || `http://localhost:${port}`
+  const internalUrl = distbinConfig.internalUrl || `http://localhost:${port}`
   const apiHandler = distbin(Object.assign(
     distbinConfig,
     ( ! distbinConfig.externalUrl ) && { externalUrl },
@@ -79,7 +80,10 @@ async function runServer() {
   }
 
   // html
-  const htmlServer = http.createServer(logMiddleware(distbinHtml.createHandler({ apiUrl: apiServerUrl, externalUrl })))
+  const htmlServer = http.createServer(logMiddleware(distbinHtml.createHandler({
+    apiUrl: apiServerUrl,
+    externalUrl,
+    internalUrl })))
   const htmlServerUrl = await listen(htmlServer)
 
   // mainServer delegates to htmlHandler or distbin api handler based on Accept header

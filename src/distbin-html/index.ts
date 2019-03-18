@@ -10,13 +10,19 @@ import {IncomingMessage, ServerResponse} from "http"
 import { createLogger } from "../logger"
 const logger = createLogger(__filename)
 
-export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, externalUrl: string}) => {
+interface IDistbinHtmlHandlerOptions {
+  apiUrl: string;
+  externalUrl: string;
+  internalUrl: string;
+}
+
+export const createHandler = ({ apiUrl, externalUrl, internalUrl }: IDistbinHtmlHandlerOptions) => {
   const routes = new Map<RoutePattern, RouteResponderFactory>([
-    [new RegExp("^/$"), () => home.createHandler({ apiUrl, externalUrl })],
+    [new RegExp("^/$"), () => home.createHandler({ apiUrl, externalUrl, internalUrl })],
     [new RegExp("^/about$"), () => about.createHandler({ externalUrl })],
-    [new RegExp("^/public$"), () => publicSection.createHandler({ apiUrl })],
+    [new RegExp("^/public$"), () => publicSection.createHandler({ apiUrl, externalUrl })],
     [new RegExp("^/activities/([^/.]+)$"),
-      (activityId: string) => anActivity.createHandler({ apiUrl, activityId, externalUrl })],
+      (activityId: string) => anActivity.createHandler({ apiUrl, activityId, externalUrl, internalUrl })],
   ])
   return (req: IncomingMessage, res: ServerResponse) => {
     const handler = route(routes, req)
@@ -25,11 +31,13 @@ export const createHandler = ({ apiUrl, externalUrl }: {apiUrl: string, external
       res.end("404 Not Found")
       return
     }
-    Promise.resolve(handler(req, res))
+    Promise.resolve((async () => {
+      return handler(req, res)
+    })())
       .catch((e) => {
         res.writeHead(500)
-        logger.error(e)
-        res.end("Error: " + e)
+        logger.error(e, e.stack)
+        res.end("Error: " + e.stack)
       })
   }
 }

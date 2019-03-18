@@ -15,3 +15,31 @@ services:
     - 80
     volumes:
     - distbin-db:/distbin-db:rw
+
+  distbin-subpath-distbin:
+    command: npm run start:ts-node
+    environment:
+    - INTERNAL_URL=http://distbin-subpath-distbin:80/
+    - EXTERNAL_URL=http://localhost:8001/distbin/
+    - NODE_DEBUG=distbin
+    - LOG_LEVEL=debug
+    # - DISTBIN_DELIVER_TO_LOCALHOST=false
+    build: .
+    networks:
+    - public
+    ports:
+    - 80
+    volumes:
+    - distbin-db:/distbin-db:rw
+    # - .:/home/distbin/app
+
+  distbin-subpath:
+    depends_on:
+    - distbin-subpath-distbin
+    image: nginx:latest
+    networks:
+    - public
+    volumes:
+    - ./etc/distbin-nginx-subpath/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 8001:80
