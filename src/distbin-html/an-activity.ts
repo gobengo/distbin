@@ -44,19 +44,13 @@ export const createHandler = ({apiUrl, activityId, externalUrl, internalUrl}:
       .map((repliesUrl: string) => {
         return url.resolve(activityUrl, repliesUrl)
       })
-
-    debuglog("BEN about to fetchDescendants", { repliesUrls })
     const descendants = flatten(await Promise.all(
       repliesUrls.map((repliesUrl) => fetchDescendants(repliesUrl, internalUrlRewriter(internalUrl, externalUrl))),
     ))
-    debuglog("BEN after fetchDescendants")
-
     const activity = Object.assign(activityWithoutDescendants, {
       replies: descendants,
     })
-    debuglog("BEN about to fetchReplyAncestors")
     const ancestors = await fetchReplyAncestors(externalUrl, activity, internalUrlRewriter(internalUrl, externalUrl))
-    debuglog("BEN after fetchReplyAncestors")
 
     async function fetchDescendants(repliesUrl: string, urlRewriter: (u: string) => string) {
       const repliesCollectionResponse = await sendRequest(createHttpOrHttpsRequest(urlRewriter(repliesUrl)))
@@ -511,7 +505,6 @@ async function fetchReplyAncestors(
     .filter((o: object|string): o is object => typeof o === "object")
     .map((o: Activity) => ensureArray(o.inReplyTo)),
   )[0]
-  debuglog("fetchReplyAncoestors resolving", { baseUrl, href: inReplyTo && href(inReplyTo)})
   const parentUrl = inReplyTo && url.resolve(baseUrl, href(inReplyTo))
   if (!parentUrl) {
     return []
@@ -542,15 +535,12 @@ async function fetchReplyAncestors(
 }
 
 async function fetchActivity(activityUrl: string) {
-  debuglog("req activity " + activityUrl)
   const activityUrlOrRedirect = activityUrl
   let activityResponse = await sendRequest(createHttpOrHttpsRequest(Object.assign(url.parse(activityUrlOrRedirect), {
     headers: {
       accept: `${ASJsonLdProfileContentType}, text/html`,
     },
   })))
-  debuglog(`res activity ${activityResponse.statusCode} ${activityUrl}`)
-
   let redirectsLeft = 3
   /* eslint-disable no-labels */
   followRedirects: while (redirectsLeft > 0) {
@@ -609,7 +599,6 @@ const isRelativeUrl = (u: string) => u && ! url.parse(u).host
 // return the activity with them made absolute URLs
 // TODO: use json-ld logic for this incl e.g. @base
 function activityWithUrlsRelativeTo(activity: Activity, relativeTo: string): Activity {
-  debuglog("activityWithUrlsRelativeTo", { activity, relativeTo })
   interface IUrlUpdates {
     replies?: typeof activity.replies,
     url?: typeof activity.url,
@@ -618,7 +607,6 @@ function activityWithUrlsRelativeTo(activity: Activity, relativeTo: string): Act
   const resolveUrl = (baseUrl: string, relativeUrl: string): string => {
     // prepend '.' to baseUrl can have subpath and not get dropped
     const resolved = url.resolve(baseUrl, `.${relativeUrl}`)
-    debuglog("activityWithUrlsRelativeTo", { baseUrl, relativeUrl }, resolved)
     return resolved;
   }
   if (activity.replies) {

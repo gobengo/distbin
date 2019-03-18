@@ -1,0 +1,39 @@
+version: "3.4"
+
+networks:
+  public: {}
+  private: {}
+
+volumes:
+  distbin-db: {}
+
+services:
+  distbin-subpath-distbin:
+    command: npm run start:ts-node
+    environment:
+    # Because with this docker networking setup, the running container cannot access EXTERNAL_URL
+    - INTERNAL_URL=http://distbin-subpath-distbin:80/
+    - EXTERNAL_URL=http://localhost:8001/distbin/
+    - NODE_DEBUG=distbin
+    - LOG_LEVEL=debug
+    # - DISTBIN_DELIVER_TO_LOCALHOST=false
+    build: ../../
+    networks:
+    - private
+    ports:
+    - 80
+    volumes:
+    - distbin-db:/distbin-db:rw
+    # - .:/home/distbin/app
+
+  distbin-subpath:
+    depends_on:
+    - distbin-subpath-distbin
+    image: nginx:latest
+    networks:
+    - public
+    - private
+    volumes:
+    - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 8001:80

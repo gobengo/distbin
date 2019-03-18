@@ -118,7 +118,7 @@ async function runServer() {
   // listen
   const mainServerUrl = await listen(mainServer, port)
   /* tslint:disable-next-line:no-console */
-  console.log(mainServerUrl)
+  console.log(externalUrl)
   // now just like listen
   await new Promise(() => {
     // pass
