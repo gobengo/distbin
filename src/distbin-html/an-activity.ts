@@ -26,12 +26,11 @@ import { distbinBodyTemplate } from "./partials";
 import { everyPageHead } from "./partials";
 import { sanitize } from "./sanitize";
 import { internalUrlRewriter } from "./url-rewriter";
-
+import * as fs from 'fs';
+import { highlightAuto } from "highlight.js"
 import { IncomingMessage, ServerResponse } from "http";
 import * as marked from "marked";
 import * as url from "url";
-import * as fs from 'fs';
-import { highlightAuto } from "highlight.js"
 
 import { createLogger } from "../logger";
 const logger = createLogger(__filename);
@@ -41,7 +40,7 @@ const failedToFetch = Symbol("is this a Link that distbin failed to fetch?");
 // Highlighting
 const highlightCss = fs.readFileSync(require.resolve('highlight.js/styles/github.css'), 'utf-8');
 marked.setOptions({
-  highlight: function (code) {
+  highlight (code) {
     return highlightAuto(code).value;
   }
 });
