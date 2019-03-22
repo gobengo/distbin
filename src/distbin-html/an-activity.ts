@@ -31,6 +31,7 @@ import { IncomingMessage, ServerResponse } from "http";
 import * as marked from "marked";
 import * as url from "url";
 import * as fs from 'fs';
+import { highlightAuto } from "highlight.js"
 
 import { createLogger } from "../logger";
 const logger = createLogger(__filename);
@@ -41,7 +42,7 @@ const failedToFetch = Symbol("is this a Link that distbin failed to fetch?");
 const highlightCss = fs.readFileSync(require.resolve('highlight.js/styles/github.css'), 'utf-8');
 marked.setOptions({
   highlight: function (code) {
-    return require('highlight.js').highlightAuto(code).value;
+    return highlightAuto(code).value;
   }
 });
 
@@ -598,7 +599,6 @@ export const createActivityCss = () => {
     code {
       background-color: rgba(0, 0, 0, 0.05);
       display: inline-block;
-      width: 100%;
     }
     ${highlightCss}
   `;
