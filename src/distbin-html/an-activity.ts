@@ -30,11 +30,20 @@ import { internalUrlRewriter } from "./url-rewriter";
 import { IncomingMessage, ServerResponse } from "http";
 import * as marked from "marked";
 import * as url from "url";
+import * as fs from 'fs';
 
 import { createLogger } from "../logger";
 const logger = createLogger(__filename);
 
 const failedToFetch = Symbol("is this a Link that distbin failed to fetch?");
+
+// Highlighting
+const highlightCss = fs.readFileSync(require.resolve('highlight.js/styles/github.css'), 'utf-8');
+marked.setOptions({
+  highlight: function (code) {
+    return require('highlight.js').highlightAuto(code).value;
+  }
+});
 
 // create handler to to render a single activity to a useful page
 export const createHandler = ({
@@ -586,6 +595,12 @@ export const createActivityCss = () => {
     .action-show-raw pre {
       color: initial
     }
+    code {
+      background-color: rgba(0, 0, 0, 0.05);
+      display: inline-block;
+      width: 100%;
+    }
+    ${highlightCss}
   `;
 };
 
