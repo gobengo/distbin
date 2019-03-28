@@ -21,28 +21,30 @@ export const createHandler = ({
   externalUrl,
   internalUrl,
 }: IDistbinHtmlHandlerOptions) => {
-  const routes = new Map<RoutePattern, RouteResponderFactory>([
-    [
-      new RegExp("^/$"),
-      () => home.createHandler({ apiUrl, externalUrl, internalUrl }),
-    ],
-    [new RegExp("^/about$"), () => about.createHandler({ externalUrl })],
-    [
-      new RegExp("^/public$"),
-      () => publicSection.createHandler({ apiUrl, externalUrl }),
-    ],
-    [
-      new RegExp("^/activities/([^/.]+)$"),
-      (activityId: string) =>
-        anActivity.createHandler({
-          activityId,
-          apiUrl,
-          externalUrl,
-          internalUrl,
-        }),
-    ],
-  ]);
   return (req: IncomingMessage, res: ServerResponse) => {
+    externalUrl = externalUrl || `http://${req.headers.host}`;
+    internalUrl = internalUrl || `http://${req.headers.host}`;
+    const routes = new Map<RoutePattern, RouteResponderFactory>([
+      [
+        new RegExp("^/$"),
+        () => home.createHandler({ apiUrl, externalUrl, internalUrl }),
+      ],
+      [new RegExp("^/about$"), () => about.createHandler({ externalUrl })],
+      [
+        new RegExp("^/public$"),
+        () => publicSection.createHandler({ apiUrl, externalUrl }),
+      ],
+      [
+        new RegExp("^/activities/([^/.]+)$"),
+        (activityId: string) =>
+          anActivity.createHandler({
+            activityId,
+            apiUrl,
+            externalUrl,
+            internalUrl,
+          }),
+      ],
+    ]);
     const handler = route(routes, req);
     if (!handler) {
       res.writeHead(404);
@@ -54,8 +56,8 @@ export const createHandler = ({
         return handler(req, res);
       })(),
     ).catch(e => {
+      logger.error(`${e.message}\n${e.stack}`);
       res.writeHead(500);
-      logger.error(e, e.stack);
       res.end("Error: " + e.stack);
     });
   };

@@ -47,8 +47,8 @@ async function runServer() {
     throw new Error("Provide required PORT environment variable to configure distbin HTTP port")
   }
 
-  const externalUrl = distbinConfig.externalUrl || `http://localhost:${port}`
-  const internalUrl = distbinConfig.internalUrl || `http://localhost:${port}`
+  const externalUrl = distbinConfig.externalUrl
+  const internalUrl = distbinConfig.internalUrl
   const apiHandler = distbin(Object.assign(
     distbinConfig,
     ( ! distbinConfig.externalUrl ) && { externalUrl },
@@ -118,8 +118,8 @@ async function runServer() {
   // listen
   const mainServerUrl = await listen(mainServer, port)
   /* tslint:disable-next-line:no-console */
-  console.log(externalUrl)
-  // now just like listen
+  console.log(externalUrl || mainServerUrl)
+  // now just listen
   await new Promise(() => {
     // pass
   })
