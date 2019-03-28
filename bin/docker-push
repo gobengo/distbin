@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+err_report() {
+    echo "Error on line $1"
+    exit 1
+}
+
+trap 'err_report $LINENO' ERR
+
+docker_image="gobengo/distbin"
+git_sha="$(git rev-parse HEAD)"
+git_tag="$(git describe --exact-match --tags $(git log -n1 --pretty='%h'))"
+
+for tag in "$git_sha" "$git_tag" "latest"; do
+  echo "building/pushing $docker_image:$tag"
+  docker build -t "$docker_image:$tag" .
+  docker push "$docker_image:$tag"
+done
