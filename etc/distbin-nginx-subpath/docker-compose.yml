@@ -25,6 +25,7 @@ services:
     volumes:
     - distbin-db:/distbin-db:rw
     # - .:/home/distbin/app
+    restart: on-failure
 
   distbin-subpath:
     depends_on:
