@@ -162,6 +162,9 @@ export const createHandler = ({
         const safeInReplyToDefault = encodeHtmlEntities(
           first(query.inReplyTo) || "",
         );
+        const safeContentDefault = encodeHtmlEntities(
+          first(query.content) || "",
+        );
         const safeTitleDefault = encodeHtmlEntities(first(query.title) || "");
         const safeAttachmentUrl = encodeHtmlEntities(
           first(query.attachment) || "",
@@ -300,7 +303,7 @@ export const createHandler = ({
             </script>
             <form class="post-form" method="post">
               <input name="name" type="text" placeholder="Title (optional)" value="${safeTitleDefault}" class="post-form-stretch"></input>
-              <textarea name="content" placeholder="Write anonymously, get feedback" class="post-form-stretch"></textarea>
+              <textarea name="content" placeholder="Write anonymously, get feedback" class="post-form-stretch">${safeContentDefault}</textarea>
               <input name="inReplyTo" type="text" placeholder="replying to another URL? (optional)" value="${safeInReplyToDefault}" class="post-form-stretch"></input>
               <details class="post-form-show-more">
                 <summary class="post-form-stretch">More</summary>
