@@ -786,6 +786,7 @@ async function fetchActivity(activityUrl: string) {
   switch (resContentType) {
     case "application/json":
     case "application/activity+json":
+    case "application/ld+json":
       const a = JSON.parse(await readableToString(activityResponse));
       // ensure there is a .url value
       return Object.assign(a, {
