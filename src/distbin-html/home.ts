@@ -2,11 +2,13 @@ import * as http from "http";
 import { IncomingMessage, ServerResponse } from "http";
 import * as querystring from "querystring";
 import * as url from "url";
+import * as createUrlRegex from "url-regex";
 import { publicCollectionId } from "../activitypub";
 import { clientAddressedActivity } from "../activitypub";
 import { discoverOutbox } from "../activitypub";
 import { ASJsonLdProfileContentType } from "../activitystreams";
 import { Activity, ASObject } from "../activitystreams";
+import { createLogger } from "../logger";
 import {
   ASLink,
   HasLinkPrefetchResult,
@@ -14,15 +16,14 @@ import {
   LinkPrefetchResult,
   LinkPrefetchSuccess,
 } from "../types";
-import { encodeHtmlEntities, readableToString, sendRequest } from "../util";
 import { requestUrl } from "../util";
 import { isProbablyAbsoluteUrl } from "../util";
 import { createHttpOrHttpsRequest } from "../util";
 import { debuglog, first } from "../util";
+import { encodeHtmlEntities, readableToString, sendRequest } from "../util";
 import { distbinBodyTemplate } from "./partials";
 import { internalUrlRewriter } from "./url-rewriter";
 
-import { createLogger } from "../logger";
 const logger = createLogger(__filename);
 
 export const createHandler = ({
@@ -113,12 +114,26 @@ export const createHandler = ({
         debuglog("about to await clientAddressedActivity", {
           unaddressedActivity,
         });
-        const addressedActivity = await clientAddressedActivity(
-          unaddressedActivity,
-          0,
-          true,
-          internalUrlRewriter(internalUrl, externalUrl),
-        );
+        const addressedActivity = await (async () => {
+          const withClientAddresssing = await clientAddressedActivity(
+            unaddressedActivity,
+            0,
+            true,
+            internalUrlRewriter(internalUrl, externalUrl),
+          );
+          return {
+            ...withClientAddresssing,
+            bcc: [
+              ...(Array.isArray(withClientAddresssing.bcc)
+                  ? withClientAddresssing.bcc
+                  : [withClientAddresssing.bcc].filter(Boolean)
+              ),
+              // Add to bcc any absolute URLs in the content
+              ...(note.content.match(createUrlRegex()) || []),
+            ]
+          }
+        })();
+
         debuglog("addressedActivity", addressedActivity);
         // submit to outbox
         // #TODO discover outbox URL

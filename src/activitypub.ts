@@ -5,6 +5,7 @@ import { get } from "lodash";
 import * as parseLinkHeader from "parse-link-header";
 import * as url from "url";
 import { UrlObject } from "url";
+import * as createUrlRegex from "url-regex";
 import { ASJsonLdProfileContentType } from "./activitystreams";
 import {
   activitySubtypes,
@@ -483,9 +484,10 @@ export const targetAndDeliver = async (
   targets: string[],
   deliverToLocalhost: boolean,
   urlRewriter: (u: string) => string,
+  modifyTargets: (targets: string[]) => string[] = (ts) => ts,
 ) => {
   logger.debug("start targetAndDeliver");
-  targets =
+  targets = modifyTargets(
     targets ||
     (await objectTargets(activity, 0, false, urlRewriter))
       .map(t => {
@@ -498,7 +500,8 @@ export const targetAndDeliver = async (
         }
         return targetUrl;
       })
-      .filter(Boolean);
+      .filter(Boolean)
+  );
   logger.debug("targetAndDeliver targets", targets);
   const deliveries: string[] = [];
   const failures: Error[] = [];

@@ -30,6 +30,7 @@
     "node-uuid": "^1.4.7",
     "parse-link-header": "^0.4.1",
     "portfinder": "^1.0.13",
+    "url-regex": "^5.0.0",
     "uuid": "^3.1.0",
     "winston": "^2.4.0"
   },
