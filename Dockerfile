@@ -3,7 +3,8 @@ FROM debian:jessie-slim
 RUN apt-get update --fix-missing && apt-get -y --no-install-recommends install \
     ca-certificates \
     curl \
-    sudo
+    sudo \
+    rsync
 
 # install node.js
 RUN curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
