@@ -180,6 +180,9 @@ export const createHandler = ({
         const safeContentDefault = encodeHtmlEntities(
           first(query.content) || "",
         );
+        const safeAttributedToNameDefault = encodeHtmlEntities(
+          first(query['attributedTo.name']) || "",
+        );
         const safeTitleDefault = encodeHtmlEntities(first(query.title) || "");
         const safeAttachmentUrl = encodeHtmlEntities(
           first(query.attachment) || "",
@@ -322,7 +325,7 @@ export const createHandler = ({
               <input name="inReplyTo" type="text" placeholder="replying to another URL? (optional)" value="${safeInReplyToDefault}" class="post-form-stretch"></input>
               <details class="post-form-show-more">
                 <summary class="post-form-stretch">More</summary>
-                <input name="attributedTo.name" type="text" placeholder="What's your name? (optional)" class="post-form-stretch"></input>
+                <input name="attributedTo.name" type="text" placeholder="What's your name? (optional)" class="post-form-stretch" value="${safeAttributedToNameDefault}"></input>
                 <input name="attributedTo.url" type="text" placeholder="What's your URL? (optional)" class="post-form-stretch"></input>
                 <input name="attachment" type="text" placeholder="Attachment URL (optional)" class="post-form-stretch" value="${safeAttachmentUrl}"></input>
                 <input name="tag_csv" type="text" placeholder="Tags (comma-separated, optional)" class="post-form-stretch"></input>
