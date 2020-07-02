@@ -9,6 +9,9 @@ volumes:
 services:
   distbin:
     build: .
+    environment:
+    - NODE_DEBUG=distbin
+    - LOG_LEVEL=debug
     networks:
     - public
     ports:

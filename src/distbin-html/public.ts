@@ -1,6 +1,7 @@
 import { IncomingMessage, ServerResponse } from "http";
 import * as querystring from "querystring";
 import * as url from "url";
+import { createLogger } from "../logger";
 import { Activity } from "../types";
 import { sendRequest } from "../util";
 import { encodeHtmlEntities } from "../util";
@@ -11,6 +12,8 @@ import { createHttpOrHttpsRequest } from "../util";
 import { linkToHref } from "../util";
 import { createActivityCss, renderActivity } from "./an-activity";
 import { distbinBodyTemplate } from "./partials";
+
+const log = createLogger('distbin-html/public')
 
 export const createHandler = ({
   apiUrl,
@@ -81,7 +84,8 @@ async function createPublicBody(
       page: page.next && url.resolve(pageUrl, linkToHref(page.next)),
     });
   const nextUrl = nextQuery && `?${querystring.stringify(nextQuery)}`;
-  const externalPageUrl = pageUrl.replace(apiUrl, externalUrl);
+  log.debug('creating externalPageUrl', { externalUrl, pageUrl })
+  const externalPageUrl = url.resolve(externalUrl, `.${url.parse(pageUrl).path}`)
   const msg = `
     <style>
       ${createActivityCss()}

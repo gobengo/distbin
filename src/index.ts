@@ -63,6 +63,7 @@ export default function distbin({
 } = {}) {
   return (req: IncomingMessage, res: ServerResponse) => {
     externalUrl = externalUrl || `http://${req.headers.host}`;
+    internalUrl = internalUrl || `http://${req.headers.host}`;
     let handler = route(
       new Map<RoutePattern, RouteResponderFactory>([
         ["/", () => index],
